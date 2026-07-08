@@ -508,19 +508,17 @@
             </div>
             <label>
               Correo
-              <input id="loginEmail" type="email" placeholder="pablo.ramos@lg-taskhub.local" required />
+              <input id="loginEmail" type="email" placeholder="correo@empresa.com" autocomplete="username" required />
             </label>
             <label>
               Clave
-              <input id="loginPassword" type="password" placeholder="Clave de acceso" required />
+              <input id="loginPassword" type="password" placeholder="Clave de acceso" autocomplete="current-password" required />
             </label>
             <button class="primary" type="submit">Entrar</button>
-            <button id="quickCoordinator" class="ghost" type="button">Entrar como Pablo Ramos</button>
             <p id="loginMessage" class="message" aria-live="polite"></p>
             <div class="note">
-              <strong>Coordinador inicial</strong>
-              <p class="muted">Pablo Ramos puede aprobar trainers y asignar tareas.</p>
-              <p>Correo: <strong>pablo.ramos@lg-taskhub.local</strong><br />Clave: <strong>Pablo2026</strong></p>
+              <strong>Tipos de acceso</strong>
+              <p class="muted">El coordinador puede crear formularios, asignar tareas, revisar fotos y dar seguimiento. Los trainers pueden revisar tareas, llenar formularios, subir fotos y comentar avances.</p>
             </div>
           </form>
 
@@ -1001,7 +999,6 @@
         loginForm: document.querySelector("#loginForm"),
         loginEmail: document.querySelector("#loginEmail"),
         loginPassword: document.querySelector("#loginPassword"),
-        quickCoordinator: document.querySelector("#quickCoordinator"),
         loginMessage: document.querySelector("#loginMessage"),
         registrationForm: document.querySelector("#registrationForm"),
         regName: document.querySelector("#regName"),
@@ -1265,7 +1262,7 @@
         els.taskList.innerHTML = "";
 
         if (!tasks.length) {
-          els.taskList.innerHTML = emptyState("No hay tareas para mostrar", isCoordinator() ? "Asigna una tarea nueva a un trainer." : "Cuando Pablo Ramos te asigne una tarea aparecera aqui.");
+          els.taskList.innerHTML = emptyState("No hay tareas para mostrar", isCoordinator() ? "Asigna una tarea nueva a un trainer." : "Cuando el coordinador te asigne una tarea aparecera aqui.");
           return;
         }
 
@@ -1664,12 +1661,6 @@
           render();
         });
 
-        els.quickCoordinator.addEventListener("click", () => {
-          els.loginEmail.value = "pablo.ramos@lg-taskhub.local";
-          els.loginPassword.value = "Pablo2026";
-          els.loginForm.requestSubmit();
-        });
-
         els.registrationForm.addEventListener("submit", (event) => {
           event.preventDefault();
           const email = clean(els.regEmail.value).toLowerCase();
@@ -1689,7 +1680,7 @@
           });
           saveState();
           els.registrationForm.reset();
-          setMessage(els.registrationMessage, "Solicitud enviada. Pablo Ramos debe aprobarla.", "ok");
+          setMessage(els.registrationMessage, "Solicitud enviada. El coordinador debe aprobarla.", "ok");
         });
 
         els.logoutButton.addEventListener("click", () => {
