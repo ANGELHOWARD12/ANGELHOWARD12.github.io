@@ -324,6 +324,89 @@
         grid-template-columns: minmax(0, 1fr) auto;
       }
 
+      .week-toolbar {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: space-between;
+      }
+
+      .week-grid {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(7, minmax(150px, 1fr));
+      }
+
+      .day-column {
+        background: #f8fbff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        min-height: 260px;
+        padding: 10px;
+      }
+
+      .day-column.today {
+        border-color: var(--blue);
+        box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.18);
+      }
+
+      .day-head {
+        display: grid;
+        gap: 4px;
+        margin-bottom: 10px;
+      }
+
+      .day-head strong {
+        font-size: 14px;
+      }
+
+      .day-stats {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .mini-task {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        display: grid;
+        gap: 8px;
+        margin-top: 8px;
+        padding: 10px;
+      }
+
+      .mini-task h3 {
+        font-size: 14px;
+        line-height: 1.25;
+      }
+
+      .mini-task .meta {
+        display: grid;
+        gap: 4px;
+      }
+
+      .reassign-box {
+        align-items: center;
+        display: grid;
+        gap: 8px;
+        grid-template-columns: minmax(145px, 1fr) auto;
+        width: min(100%, 380px);
+      }
+
+      .cloud-path {
+        background: #f8fbff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--muted);
+        font-family: Consolas, "Courier New", monospace;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+        padding: 10px;
+      }
+
       .title-row,
       .meta,
       .actions {
@@ -456,7 +539,8 @@
 
       @media (max-width: 1060px) {
         .dashboard,
-        .two-col {
+        .two-col,
+        .week-grid {
           grid-template-columns: 1fr;
         }
 
@@ -611,6 +695,22 @@
       </nav>
 
       <section id="tasksView" class="view active">
+        <section id="coordinatorWeekPanel" class="panel stack">
+          <div class="week-toolbar">
+            <div>
+              <h2>Calendario semanal del coordinador</h2>
+              <p class="muted">Vista por dia, trainer y estado para mover la operacion de la semana.</p>
+            </div>
+            <div class="actions">
+              <button id="prevWeek" class="small" type="button">Semana anterior</button>
+              <button id="todayWeek" class="small" type="button">Hoy</button>
+              <button id="nextWeek" class="small" type="button">Semana siguiente</button>
+            </div>
+          </div>
+          <strong id="weekLabel"></strong>
+          <div id="weeklySummary" class="week-grid"></div>
+        </section>
+
         <div class="two-col">
           <section id="coordinatorTaskPanel" class="panel stack">
             <div>
@@ -676,6 +776,7 @@
                   <option value="En revision">En revision</option>
                   <option value="Cumplida">Cumplidas</option>
                   <option value="Observada">Observadas</option>
+                  <option value="No disponible">No disponibles</option>
                 </select>
               </label>
               <label id="trainerFilterWrap">
@@ -733,6 +834,12 @@
             <div>
               <h2>Sustentos recibidos</h2>
               <p class="muted">Pablo aprueba u observa los sustentos enviados.</p>
+            </div>
+            <div id="cloudPlanPanel" class="note">
+              <strong>Orden para Microsoft 365</strong>
+              <p class="muted">Cuando conectemos la nube, cada sustento se guardara asi:</p>
+              <div class="cloud-path">LG Task Hub / Sustentos / fecha / trainer / tarea</div>
+              <p class="muted">Esto deja fotos y formularios separados por nombre de trainer y fecha.</p>
             </div>
             <div id="evidenceList" class="list"></div>
           </aside>
@@ -913,6 +1020,7 @@
         version: 3,
         activeUserId: "",
         selectedProduct: "oled",
+        selectedWeekStart: "",
         users: [],
         registrationRequests: [],
         tasks: [],
@@ -1016,6 +1124,12 @@
         reviewCount: document.querySelector("#reviewCount"),
         doneCount: document.querySelector("#doneCount"),
         trainerCount: document.querySelector("#trainerCount"),
+        coordinatorWeekPanel: document.querySelector("#coordinatorWeekPanel"),
+        prevWeek: document.querySelector("#prevWeek"),
+        todayWeek: document.querySelector("#todayWeek"),
+        nextWeek: document.querySelector("#nextWeek"),
+        weekLabel: document.querySelector("#weekLabel"),
+        weeklySummary: document.querySelector("#weeklySummary"),
         coordinatorTaskPanel: document.querySelector("#coordinatorTaskPanel"),
         taskForm: document.querySelector("#taskForm"),
         taskTitle: document.querySelector("#taskTitle"),
@@ -1038,6 +1152,7 @@
         evidencePhoto: document.querySelector("#evidencePhoto"),
         evidenceNotes: document.querySelector("#evidenceNotes"),
         evidenceMessage: document.querySelector("#evidenceMessage"),
+        cloudPlanPanel: document.querySelector("#cloudPlanPanel"),
         evidenceList: document.querySelector("#evidenceList"),
         coordinatorTeamPanel: document.querySelector("#coordinatorTeamPanel"),
         createTrainerForm: document.querySelector("#createTrainerForm"),
@@ -1087,6 +1202,7 @@
         nextState.tasks = nextState.tasks || [];
         nextState.announcements = nextState.announcements || [];
         nextState.supportRequests = nextState.supportRequests || [];
+        nextState.selectedWeekStart = nextState.selectedWeekStart || weekStartIso(todayIso);
         return nextState;
       }
 
@@ -1150,6 +1266,7 @@
       function taskStatusClass(status) {
         if (status === "Cumplida") return "approved";
         if (status === "Observada") return "observed";
+        if (status === "No disponible") return "observed";
         if (status === "En revision") return "review";
         if (status === "En proceso") return "process";
         return "pending";
@@ -1166,6 +1283,10 @@
         return new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "short" }).format(new Date(`${dateValue}T12:00:00`));
       }
 
+      function formatShortDate(dateValue) {
+        return new Intl.DateTimeFormat("es-PE", { weekday: "short", day: "2-digit", month: "short" }).format(new Date(`${dateValue}T12:00:00`));
+      }
+
       function formatDateTime(value) {
         return new Intl.DateTimeFormat("es-PE", {
           day: "2-digit",
@@ -1173,6 +1294,38 @@
           hour: "2-digit",
           minute: "2-digit"
         }).format(new Date(value));
+      }
+
+      function addDaysIso(dateValue, days) {
+        const date = new Date(`${dateValue}T12:00:00`);
+        date.setDate(date.getDate() + days);
+        return date.toISOString().slice(0, 10);
+      }
+
+      function weekStartIso(dateValue) {
+        const date = new Date(`${dateValue}T12:00:00`);
+        const day = date.getDay() || 7;
+        date.setDate(date.getDate() - day + 1);
+        return date.toISOString().slice(0, 10);
+      }
+
+      function selectedWeekDates() {
+        const start = state.selectedWeekStart || weekStartIso(todayIso);
+        return Array.from({ length: 7 }, (_, index) => addDaysIso(start, index));
+      }
+
+      function folderSafe(value) {
+        return clean(value)
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[\\/:*?"<>|#%{}~&]/g, "-")
+          .replace(/\s+/g, " ")
+          .slice(0, 70) || "sin-dato";
+      }
+
+      function cloudFolderForEvidence(evidence, task) {
+        const date = new Date(evidence.submittedAt || Date.now()).toISOString().slice(0, 10);
+        return `LG Task Hub / Sustentos / ${date} / ${folderSafe(userName(evidence.submittedById))} / ${folderSafe(task.title)}`;
       }
 
       function emptyState(title, detail) {
@@ -1197,13 +1350,16 @@
         }).format(new Date());
 
         els.coordinatorTaskPanel.classList.toggle("hidden", !isCoordinator());
+        els.coordinatorWeekPanel.classList.toggle("hidden", !isCoordinator());
         els.trainerFilterWrap.classList.toggle("hidden", !isCoordinator());
         els.coordinatorTeamPanel.classList.toggle("hidden", !isCoordinator());
         els.backupTools.classList.toggle("hidden", !isCoordinator());
         els.coordinatorAnnouncementPanel.classList.toggle("hidden", !isCoordinator());
+        els.cloudPlanPanel.classList.toggle("hidden", !isCoordinator());
 
         refreshSelects();
         renderDashboard();
+        renderWeeklyCalendar();
         renderTasks();
         renderEvidence();
         renderTeam();
@@ -1224,7 +1380,7 @@
         fillSelect(els.supportTo, otherUsers, els.supportTo.value);
 
         const availableTasks = state.tasks
-          .filter((task) => !isCoordinator() && task.ownerId === state.activeUserId && task.status !== "Cumplida")
+          .filter((task) => !isCoordinator() && task.ownerId === state.activeUserId && task.status !== "Cumplida" && task.status !== "No disponible")
           .map((task) => ({ value: task.id, label: `${task.title} (${formatDate(task.dueDate)})` }));
         fillSelect(els.evidenceTask, availableTasks, els.evidenceTask.value);
         els.taskDueDate.value = els.taskDueDate.value || todayIso;
@@ -1243,11 +1399,154 @@
           .sort((a, b) => b.createdAt - a.createdAt);
       }
 
+      function trainerWorkloadOnDate(trainerId, dateValue, excludeTaskId = "") {
+        return state.tasks.filter((task) => {
+          if (task.id === excludeTaskId) return false;
+          if (task.ownerId !== trainerId || task.dueDate !== dateValue) return false;
+          return task.status !== "Cumplida" && task.status !== "No disponible";
+        }).length;
+      }
+
+      function availableTrainersForTask(task) {
+        return trainers()
+          .filter((trainer) => trainer.id !== task.ownerId)
+          .map((trainer) => ({
+            ...trainer,
+            workload: trainerWorkloadOnDate(trainer.id, task.dueDate, task.id)
+          }))
+          .sort((a, b) => a.workload - b.workload || a.name.localeCompare(b.name));
+      }
+
+      function reassignTask(taskId, newOwnerId) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        const nextOwner = state.users.find((user) => user.id === newOwnerId);
+        if (!task || !nextOwner || !isCoordinator()) return;
+        const previousOwnerId = task.ownerId;
+        task.history = task.history || [];
+        task.history.push({
+          type: "Reasignacion",
+          fromId: previousOwnerId,
+          toId: newOwnerId,
+          reason: task.blockedReason || "Reasignacion operativa del coordinador",
+          byId: state.activeUserId,
+          at: Date.now()
+        });
+        task.ownerId = newOwnerId;
+        task.status = "Pendiente";
+        task.blockedReason = "";
+        task.blockedAt = "";
+        saveState();
+        render();
+      }
+
+      function renderReassignControl(container, task) {
+        const options = availableTrainersForTask(task);
+        if (!options.length) return;
+        const box = document.createElement("div");
+        box.className = "reassign-box";
+        const select = document.createElement("select");
+        options.forEach((trainer) => {
+          const option = document.createElement("option");
+          option.value = trainer.id;
+          option.textContent = `${trainer.name} (${trainer.workload} tareas ese dia)`;
+          select.appendChild(option);
+        });
+        const button = document.createElement("button");
+        button.className = "small";
+        button.type = "button";
+        button.textContent = "Reasignar";
+        button.addEventListener("click", () => reassignTask(task.id, select.value));
+        box.append(select, button);
+        container.appendChild(box);
+      }
+
+      function markTaskBlocked(taskId) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        if (!task || isCoordinator()) return;
+        document.querySelector('[data-view="evidenceView"]').click();
+        els.evidenceTask.value = task.id;
+        els.evidenceResult.value = "No se pudo cumplir";
+        els.evidenceNotes.focus();
+        setMessage(els.evidenceMessage, "Escribe el motivo. Pablo vera este feedback para reasignar o dar seguimiento.", "err");
+      }
+
+      function focusTaskFormForDate(dateValue) {
+        els.taskDueDate.value = dateValue;
+        els.taskTitle.focus();
+        setMessage(els.taskMessage, `Nueva tarea para ${formatDate(dateValue)}. Completa titulo y trainer.`, "ok");
+      }
+
+      function renderWeeklyCalendar() {
+        if (!isCoordinator()) return;
+        const days = selectedWeekDates();
+        els.weekLabel.textContent = `${formatShortDate(days[0])} - ${formatShortDate(days[6])}`;
+        els.weeklySummary.innerHTML = "";
+
+        days.forEach((day) => {
+          const tasks = state.tasks
+            .filter((task) => task.dueDate === day)
+            .sort((a, b) => userName(a.ownerId).localeCompare(userName(b.ownerId)) || a.createdAt - b.createdAt);
+          const done = tasks.filter((task) => task.status === "Cumplida").length;
+          const blocked = tasks.filter((task) => task.status === "No disponible").length;
+          const column = document.createElement("article");
+          column.className = `day-column ${day === todayIso ? "today" : ""}`;
+          column.innerHTML = `
+            <div class="day-head">
+              <strong>${formatShortDate(day)}</strong>
+              <div class="day-stats">
+                <span class="pill">${tasks.length} tareas</span>
+                <span class="pill approved">${done} ok</span>
+                ${blocked ? `<span class="pill observed">${blocked} bloqueo</span>` : ""}
+              </div>
+            </div>
+            <button class="small" type="button" data-new-task="${day}">Agregar tarea</button>
+            <div class="day-tasks"></div>
+          `;
+          column.querySelector("[data-new-task]").addEventListener("click", () => focusTaskFormForDate(day));
+          const taskWrap = column.querySelector(".day-tasks");
+
+          if (!tasks.length) {
+            taskWrap.innerHTML = `<div class="empty"><strong>Libre</strong><p>Sin tareas programadas.</p></div>`;
+          } else {
+            tasks.forEach((task) => {
+              const mini = document.createElement("div");
+              mini.className = "mini-task";
+              mini.innerHTML = `
+                <div class="title-row">
+                  <h3>${escapeHtml(task.title)}</h3>
+                  <span class="pill ${taskStatusClass(task.status)}">${escapeHtml(task.status)}</span>
+                </div>
+                <div class="meta">
+                  <span>${escapeHtml(userName(task.ownerId))}</span>
+                  <span>${escapeHtml(task.category)}${task.product ? ` | ${escapeHtml(task.product)}` : ""}</span>
+                  ${task.blockedReason ? `<span>Motivo: ${escapeHtml(task.blockedReason)}</span>` : ""}
+                </div>
+                <div class="actions"></div>
+              `;
+              const actions = mini.querySelector(".actions");
+              renderReassignControl(actions, task);
+              const deleteButton = document.createElement("button");
+              deleteButton.className = "small";
+              deleteButton.type = "button";
+              deleteButton.textContent = "Eliminar";
+              deleteButton.addEventListener("click", () => {
+                state.tasks = state.tasks.filter((item) => item.id !== task.id);
+                saveState();
+                render();
+              });
+              actions.appendChild(deleteButton);
+              taskWrap.appendChild(mini);
+            });
+          }
+          els.weeklySummary.appendChild(column);
+        });
+      }
+
       function renderDashboard() {
         const tasks = relevantTasks();
         const done = tasks.filter((task) => task.status === "Cumplida").length;
         const review = tasks.filter((task) => task.status === "En revision").length;
-        const pending = tasks.filter((task) => task.status === "Pendiente" || task.status === "En proceso" || task.status === "Observada").length;
+        const pending = tasks.filter((task) => task.status === "Pendiente" || task.status === "En proceso" || task.status === "Observada" || task.status === "No disponible").length;
         const percent = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
         els.progressPercent.textContent = `${percent}%`;
         els.progressBar.style.width = `${percent}%`;
@@ -1284,6 +1583,12 @@
                 ${task.product ? `<span>Producto: ${escapeHtml(task.product)}</span>` : ""}
               </div>
               ${task.description ? `<p>${escapeHtml(task.description)}</p>` : ""}
+              ${task.blockedReason ? `<div class="note"><strong>No puede cumplir:</strong><p class="muted">${escapeHtml(task.blockedReason)}${task.blockedAt ? ` | ${formatDateTime(task.blockedAt)}` : ""}</p></div>` : ""}
+              ${
+                task.history?.length
+                  ? `<div class="note"><strong>Ultimo movimiento:</strong><p class="muted">${escapeHtml(task.history.at(-1).type)}${task.history.at(-1).toId ? ` a ${escapeHtml(userName(task.history.at(-1).toId))}` : ""} | ${formatDateTime(task.history.at(-1).at)}</p></div>`
+                  : ""
+              }
               ${
                 latestEvidence
                   ? `<div class="note"><strong>Ultimo sustento:</strong><p class="muted">${escapeHtml(latestEvidence.result)} | ${escapeHtml(latestEvidence.store)} | ${formatDateTime(latestEvidence.submittedAt)}</p></div>`
@@ -1307,7 +1612,7 @@
             actions.appendChild(startButton);
           }
 
-          if (!isCoordinator() && task.status !== "Cumplida") {
+          if (!isCoordinator() && task.status !== "Cumplida" && task.status !== "No disponible") {
             const evidenceButton = document.createElement("button");
             evidenceButton.className = "small";
             evidenceButton.type = "button";
@@ -1318,6 +1623,15 @@
               els.evidenceStore.focus();
             });
             actions.appendChild(evidenceButton);
+          }
+
+          if (!isCoordinator() && task.status !== "Cumplida" && task.status !== "En revision" && task.status !== "No disponible") {
+            const blockedButton = document.createElement("button");
+            blockedButton.className = "small";
+            blockedButton.type = "button";
+            blockedButton.textContent = "No puedo cumplir";
+            blockedButton.addEventListener("click", () => markTaskBlocked(task.id));
+            actions.appendChild(blockedButton);
           }
 
           if (isCoordinator() && task.status === "En revision") {
@@ -1336,6 +1650,7 @@
           }
 
           if (isCoordinator()) {
+            renderReassignControl(actions, task);
             const deleteButton = document.createElement("button");
             deleteButton.className = "small";
             deleteButton.type = "button";
@@ -1393,6 +1708,7 @@
             </div>
             ${entry.product ? `<p><strong>Producto:</strong> ${escapeHtml(entry.product)}</p>` : ""}
             ${entry.notes ? `<p>${escapeHtml(entry.notes)}</p>` : ""}
+            <div class="cloud-path">${escapeHtml(entry.cloudPath || cloudFolderForEvidence(entry, entry.task))}</div>
             ${entry.photoData ? `<img class="evidence-photo" src="${entry.photoData}" alt="Foto de sustento" />` : ""}
           `;
 
@@ -1727,6 +2043,24 @@
           });
         });
 
+        els.prevWeek.addEventListener("click", () => {
+          state.selectedWeekStart = addDaysIso(state.selectedWeekStart || weekStartIso(todayIso), -7);
+          saveState();
+          render();
+        });
+
+        els.todayWeek.addEventListener("click", () => {
+          state.selectedWeekStart = weekStartIso(todayIso);
+          saveState();
+          render();
+        });
+
+        els.nextWeek.addEventListener("click", () => {
+          state.selectedWeekStart = addDaysIso(state.selectedWeekStart || weekStartIso(todayIso), 7);
+          saveState();
+          render();
+        });
+
         els.taskForm.addEventListener("submit", (event) => {
           event.preventDefault();
           if (!els.taskOwner.value) {
@@ -1745,6 +2079,7 @@
             description: clean(els.taskDescription.value),
             status: "Pendiente",
             createdAt: Date.now(),
+            history: [],
             evidence: []
           });
           saveState();
@@ -1764,24 +2099,48 @@
             setMessage(els.evidenceMessage, "No hay tarea seleccionada.", "err");
             return;
           }
+          const notes = clean(els.evidenceNotes.value);
+          if (els.evidenceResult.value === "No se pudo cumplir" && !notes) {
+            setMessage(els.evidenceMessage, "Explica el motivo para que el coordinador pueda reasignar o dar seguimiento.", "err");
+            return;
+          }
           setMessage(els.evidenceMessage, "Procesando sustento...", "");
           const photoData = await compressImage(els.evidencePhoto.files[0]);
-          task.evidence = task.evidence || [];
-          task.evidence.push({
+          const evidence = {
             id: id(),
             submittedById: state.activeUserId,
             submittedAt: Date.now(),
             store: clean(els.evidenceStore.value),
             product: clean(els.evidenceProduct.value),
             result: els.evidenceResult.value,
-            notes: clean(els.evidenceNotes.value),
+            notes,
             photoData,
             review: "Pendiente"
-          });
-          task.status = "En revision";
+          };
+          evidence.cloudPath = cloudFolderForEvidence(evidence, task);
+          task.evidence = task.evidence || [];
+          task.evidence.push(evidence);
+          if (els.evidenceResult.value === "No se pudo cumplir") {
+            task.status = "No disponible";
+            task.blockedReason = notes;
+            task.blockedAt = Date.now();
+            task.history = task.history || [];
+            task.history.push({
+              type: "Bloqueo",
+              fromId: state.activeUserId,
+              reason: notes,
+              at: Date.now()
+            });
+          } else {
+            task.status = "En revision";
+          }
           saveState();
           els.evidenceForm.reset();
-          setMessage(els.evidenceMessage, "Sustento enviado. Queda pendiente de revision del coordinador.", "ok");
+          setMessage(
+            els.evidenceMessage,
+            evidence.result === "No se pudo cumplir" ? "Feedback enviado. La tarea queda disponible para reasignacion del coordinador." : "Sustento enviado. Queda pendiente de revision del coordinador.",
+            "ok"
+          );
           render();
         });
 
