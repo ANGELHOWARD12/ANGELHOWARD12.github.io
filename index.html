@@ -1,0 +1,2152 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LG Task Hub</title>
+    <style>
+:root {
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface-strong: #eef4ff;
+  --ink: #172033;
+  --muted: #667085;
+  --line: #d9e1ec;
+  --blue: #2563eb;
+  --blue-dark: #1e40af;
+  --green: #0f8a5f;
+  --green-soft: #dff7ed;
+  --red: #c8333b;
+  --red-soft: #ffe8ea;
+  --yellow: #9a6a00;
+  --yellow-soft: #fff4d7;
+  --shadow: 0 12px 30px rgba(23, 32, 51, 0.08);
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+  font-size: 15px;
+}
+
+.login-screen {
+  align-items: center;
+  display: none;
+  min-height: 100vh;
+  padding: 28px clamp(14px, 4vw, 40px);
+}
+
+.login-screen.is-active {
+  display: flex;
+}
+
+.login-card {
+  margin: 0 auto;
+  max-width: 980px;
+  width: 100%;
+}
+
+.login-brand {
+  margin-bottom: 18px;
+}
+
+.login-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.login-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.form-message {
+  color: var(--muted);
+  margin: 0;
+  min-height: 20px;
+}
+
+.form-message.success {
+  color: var(--green);
+  font-weight: 700;
+}
+
+.form-message.error {
+  color: var(--red);
+  font-weight: 700;
+}
+
+.compact-note {
+  margin-top: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.topbar {
+  align-items: center;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  min-height: 78px;
+  padding: 14px clamp(16px, 4vw, 40px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.brand {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+}
+
+.brand-mark {
+  align-items: center;
+  background: #b91c35;
+  border-radius: 8px;
+  color: #fff;
+  display: inline-flex;
+  font-weight: 800;
+  height: 44px;
+  justify-content: center;
+  letter-spacing: 0;
+  width: 44px;
+}
+
+.brand h1,
+.brand p,
+.panel h2,
+.panel p {
+  margin: 0;
+}
+
+.brand h1 {
+  font-size: 21px;
+  line-height: 1.1;
+}
+
+.brand p,
+.panel p,
+.date-block span,
+.metric span,
+label,
+.subtle {
+  color: var(--muted);
+}
+
+.session-panel {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-width: 430px;
+}
+
+.session-panel label {
+  white-space: nowrap;
+}
+
+.role-pill,
+.status-pill,
+.priority-pill {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+
+.role-pill {
+  background: var(--surface-strong);
+  color: var(--blue-dark);
+}
+
+.app-shell {
+  margin: 0 auto;
+  max-width: 1280px;
+  padding: 22px clamp(16px, 4vw, 40px) 36px;
+}
+
+.dashboard {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1.3fr 1.7fr repeat(3, minmax(130px, 1fr));
+  margin-bottom: 16px;
+}
+
+.date-block,
+.metric,
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.date-block,
+.metric {
+  min-height: 94px;
+  padding: 16px;
+}
+
+.date-block {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.date-block strong {
+  font-size: 26px;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: center;
+}
+
+.metric strong {
+  font-size: 28px;
+}
+
+.meter {
+  background: #e9eef6;
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.meter span {
+  background: var(--green);
+  display: block;
+  height: 100%;
+  transition: width 180ms ease;
+  width: 0;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+
+.tab {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  min-height: 42px;
+  padding: 0 16px;
+}
+
+.tab.is-active {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+
+.view {
+  display: none;
+}
+
+.view.is-active {
+  display: block;
+}
+
+.two-column {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr);
+}
+
+.panel {
+  padding: 18px;
+}
+
+.panel-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.panel h2 {
+  font-size: 20px;
+}
+
+.form-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 6px;
+}
+
+input,
+select,
+textarea {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  min-height: 42px;
+  padding: 9px 11px;
+  width: 100%;
+}
+
+textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+button:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.18);
+  outline-offset: 2px;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+.primary-button,
+.ghost-button,
+.small-button {
+  border-radius: 8px;
+  font-weight: 800;
+  min-height: 42px;
+  padding: 0 14px;
+}
+
+.primary-button {
+  background: var(--blue);
+  border: 1px solid var(--blue);
+  color: #fff;
+}
+
+.primary-button:hover {
+  background: var(--blue-dark);
+}
+
+.ghost-button,
+.small-button {
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.small-button {
+  min-height: 34px;
+  padding: 0 10px;
+}
+
+.filters {
+  align-items: end;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 18px;
+  padding-top: 16px;
+}
+
+.list,
+.progress-list,
+.team-list {
+  display: grid;
+  gap: 10px;
+}
+
+.filters + .list,
+.panel-header + .list,
+.form-grid + .list {
+  margin-top: 16px;
+}
+
+.task-card,
+.announcement-card,
+.request-card,
+.person-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.task-card {
+  align-items: flex-start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.task-card input[type="checkbox"] {
+  height: 22px;
+  margin-top: 3px;
+  min-height: auto;
+  width: 22px;
+}
+
+.task-card.is-done {
+  background: #f8fbfa;
+}
+
+.task-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.task-title strong {
+  line-height: 1.35;
+}
+
+.meta-row {
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 13px;
+  gap: 8px 12px;
+}
+
+.status-pill.done {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.status-pill.open {
+  background: var(--yellow-soft);
+  color: var(--yellow);
+}
+
+.priority-pill.alta,
+.priority-pill.urgente {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.priority-pill.media,
+.priority-pill.importante {
+  background: var(--yellow-soft);
+  color: var(--yellow);
+}
+
+.priority-pill.baja,
+.priority-pill.normal {
+  background: var(--surface-strong);
+  color: var(--blue-dark);
+}
+
+.progress-row {
+  display: grid;
+  gap: 8px;
+}
+
+.progress-top {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.progress-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.note-box {
+  background: #f6f9fd;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-top: 16px;
+  padding: 14px;
+}
+
+.note-box p {
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.section-divider {
+  border-top: 1px solid var(--line);
+  margin: 18px 0;
+}
+
+.stacked-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.admin-only {
+  display: none;
+}
+
+.admin-only.is-visible {
+  display: block;
+}
+
+.announcement-card,
+.request-card,
+.person-card {
+  display: grid;
+  gap: 10px;
+}
+
+.card-top {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.card-top h3 {
+  font-size: 16px;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.empty-state {
+  background: #fff;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  padding: 24px;
+  text-align: center;
+}
+
+.empty-state strong {
+  color: var(--ink);
+  display: block;
+  margin-bottom: 6px;
+}
+
+.product-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.product-tabs button {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+}
+
+.product-tabs button.is-active {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+.product-info {
+  display: grid;
+  gap: 14px;
+}
+
+.feature-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.feature-box {
+  background: #f8fbff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.feature-box strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.checklist {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.checklist li {
+  align-items: flex-start;
+  display: flex;
+  gap: 8px;
+  list-style: none;
+}
+
+.checklist input {
+  height: 18px;
+  margin-top: 2px;
+  min-height: auto;
+  width: 18px;
+}
+
+.quiz-box {
+  display: grid;
+  gap: 12px;
+}
+
+.quiz-options {
+  display: grid;
+  gap: 8px;
+}
+
+.quiz-options button {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-height: 42px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.quiz-options button.correct {
+  background: var(--green-soft);
+  border-color: var(--green);
+}
+
+.quiz-options button.incorrect {
+  background: var(--red-soft);
+  border-color: var(--red);
+}
+
+@media (max-width: 980px) {
+  .topbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .session-panel {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .login-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard,
+  .two-column {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .app-shell {
+    padding-inline: 12px;
+  }
+
+  .date-block,
+  .metric {
+    min-height: 78px;
+  }
+
+  .form-grid,
+  .filters,
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .task-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .task-card .actions {
+    grid-column: 1 / -1;
+  }
+
+  .panel-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .session-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+</style>
+  </head>
+  <body>
+    <section id="loginScreen" class="login-screen">
+      <div class="login-card">
+        <div class="brand login-brand">
+          <span class="brand-mark">LG</span>
+          <div>
+            <h1>Task Hub</h1>
+            <p>Acceso web para coordinador y entrenadores</p>
+          </div>
+        </div>
+
+        <div class="login-grid">
+          <form id="loginForm" class="panel login-panel">
+            <div class="panel-header">
+              <div>
+                <h2>Ingresar</h2>
+                <p>Usa tu correo y clave asignada.</p>
+              </div>
+            </div>
+            <label>
+              Correo
+              <input id="loginEmail" type="email" placeholder="admin@lg-taskhub.demo" required />
+            </label>
+            <label>
+              Clave
+              <input id="loginPassword" type="password" placeholder="Tu clave" required />
+            </label>
+            <button class="primary-button" type="submit">Entrar</button>
+            <button id="adminQuickLogin" class="ghost-button" type="button">Entrar como administrador demo</button>
+            <p id="loginStatus" class="form-message" aria-live="polite"></p>
+            <div class="note-box compact-note">
+              <strong>Acceso administrador demo</strong>
+              <p>Correo: admin@lg-taskhub.demo<br />Clave: LG2026Admin</p>
+            </div>
+          </form>
+
+          <form id="trainerRegistrationForm" class="panel login-panel">
+            <div class="panel-header">
+              <div>
+                <h2>Registro de entrenador</h2>
+                <p>Solicita acceso para que el coordinador lo apruebe.</p>
+              </div>
+            </div>
+            <label>
+              Nombre completo
+              <input id="regName" type="text" placeholder="Ej. Luis Garcia" required />
+            </label>
+            <label>
+              Correo
+              <input id="regEmail" type="email" placeholder="nombre@empresa.com" required />
+            </label>
+            <label>
+              Zona o tienda
+              <input id="regZone" type="text" placeholder="Ej. Zona Norte" required />
+            </label>
+            <label>
+              Crear clave
+              <input id="regPassword" type="password" minlength="6" placeholder="Minimo 6 caracteres" required />
+            </label>
+            <button class="primary-button" type="submit">Solicitar registro</button>
+            <p id="registrationStatus" class="form-message" aria-live="polite"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <header id="appHeader" class="topbar">
+      <div class="brand">
+        <span class="brand-mark">LG</span>
+        <div>
+          <h1>Task Hub</h1>
+          <p>Cuenta LG | Operacion diaria de entrenadores</p>
+        </div>
+      </div>
+
+      <div class="session-panel">
+        <label for="activeUser">Sesion</label>
+        <select id="activeUser"></select>
+        <span id="sessionName" class="subtle">Activo</span>
+        <span id="activeRole" class="role-pill">Coordinador</span>
+        <button id="logoutButton" class="ghost-button" type="button">Salir</button>
+      </div>
+    </header>
+
+    <main id="appShell" class="app-shell">
+      <section class="dashboard" aria-label="Resumen del dia">
+        <div class="date-block">
+          <span id="todayLabel">Hoy</span>
+          <strong>Tablero diario</strong>
+        </div>
+        <div class="metric">
+          <span>Avance general</span>
+          <strong id="globalProgress">0%</strong>
+          <div class="meter" aria-hidden="true"><span id="globalProgressBar"></span></div>
+        </div>
+        <div class="metric">
+          <span>Tareas abiertas</span>
+          <strong id="openTasks">0</strong>
+        </div>
+        <div class="metric">
+          <span>Vencen hoy</span>
+          <strong id="dueToday">0</strong>
+        </div>
+        <div class="metric">
+          <span>Anuncios visibles</span>
+          <strong id="visibleAnnouncements">0</strong>
+        </div>
+      </section>
+
+      <nav class="tabs" aria-label="Vistas principales">
+        <button class="tab is-active" data-view="tasks">Tareas</button>
+        <button class="tab" data-view="announcements">Anuncios</button>
+        <button class="tab" data-view="team">Equipo</button>
+        <button class="tab" data-view="lg">Info LG</button>
+      </nav>
+
+      <section id="tasksView" class="view is-active">
+        <div class="two-column">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Tareas del dia</h2>
+                <p>Asignacion, seguimiento y cierre de actividades.</p>
+              </div>
+              <button id="resetDemo" class="ghost-button" type="button">Restaurar demo</button>
+            </div>
+
+            <form id="taskForm" class="form-grid">
+              <label>
+                Tarea
+                <input id="taskTitle" type="text" placeholder="Ej. Validar exhibicion OLED" required />
+              </label>
+              <label>
+                Responsable
+                <select id="taskOwner"></select>
+              </label>
+              <label>
+                Categoria
+                <select id="taskCategory">
+                  <option>Entrenamiento</option>
+                  <option>PDV</option>
+                  <option>Reporte</option>
+                  <option>Producto</option>
+                  <option>Coordinacion</option>
+                </select>
+              </label>
+              <label>
+                Prioridad
+                <select id="taskPriority">
+                  <option>Media</option>
+                  <option>Alta</option>
+                  <option>Baja</option>
+                </select>
+              </label>
+              <label>
+                Fecha limite
+                <input id="taskDue" type="date" required />
+              </label>
+              <label class="wide">
+                Nota
+                <input id="taskNotes" type="text" placeholder="Detalle corto para el responsable" />
+              </label>
+              <button class="primary-button wide" type="submit">Agregar tarea</button>
+            </form>
+
+            <div class="filters">
+              <label>
+                Estado
+                <select id="statusFilter">
+                  <option value="all">Todas</option>
+                  <option value="open">Pendientes</option>
+                  <option value="done">Completadas</option>
+                </select>
+              </label>
+              <label>
+                Persona
+                <select id="personFilter">
+                  <option value="all">Todo el equipo</option>
+                </select>
+              </label>
+            </div>
+
+            <div id="taskList" class="list" aria-live="polite"></div>
+          </section>
+
+          <aside class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Avance por persona</h2>
+                <p>Lectura rapida para coordinacion y seguimiento.</p>
+              </div>
+            </div>
+            <div id="peopleProgress" class="progress-list"></div>
+            <div class="note-box">
+              <strong>Uso sugerido</strong>
+              <p>El coordinador revisa el avance general. Cada entrenador ve sus tareas y puede cerrar actividades en tiempo real.</p>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="announcementsView" class="view">
+        <div class="two-column">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Enviar anuncio</h2>
+                <p>Comunicados generales o mensajes directos por persona.</p>
+              </div>
+            </div>
+
+            <form id="announcementForm" class="form-grid">
+              <label>
+                Titulo
+                <input id="announcementTitle" type="text" placeholder="Ej. Cambio de horario de capacitacion" required />
+              </label>
+              <label>
+                Alcance
+                <select id="announcementAudience">
+                  <option value="general">General</option>
+                  <option value="individual">Individual</option>
+                </select>
+              </label>
+              <label id="announcementTargetWrap">
+                Persona
+                <select id="announcementTarget"></select>
+              </label>
+              <label>
+                Prioridad
+                <select id="announcementPriority">
+                  <option>Normal</option>
+                  <option>Importante</option>
+                  <option>Urgente</option>
+                </select>
+              </label>
+              <label class="wide">
+                Mensaje
+                <textarea id="announcementBody" rows="4" placeholder="Escribe el comunicado para el equipo" required></textarea>
+              </label>
+              <button class="primary-button wide" type="submit">Publicar anuncio</button>
+            </form>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Bandeja de anuncios</h2>
+                <p>Filtrada segun el usuario activo.</p>
+              </div>
+            </div>
+            <div id="announcementList" class="list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="teamView" class="view">
+        <div class="two-column">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Solicitudes entre roles</h2>
+                <p>Entrenadores y coordinador pueden pedir apoyo o enviar encargos.</p>
+              </div>
+            </div>
+
+            <form id="requestForm" class="form-grid">
+              <label>
+                Para
+                <select id="requestTo"></select>
+              </label>
+              <label>
+                Tipo
+                <select id="requestType">
+                  <option>Seguimiento</option>
+                  <option>Capacitacion</option>
+                  <option>Validacion</option>
+                  <option>Reporte</option>
+                </select>
+              </label>
+              <label class="wide">
+                Solicitud
+                <input id="requestTitle" type="text" placeholder="Ej. Revisar evidencia de modulo LG" required />
+              </label>
+              <button class="primary-button wide" type="submit">Crear solicitud</button>
+            </form>
+
+            <div id="requestList" class="list"></div>
+          </section>
+
+          <aside class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Equipo LG</h2>
+                <p>Roles activos y cobertura de trabajo.</p>
+              </div>
+            </div>
+            <div id="teamList" class="team-list"></div>
+
+            <div class="admin-only">
+              <div class="section-divider"></div>
+              <h2>Alta de entrenadores</h2>
+              <p>Crear usuarios o aprobar solicitudes de registro.</p>
+              <form id="trainerCreateForm" class="stacked-form">
+                <label>
+                  Nombre completo
+                  <input id="newTrainerName" type="text" placeholder="Nombre del entrenador" required />
+                </label>
+                <label>
+                  Correo
+                  <input id="newTrainerEmail" type="email" placeholder="correo@empresa.com" required />
+                </label>
+                <label>
+                  Zona o tienda
+                  <input id="newTrainerZone" type="text" placeholder="Zona asignada" required />
+                </label>
+                <label>
+                  Clave temporal
+                  <input id="newTrainerPassword" type="text" value="LG2026" required />
+                </label>
+                <button class="primary-button" type="submit">Crear entrenador</button>
+              </form>
+              <div id="registrationRequestsList" class="list"></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="lgView" class="view">
+        <div class="two-column">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Informacion interactiva LG</h2>
+                <p>Consulta rapida para especialistas de producto.</p>
+              </div>
+            </div>
+
+            <div id="productTabs" class="product-tabs"></div>
+            <div id="productInfo" class="product-info"></div>
+          </section>
+
+          <aside class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Practica de venta</h2>
+                <p>Pregunta rapida para reforzar argumentos.</p>
+              </div>
+            </div>
+
+            <div id="quizBox" class="quiz-box"></div>
+            <div class="note-box">
+              <strong>Base de conocimiento</strong>
+              <p>Esta seccion se puede ampliar con fichas tecnicas, videos, promociones, lanzamientos y guiones por categoria.</p>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <template id="emptyStateTemplate">
+      <div class="empty-state">
+        <strong>No hay elementos para mostrar</strong>
+        <p>Agrega informacion nueva o cambia los filtros.</p>
+      </div>
+    </template>
+
+    <script>
+const storageKey = "lg-task-hub-v1";
+
+const defaultPeople = [
+  { id: "ana", name: "Ana Torres", role: "Coordinador", zone: "Cuenta LG" },
+  { id: "carlos", name: "Carlos Ruiz", role: "Entrenador", zone: "Zona Norte" },
+  { id: "maria", name: "Maria Perez", role: "Entrenador", zone: "Zona Centro" },
+  { id: "jose", name: "Jose Ramos", role: "Entrenador", zone: "Zona Sur" }
+];
+
+const todayIso = new Date().toISOString().slice(0, 10);
+
+const demoData = {
+  activeUserId: "ana",
+  isLoggedIn: false,
+  people: defaultPeople,
+  accounts: [
+    { personId: "ana", email: "admin@lg-taskhub.demo", password: "LG2026Admin" },
+    { personId: "carlos", email: "carlos@lg-taskhub.demo", password: "LG2026" },
+    { personId: "maria", email: "maria@lg-taskhub.demo", password: "LG2026" },
+    { personId: "jose", email: "jose@lg-taskhub.demo", password: "LG2026" }
+  ],
+  registrationRequests: [],
+  selectedProduct: "oled",
+  tasks: [
+    {
+      id: "task-1",
+      title: "Validar exhibicion OLED y tomar evidencia",
+      ownerId: "carlos",
+      createdById: "ana",
+      category: "PDV",
+      priority: "Alta",
+      dueDate: todayIso,
+      notes: "Subir foto y observacion del modulo.",
+      done: false,
+      createdAt: Date.now() - 3600000
+    },
+    {
+      id: "task-2",
+      title: "Actualizar argumento de venta para lavadoras",
+      ownerId: "maria",
+      createdById: "ana",
+      category: "Producto",
+      priority: "Media",
+      dueDate: todayIso,
+      notes: "Incluir beneficio de ahorro y cuidado de prendas.",
+      done: true,
+      createdAt: Date.now() - 7200000
+    },
+    {
+      id: "task-3",
+      title: "Enviar reporte de asistencia a capacitacion",
+      ownerId: "ana",
+      createdById: "jose",
+      category: "Reporte",
+      priority: "Media",
+      dueDate: todayIso,
+      notes: "Consolidar participantes por tienda.",
+      done: false,
+      createdAt: Date.now() - 2400000
+    },
+    {
+      id: "task-4",
+      title: "Reforzar demo de AI DD con promotores nuevos",
+      ownerId: "jose",
+      createdById: "ana",
+      category: "Entrenamiento",
+      priority: "Baja",
+      dueDate: todayIso,
+      notes: "Usar guion de 3 preguntas al cliente.",
+      done: false,
+      createdAt: Date.now() - 5400000
+    }
+  ],
+  announcements: [
+    {
+      id: "ann-1",
+      title: "Prioridad de la semana: experiencia OLED",
+      audience: "general",
+      targetId: "",
+      priority: "Importante",
+      body: "En cada visita validar exhibicion, demo activa y argumento de contraste. Reportar quiebres antes de las 5:00 p. m.",
+      createdById: "ana",
+      createdAt: Date.now() - 5000000,
+      readBy: []
+    },
+    {
+      id: "ann-2",
+      title: "Seguimiento a capacitacion de linea blanca",
+      audience: "individual",
+      targetId: "maria",
+      priority: "Normal",
+      body: "Maria, por favor comparte el avance de participantes certificados antes del cierre.",
+      createdById: "ana",
+      createdAt: Date.now() - 3000000,
+      readBy: []
+    }
+  ],
+  requests: [
+    {
+      id: "req-1",
+      title: "Revisar evidencia de exhibicion en tienda principal",
+      fromId: "carlos",
+      toId: "ana",
+      type: "Validacion",
+      status: "Abierta",
+      createdAt: Date.now() - 2800000
+    },
+    {
+      id: "req-2",
+      title: "Enviar material de apoyo para monitores UltraGear",
+      fromId: "ana",
+      toId: "jose",
+      type: "Capacitacion",
+      status: "Abierta",
+      createdAt: Date.now() - 1800000
+    }
+  ],
+  quiz: {
+    answered: false,
+    selected: ""
+  }
+};
+
+const products = [
+  {
+    id: "oled",
+    name: "TV OLED",
+    promise: "Negros perfectos, contraste preciso y experiencia premium para cine, gaming y deportes.",
+    features: [
+      ["Argumento clave", "Cada pixel se ilumina de forma independiente para mejorar contraste y profundidad."],
+      ["Cliente ideal", "Usuario que busca maxima calidad de imagen, videojuegos o cine en casa."],
+      ["Demo sugerida", "Mostrar una escena oscura y comparar detalle en sombras frente a pantallas convencionales."],
+      ["Cierre", "Enfatizar inmersion, diseño delgado y tecnologia diferenciada."]
+    ],
+    checklist: [
+      "Confirmar modo demo activo.",
+      "Validar conexion de contenido 4K.",
+      "Explicar diferencia entre OLED, QNED y UHD.",
+      "Preguntar uso principal del cliente."
+    ],
+    quiz: {
+      question: "Cual es el beneficio principal de una TV OLED?",
+      answer: "Contraste alto gracias a pixeles autoiluminados",
+      options: [
+        "Contraste alto gracias a pixeles autoiluminados",
+        "Mayor peso para estabilidad",
+        "Solo funciona con contenido HD"
+      ]
+    }
+  },
+  {
+    id: "white-line",
+    name: "Linea blanca",
+    promise: "Soluciones para el hogar enfocadas en ahorro, cuidado, capacidad y conveniencia.",
+    features: [
+      ["Argumento clave", "Tecnologias como AI DD y compresores eficientes ayudan a cuidar prendas y energia."],
+      ["Cliente ideal", "Familias que necesitan capacidad, durabilidad y facilidad de uso."],
+      ["Demo sugerida", "Conectar necesidad del cliente con ahorro, garantia y practicidad diaria."],
+      ["Cierre", "Resumir beneficio economico, cuidado del hogar y respaldo de marca."]
+    ],
+    checklist: [
+      "Revisar etiquetas de precio y promocion.",
+      "Confirmar disponibilidad de modelos clave.",
+      "Explicar capacidad con ejemplos reales.",
+      "Validar que el equipo este limpio y presentable."
+    ],
+    quiz: {
+      question: "Que debe conectar el especialista al vender linea blanca?",
+      answer: "Necesidad del hogar, ahorro y cuidado diario",
+      options: [
+        "Solo el color disponible",
+        "Necesidad del hogar, ahorro y cuidado diario",
+        "Unicamente el precio final"
+      ]
+    }
+  },
+  {
+    id: "audio",
+    name: "Audio",
+    promise: "Sonido envolvente y facil conexion para complementar television, musica y entretenimiento.",
+    features: [
+      ["Argumento clave", "Una barra de sonido mejora claridad, potencia y sensacion envolvente frente al audio del TV."],
+      ["Cliente ideal", "Clientes que compran TV, gamers o usuarios que consumen peliculas y musica."],
+      ["Demo sugerida", "Activar una escena con dialogo y efectos para comparar claridad y profundidad."],
+      ["Cierre", "Proponer combo con TV para elevar el ticket y la experiencia."]
+    ],
+    checklist: [
+      "Verificar que el equipo tenga corriente y fuente conectada.",
+      "Preparar demo corta con dialogo y bajos.",
+      "Ofrecer combo junto a TV.",
+      "Confirmar compatibilidad de conexion."
+    ],
+    quiz: {
+      question: "Cuando conviene ofrecer una barra de sonido?",
+      answer: "Al vender una TV o mejorar la experiencia de entretenimiento",
+      options: [
+        "Solo cuando no hay televisores",
+        "Al vender una TV o mejorar la experiencia de entretenimiento",
+        "Unicamente en productos de cocina"
+      ]
+    }
+  },
+  {
+    id: "monitors",
+    name: "Monitores",
+    promise: "Pantallas para productividad, gaming y creadores con foco en fluidez, color y espacio de trabajo.",
+    features: [
+      ["Argumento clave", "UltraWide y UltraGear responden a necesidades distintas: multitarea o juego fluido."],
+      ["Cliente ideal", "Gamers, estudiantes, oficinas, creadores de contenido y usuarios multitarea."],
+      ["Demo sugerida", "Preguntar uso principal y mostrar tasa de refresco, resolucion o formato."],
+      ["Cierre", "Recomendar por actividad, no solo por pulgadas."]
+    ],
+    checklist: [
+      "Separar argumento gamer y productividad.",
+      "Validar cable correcto para tasa de refresco.",
+      "Mostrar beneficio de pantalla amplia.",
+      "Comparar resolucion segun uso."
+    ],
+    quiz: {
+      question: "Que debe guiar la recomendacion de un monitor?",
+      answer: "El uso principal del cliente",
+      options: ["El uso principal del cliente", "El color de la caja", "La ubicacion del almacen"]
+    }
+  },
+  {
+    id: "air",
+    name: "Aire acondicionado",
+    promise: "Confort, eficiencia y control para hogares y espacios de trabajo.",
+    features: [
+      ["Argumento clave", "La eficiencia y el control de temperatura impactan comodidad y consumo."],
+      ["Cliente ideal", "Clientes que buscan enfriar rapido, ahorrar energia o controlar humedad."],
+      ["Demo sugerida", "Explicar capacidad segun tamano del ambiente y habitos de uso."],
+      ["Cierre", "Reforzar confort, eficiencia y correcta instalacion."]
+    ],
+    checklist: [
+      "Preguntar tamano del ambiente.",
+      "Explicar eficiencia y consumo.",
+      "Validar condiciones de instalacion.",
+      "Recordar mantenimiento preventivo."
+    ],
+    quiz: {
+      question: "Que dato es basico antes de recomendar aire acondicionado?",
+      answer: "Tamano del ambiente y necesidad de enfriamiento",
+      options: [
+        "Tamano del ambiente y necesidad de enfriamiento",
+        "Cantidad de televisores en casa",
+        "Marca del celular del cliente"
+      ]
+    }
+  }
+];
+
+let state = loadState();
+let people = state.people || defaultPeople;
+
+const els = {
+  loginScreen: document.querySelector("#loginScreen"),
+  appHeader: document.querySelector("#appHeader"),
+  appShell: document.querySelector("#appShell"),
+  loginForm: document.querySelector("#loginForm"),
+  loginEmail: document.querySelector("#loginEmail"),
+  loginPassword: document.querySelector("#loginPassword"),
+  adminQuickLogin: document.querySelector("#adminQuickLogin"),
+  loginStatus: document.querySelector("#loginStatus"),
+  trainerRegistrationForm: document.querySelector("#trainerRegistrationForm"),
+  regName: document.querySelector("#regName"),
+  regEmail: document.querySelector("#regEmail"),
+  regZone: document.querySelector("#regZone"),
+  regPassword: document.querySelector("#regPassword"),
+  registrationStatus: document.querySelector("#registrationStatus"),
+  activeUser: document.querySelector("#activeUser"),
+  activeRole: document.querySelector("#activeRole"),
+  sessionName: document.querySelector("#sessionName"),
+  logoutButton: document.querySelector("#logoutButton"),
+  todayLabel: document.querySelector("#todayLabel"),
+  globalProgress: document.querySelector("#globalProgress"),
+  globalProgressBar: document.querySelector("#globalProgressBar"),
+  openTasks: document.querySelector("#openTasks"),
+  dueToday: document.querySelector("#dueToday"),
+  visibleAnnouncements: document.querySelector("#visibleAnnouncements"),
+  tabs: document.querySelectorAll(".tab"),
+  views: document.querySelectorAll(".view"),
+  taskForm: document.querySelector("#taskForm"),
+  taskTitle: document.querySelector("#taskTitle"),
+  taskOwner: document.querySelector("#taskOwner"),
+  taskCategory: document.querySelector("#taskCategory"),
+  taskPriority: document.querySelector("#taskPriority"),
+  taskDue: document.querySelector("#taskDue"),
+  taskNotes: document.querySelector("#taskNotes"),
+  statusFilter: document.querySelector("#statusFilter"),
+  personFilter: document.querySelector("#personFilter"),
+  taskList: document.querySelector("#taskList"),
+  peopleProgress: document.querySelector("#peopleProgress"),
+  resetDemo: document.querySelector("#resetDemo"),
+  announcementForm: document.querySelector("#announcementForm"),
+  announcementTitle: document.querySelector("#announcementTitle"),
+  announcementAudience: document.querySelector("#announcementAudience"),
+  announcementTargetWrap: document.querySelector("#announcementTargetWrap"),
+  announcementTarget: document.querySelector("#announcementTarget"),
+  announcementPriority: document.querySelector("#announcementPriority"),
+  announcementBody: document.querySelector("#announcementBody"),
+  announcementList: document.querySelector("#announcementList"),
+  requestForm: document.querySelector("#requestForm"),
+  requestTo: document.querySelector("#requestTo"),
+  requestType: document.querySelector("#requestType"),
+  requestTitle: document.querySelector("#requestTitle"),
+  requestList: document.querySelector("#requestList"),
+  teamList: document.querySelector("#teamList"),
+  trainerCreateForm: document.querySelector("#trainerCreateForm"),
+  newTrainerName: document.querySelector("#newTrainerName"),
+  newTrainerEmail: document.querySelector("#newTrainerEmail"),
+  newTrainerZone: document.querySelector("#newTrainerZone"),
+  newTrainerPassword: document.querySelector("#newTrainerPassword"),
+  registrationRequestsList: document.querySelector("#registrationRequestsList"),
+  productTabs: document.querySelector("#productTabs"),
+  productInfo: document.querySelector("#productInfo"),
+  quizBox: document.querySelector("#quizBox"),
+  emptyStateTemplate: document.querySelector("#emptyStateTemplate")
+};
+
+function loadState() {
+  const saved = localStorage.getItem(storageKey);
+  if (!saved) return structuredClone(demoData);
+
+  try {
+    return normalizeState({ ...structuredClone(demoData), ...JSON.parse(saved) });
+  } catch {
+    return structuredClone(demoData);
+  }
+}
+
+function normalizeState(nextState) {
+  nextState.people = nextState.people?.length ? nextState.people : structuredClone(defaultPeople);
+  nextState.accounts = nextState.accounts?.length ? nextState.accounts : structuredClone(demoData.accounts);
+  nextState.registrationRequests = nextState.registrationRequests || [];
+  nextState.isLoggedIn = Boolean(nextState.isLoggedIn);
+  return nextState;
+}
+
+function saveState() {
+  localStorage.setItem(storageKey, JSON.stringify(state));
+}
+
+function syncPeople() {
+  people = state.people || defaultPeople;
+}
+
+function personName(id) {
+  return people.find((person) => person.id === id)?.name || "Sin asignar";
+}
+
+function personRole(id) {
+  return people.find((person) => person.id === id)?.role || "";
+}
+
+function activeUser() {
+  return people.find((person) => person.id === state.activeUserId) || people[0];
+}
+
+function canSeeAll() {
+  return activeUser().role === "Coordinador";
+}
+
+function visibleTasks() {
+  const status = els.statusFilter.value;
+  const person = els.personFilter.value;
+
+  return state.tasks
+    .filter((task) => canSeeAll() || task.ownerId === state.activeUserId || task.createdById === state.activeUserId)
+    .filter((task) => (status === "all" ? true : status === "done" ? task.done : !task.done))
+    .filter((task) => (person === "all" ? true : task.ownerId === person))
+    .sort((a, b) => Number(a.done) - Number(b.done) || priorityRank(a.priority) - priorityRank(b.priority));
+}
+
+function visibleAnnouncements() {
+  return state.announcements
+    .filter((announcement) => {
+      if (canSeeAll() || announcement.createdById === state.activeUserId) return true;
+      return announcement.audience === "general" || announcement.targetId === state.activeUserId;
+    })
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+function priorityRank(priority) {
+  const ranks = { Alta: 0, Urgente: 0, Importante: 1, Media: 1, Normal: 2, Baja: 3 };
+  return ranks[priority] ?? 2;
+}
+
+function formatDate(value) {
+  return new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "short" }).format(new Date(`${value}T12:00:00`));
+}
+
+function formatTime(value) {
+  return new Intl.DateTimeFormat("es-PE", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
+
+function emptyState() {
+  return els.emptyStateTemplate.content.firstElementChild.cloneNode(true);
+}
+
+function fillSelect(select, options, selected = "") {
+  select.innerHTML = "";
+  options.forEach((option) => {
+    const node = document.createElement("option");
+    node.value = option.value;
+    node.textContent = option.label;
+    if (option.value === selected) node.selected = true;
+    select.appendChild(node);
+  });
+}
+
+function initStaticControls() {
+  syncPeople();
+  const peopleOptions = people.map((person) => ({
+    value: person.id,
+    label: `${person.name} - ${person.role}`
+  }));
+
+  fillSelect(els.activeUser, peopleOptions, state.activeUserId);
+  fillSelect(els.taskOwner, peopleOptions, state.activeUserId);
+  fillSelect(els.announcementTarget, peopleOptions.filter((person) => person.value !== state.activeUserId));
+  fillSelect(els.requestTo, peopleOptions.filter((person) => person.value !== state.activeUserId));
+
+  fillSelect(els.personFilter, [
+    { value: "all", label: "Todo el equipo" },
+    ...people.map((person) => ({ value: person.id, label: person.name }))
+  ]);
+
+  els.taskDue.value = todayIso;
+  els.todayLabel.textContent = new Intl.DateTimeFormat("es-PE", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long"
+  }).format(new Date());
+}
+
+function render() {
+  syncPeople();
+  renderAuthShell();
+  if (!state.isLoggedIn) return;
+
+  const user = activeUser();
+  els.activeUser.value = user.id;
+  els.activeUser.disabled = true;
+  els.sessionName.textContent = user.name;
+  els.activeRole.textContent = user.role;
+  els.activeRole.className = "role-pill";
+
+  refreshRoleDependentOptions();
+  renderDashboard();
+  renderTasks();
+  renderPeopleProgress();
+  renderAnnouncements();
+  renderRequests();
+  renderTeam();
+  renderProducts();
+}
+
+function renderAuthShell() {
+  const isLoggedIn = Boolean(state.isLoggedIn);
+  els.loginScreen.classList.toggle("is-active", !isLoggedIn);
+  els.appHeader.style.display = isLoggedIn ? "flex" : "none";
+  els.appShell.style.display = isLoggedIn ? "block" : "none";
+}
+
+function refreshRoleDependentOptions() {
+  const peopleOptions = people.map((person) => ({
+    value: person.id,
+    label: `${person.name} - ${person.role}`
+  }));
+  const otherPeopleOptions = peopleOptions.filter((person) => person.value !== state.activeUserId);
+
+  fillSelect(els.taskOwner, peopleOptions, els.taskOwner.value || state.activeUserId);
+  fillSelect(els.announcementTarget, otherPeopleOptions, els.announcementTarget.value || otherPeopleOptions[0]?.value);
+  fillSelect(els.requestTo, otherPeopleOptions, els.requestTo.value || otherPeopleOptions[0]?.value);
+
+  els.announcementTargetWrap.style.display = els.announcementAudience.value === "individual" ? "flex" : "none";
+}
+
+function renderDashboard() {
+  const tasks = canSeeAll()
+    ? state.tasks
+    : state.tasks.filter((task) => task.ownerId === state.activeUserId || task.createdById === state.activeUserId);
+  const total = tasks.length;
+  const done = tasks.filter((task) => task.done).length;
+  const progress = total ? Math.round((done / total) * 100) : 0;
+
+  els.globalProgress.textContent = `${progress}%`;
+  els.globalProgressBar.style.width = `${progress}%`;
+  els.openTasks.textContent = tasks.filter((task) => !task.done).length;
+  els.dueToday.textContent = tasks.filter((task) => !task.done && task.dueDate === todayIso).length;
+  els.visibleAnnouncements.textContent = visibleAnnouncements().length;
+}
+
+function renderTasks() {
+  const tasks = visibleTasks();
+  els.taskList.innerHTML = "";
+
+  if (!tasks.length) {
+    els.taskList.appendChild(emptyState());
+    return;
+  }
+
+  tasks.forEach((task) => {
+    const card = document.createElement("article");
+    card.className = `task-card ${task.done ? "is-done" : ""}`;
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = task.done;
+    checkbox.setAttribute("aria-label", `Marcar ${task.title}`);
+    checkbox.addEventListener("change", () => {
+      task.done = checkbox.checked;
+      saveState();
+      render();
+    });
+
+    const body = document.createElement("div");
+    body.innerHTML = `
+      <div class="task-title">
+        <strong>${escapeHtml(task.title)}</strong>
+        <span class="status-pill ${task.done ? "done" : "open"}">${task.done ? "Completada" : "Pendiente"}</span>
+        <span class="priority-pill ${task.priority.toLowerCase()}">${task.priority}</span>
+      </div>
+      <div class="meta-row">
+        <span>Responsable: ${escapeHtml(personName(task.ownerId))}</span>
+        <span>Asigno: ${escapeHtml(personName(task.createdById))}</span>
+        <span>${escapeHtml(task.category)}</span>
+        <span>Limite: ${formatDate(task.dueDate)}</span>
+      </div>
+      ${task.notes ? `<p class="subtle">${escapeHtml(task.notes)}</p>` : ""}
+    `;
+
+    const actions = document.createElement("div");
+    actions.className = "actions";
+
+    const deleteButton = document.createElement("button");
+    deleteButton.className = "small-button";
+    deleteButton.type = "button";
+    deleteButton.textContent = "Eliminar";
+    deleteButton.addEventListener("click", () => {
+      state.tasks = state.tasks.filter((item) => item.id !== task.id);
+      saveState();
+      render();
+    });
+    actions.appendChild(deleteButton);
+
+    card.append(checkbox, body, actions);
+    els.taskList.appendChild(card);
+  });
+}
+
+function renderPeopleProgress() {
+  els.peopleProgress.innerHTML = "";
+
+  people.forEach((person) => {
+    const tasks = state.tasks.filter((task) => task.ownerId === person.id);
+    const done = tasks.filter((task) => task.done).length;
+    const progress = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+    const row = document.createElement("div");
+    row.className = "progress-row";
+    row.innerHTML = `
+      <div class="progress-top">
+        <div class="progress-name">
+          <strong>${escapeHtml(person.name)}</strong>
+          <span class="subtle">${escapeHtml(person.role)} | ${escapeHtml(person.zone)}</span>
+        </div>
+        <strong>${progress}%</strong>
+      </div>
+      <div class="meter" aria-hidden="true"><span style="width: ${progress}%"></span></div>
+      <span class="subtle">${done} de ${tasks.length} tareas completadas</span>
+    `;
+    els.peopleProgress.appendChild(row);
+  });
+}
+
+function renderAnnouncements() {
+  const announcements = visibleAnnouncements();
+  els.announcementList.innerHTML = "";
+
+  if (!announcements.length) {
+    els.announcementList.appendChild(emptyState());
+    return;
+  }
+
+  announcements.forEach((announcement) => {
+    const isRead = announcement.readBy.includes(state.activeUserId);
+    const card = document.createElement("article");
+    card.className = "announcement-card";
+    card.innerHTML = `
+      <div class="card-top">
+        <h3>${escapeHtml(announcement.title)}</h3>
+        <span class="priority-pill ${announcement.priority.toLowerCase()}">${escapeHtml(announcement.priority)}</span>
+      </div>
+      <p>${escapeHtml(announcement.body)}</p>
+      <div class="meta-row">
+        <span>${announcement.audience === "general" ? "General" : `Para ${escapeHtml(personName(announcement.targetId))}`}</span>
+        <span>Publicado por ${escapeHtml(personName(announcement.createdById))}</span>
+        <span>${formatTime(announcement.createdAt)}</span>
+        <span>${isRead ? "Leido" : "No leido"}</span>
+      </div>
+    `;
+
+    const actions = document.createElement("div");
+    actions.className = "actions";
+
+    const readButton = document.createElement("button");
+    readButton.className = "small-button";
+    readButton.type = "button";
+    readButton.textContent = isRead ? "Marcar no leido" : "Marcar leido";
+    readButton.addEventListener("click", () => {
+      if (isRead) {
+        announcement.readBy = announcement.readBy.filter((id) => id !== state.activeUserId);
+      } else {
+        announcement.readBy.push(state.activeUserId);
+      }
+      saveState();
+      render();
+    });
+    actions.appendChild(readButton);
+
+    if (canSeeAll() || announcement.createdById === state.activeUserId) {
+      const deleteButton = document.createElement("button");
+      deleteButton.className = "small-button";
+      deleteButton.type = "button";
+      deleteButton.textContent = "Eliminar";
+      deleteButton.addEventListener("click", () => {
+        state.announcements = state.announcements.filter((item) => item.id !== announcement.id);
+        saveState();
+        render();
+      });
+      actions.appendChild(deleteButton);
+    }
+
+    card.appendChild(actions);
+    els.announcementList.appendChild(card);
+  });
+}
+
+function renderRequests() {
+  els.requestList.innerHTML = "";
+  const requests = state.requests
+    .filter((request) => canSeeAll() || request.fromId === state.activeUserId || request.toId === state.activeUserId)
+    .sort((a, b) => b.createdAt - a.createdAt);
+
+  if (!requests.length) {
+    els.requestList.appendChild(emptyState());
+    return;
+  }
+
+  requests.forEach((request) => {
+    const card = document.createElement("article");
+    card.className = "request-card";
+    card.innerHTML = `
+      <div class="card-top">
+        <h3>${escapeHtml(request.title)}</h3>
+        <span class="status-pill ${request.status === "Cerrada" ? "done" : "open"}">${escapeHtml(request.status)}</span>
+      </div>
+      <div class="meta-row">
+        <span>De ${escapeHtml(personName(request.fromId))}</span>
+        <span>Para ${escapeHtml(personName(request.toId))}</span>
+        <span>${escapeHtml(request.type)}</span>
+        <span>${formatTime(request.createdAt)}</span>
+      </div>
+    `;
+
+    const actions = document.createElement("div");
+    actions.className = "actions";
+
+    const toggleButton = document.createElement("button");
+    toggleButton.className = "small-button";
+    toggleButton.type = "button";
+    toggleButton.textContent = request.status === "Cerrada" ? "Reabrir" : "Cerrar";
+    toggleButton.addEventListener("click", () => {
+      request.status = request.status === "Cerrada" ? "Abierta" : "Cerrada";
+      saveState();
+      render();
+    });
+    actions.appendChild(toggleButton);
+
+    card.appendChild(actions);
+    els.requestList.appendChild(card);
+  });
+}
+
+function renderTeam() {
+  els.teamList.innerHTML = "";
+  document.querySelectorAll(".admin-only").forEach((node) => node.classList.toggle("is-visible", canSeeAll()));
+
+  people.forEach((person) => {
+    const assigned = state.tasks.filter((task) => task.ownerId === person.id);
+    const open = assigned.filter((task) => !task.done);
+    const card = document.createElement("article");
+    card.className = "person-card";
+    card.innerHTML = `
+      <div class="card-top">
+        <h3>${escapeHtml(person.name)}</h3>
+        <span class="role-pill">${escapeHtml(person.role)}</span>
+      </div>
+      <div class="meta-row">
+        <span>${escapeHtml(person.zone)}</span>
+        <span>${assigned.length} tareas</span>
+        <span>${open.length} pendientes</span>
+      </div>
+    `;
+    els.teamList.appendChild(card);
+  });
+
+  renderRegistrationRequests();
+}
+
+function renderRegistrationRequests() {
+  els.registrationRequestsList.innerHTML = "";
+  if (!canSeeAll()) return;
+
+  const title = document.createElement("div");
+  title.className = "section-divider";
+  els.registrationRequestsList.appendChild(title);
+
+  const pending = state.registrationRequests.filter((request) => request.status === "Pendiente");
+  if (!pending.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.innerHTML = "<strong>No hay solicitudes pendientes</strong><p>Cuando un entrenador solicite acceso aparecera aqui.</p>";
+    els.registrationRequestsList.appendChild(empty);
+    return;
+  }
+
+  pending.forEach((request) => {
+    const card = document.createElement("article");
+    card.className = "person-card";
+    card.innerHTML = `
+      <div class="card-top">
+        <h3>${escapeHtml(request.name)}</h3>
+        <span class="status-pill open">Pendiente</span>
+      </div>
+      <div class="meta-row">
+        <span>${escapeHtml(request.email)}</span>
+        <span>${escapeHtml(request.zone)}</span>
+      </div>
+    `;
+
+    const actions = document.createElement("div");
+    actions.className = "actions";
+
+    const approveButton = document.createElement("button");
+    approveButton.className = "small-button";
+    approveButton.type = "button";
+    approveButton.textContent = "Aprobar";
+    approveButton.addEventListener("click", () => {
+      createTrainerAccount(request.name, request.email, request.zone, request.password);
+      request.status = "Aprobada";
+      saveState();
+      initStaticControls();
+      render();
+    });
+
+    const rejectButton = document.createElement("button");
+    rejectButton.className = "small-button";
+    rejectButton.type = "button";
+    rejectButton.textContent = "Rechazar";
+    rejectButton.addEventListener("click", () => {
+      request.status = "Rechazada";
+      saveState();
+      render();
+    });
+
+    actions.append(approveButton, rejectButton);
+    card.appendChild(actions);
+    els.registrationRequestsList.appendChild(card);
+  });
+}
+
+function renderProducts() {
+  els.productTabs.innerHTML = "";
+
+  products.forEach((product) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = product.name;
+    button.className = product.id === state.selectedProduct ? "is-active" : "";
+    button.addEventListener("click", () => {
+      state.selectedProduct = product.id;
+      state.quiz = { answered: false, selected: "" };
+      saveState();
+      renderProducts();
+    });
+    els.productTabs.appendChild(button);
+  });
+
+  const product = products.find((item) => item.id === state.selectedProduct) || products[0];
+  els.productInfo.innerHTML = `
+    <div>
+      <h3>${escapeHtml(product.name)}</h3>
+      <p>${escapeHtml(product.promise)}</p>
+    </div>
+    <div class="feature-grid">
+      ${product.features
+        .map(
+          ([title, text]) => `
+          <div class="feature-box">
+            <strong>${escapeHtml(title)}</strong>
+            <span>${escapeHtml(text)}</span>
+          </div>
+        `
+        )
+        .join("")}
+    </div>
+    <div>
+      <h3>Checklist de tienda</h3>
+      <ul class="checklist">
+        ${product.checklist
+          .map(
+            (item, index) => `
+          <li>
+            <input type="checkbox" id="${product.id}-check-${index}" />
+            <label for="${product.id}-check-${index}">${escapeHtml(item)}</label>
+          </li>
+        `
+          )
+          .join("")}
+      </ul>
+    </div>
+  `;
+
+  renderQuiz(product);
+}
+
+function renderQuiz(product) {
+  const quiz = product.quiz;
+  const answered = state.quiz.answered;
+  els.quizBox.innerHTML = `
+    <strong>${escapeHtml(quiz.question)}</strong>
+    <div class="quiz-options">
+      ${quiz.options
+        .map((option) => {
+          let className = "";
+          if (answered && option === quiz.answer) className = "correct";
+          if (answered && option === state.quiz.selected && option !== quiz.answer) className = "incorrect";
+          return `<button type="button" class="${className}" data-answer="${escapeHtml(option)}">${escapeHtml(option)}</button>`;
+        })
+        .join("")}
+    </div>
+    <p class="subtle">${
+      answered
+        ? state.quiz.selected === quiz.answer
+          ? "Correcto. Puedes usar este argumento en tienda."
+          : `Respuesta correcta: ${escapeHtml(quiz.answer)}.`
+        : "Selecciona una respuesta para validar conocimiento."
+    }</p>
+  `;
+
+  els.quizBox.querySelectorAll("button").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.quiz = { answered: true, selected: button.dataset.answer };
+      saveState();
+      renderQuiz(product);
+    });
+  });
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function setMessage(element, message, type = "") {
+  element.textContent = message;
+  element.className = `form-message ${type}`.trim();
+}
+
+function findAccountByEmail(email) {
+  return state.accounts.find((account) => account.email.toLowerCase() === email.trim().toLowerCase());
+}
+
+function createTrainerAccount(name, email, zone, password) {
+  const existing = findAccountByEmail(email);
+  if (existing) return { ok: false, message: "Ese correo ya tiene una cuenta creada." };
+
+  const id = `trainer-${Date.now()}-${Math.round(Math.random() * 999)}`;
+  const person = { id, name: name.trim(), role: "Entrenador", zone: zone.trim() };
+  state.people.push(person);
+  state.accounts.push({ personId: id, email: email.trim().toLowerCase(), password });
+  syncPeople();
+  return { ok: true, person };
+}
+
+function loginWithCredentials(email, password) {
+  const account = findAccountByEmail(email);
+  if (!account || account.password !== password) {
+    return { ok: false, message: "Correo o clave incorrectos." };
+  }
+
+  state.activeUserId = account.personId;
+  state.isLoggedIn = true;
+  saveState();
+  initStaticControls();
+  render();
+  return { ok: true };
+}
+
+function addEventListeners() {
+  els.loginForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const result = loginWithCredentials(els.loginEmail.value, els.loginPassword.value);
+    if (!result.ok) setMessage(els.loginStatus, result.message, "error");
+  });
+
+  els.adminQuickLogin.addEventListener("click", () => {
+    els.loginEmail.value = "admin@lg-taskhub.demo";
+    els.loginPassword.value = "LG2026Admin";
+    loginWithCredentials(els.loginEmail.value, els.loginPassword.value);
+  });
+
+  els.trainerRegistrationForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const email = els.regEmail.value.trim().toLowerCase();
+    if (findAccountByEmail(email)) {
+      setMessage(els.registrationStatus, "Ese correo ya esta registrado.", "error");
+      return;
+    }
+
+    const alreadyPending = state.registrationRequests.some(
+      (request) => request.email.toLowerCase() === email && request.status === "Pendiente"
+    );
+    if (alreadyPending) {
+      setMessage(els.registrationStatus, "Ya existe una solicitud pendiente para ese correo.", "error");
+      return;
+    }
+
+    state.registrationRequests.push({
+      id: crypto.randomUUID(),
+      name: els.regName.value.trim(),
+      email,
+      zone: els.regZone.value.trim(),
+      password: els.regPassword.value,
+      status: "Pendiente",
+      createdAt: Date.now()
+    });
+    saveState();
+    els.trainerRegistrationForm.reset();
+    setMessage(els.registrationStatus, "Solicitud enviada. El coordinador debe aprobarla.", "success");
+  });
+
+  els.logoutButton.addEventListener("click", () => {
+    state.isLoggedIn = false;
+    saveState();
+    render();
+  });
+
+  els.activeUser.addEventListener("change", () => {
+    state.activeUserId = els.activeUser.value;
+    saveState();
+    render();
+  });
+
+  els.tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      els.tabs.forEach((item) => item.classList.toggle("is-active", item === tab));
+      els.views.forEach((view) => view.classList.toggle("is-active", view.id === `${tab.dataset.view}View`));
+    });
+  });
+
+  els.taskForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    state.tasks.unshift({
+      id: crypto.randomUUID(),
+      title: els.taskTitle.value.trim(),
+      ownerId: els.taskOwner.value,
+      createdById: state.activeUserId,
+      category: els.taskCategory.value,
+      priority: els.taskPriority.value,
+      dueDate: els.taskDue.value,
+      notes: els.taskNotes.value.trim(),
+      done: false,
+      createdAt: Date.now()
+    });
+    els.taskForm.reset();
+    els.taskDue.value = todayIso;
+    saveState();
+    render();
+  });
+
+  els.statusFilter.addEventListener("change", render);
+  els.personFilter.addEventListener("change", render);
+
+  els.announcementAudience.addEventListener("change", () => {
+    els.announcementTargetWrap.style.display = els.announcementAudience.value === "individual" ? "flex" : "none";
+  });
+
+  els.announcementForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    state.announcements.unshift({
+      id: crypto.randomUUID(),
+      title: els.announcementTitle.value.trim(),
+      audience: els.announcementAudience.value,
+      targetId: els.announcementAudience.value === "individual" ? els.announcementTarget.value : "",
+      priority: els.announcementPriority.value,
+      body: els.announcementBody.value.trim(),
+      createdById: state.activeUserId,
+      createdAt: Date.now(),
+      readBy: []
+    });
+    els.announcementForm.reset();
+    saveState();
+    render();
+  });
+
+  els.requestForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    state.requests.unshift({
+      id: crypto.randomUUID(),
+      title: els.requestTitle.value.trim(),
+      fromId: state.activeUserId,
+      toId: els.requestTo.value,
+      type: els.requestType.value,
+      status: "Abierta",
+      createdAt: Date.now()
+    });
+    els.requestForm.reset();
+    saveState();
+    render();
+  });
+
+  els.trainerCreateForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const result = createTrainerAccount(
+      els.newTrainerName.value,
+      els.newTrainerEmail.value,
+      els.newTrainerZone.value,
+      els.newTrainerPassword.value
+    );
+
+    if (!result.ok) {
+      window.alert(result.message);
+      return;
+    }
+
+    els.trainerCreateForm.reset();
+    els.newTrainerPassword.value = "LG2026";
+    saveState();
+    initStaticControls();
+    render();
+  });
+
+  els.resetDemo.addEventListener("click", () => {
+    state = structuredClone(demoData);
+    syncPeople();
+    saveState();
+    initStaticControls();
+    render();
+  });
+}
+
+initStaticControls();
+addEventListeners();
+render();
+
+</script>
+  </body>
+</html>
