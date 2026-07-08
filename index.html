@@ -5,713 +5,489 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>LG Task Hub</title>
     <style>
-:root {
-  --bg: #f5f7fb;
-  --surface: #ffffff;
-  --surface-strong: #eef4ff;
-  --ink: #172033;
-  --muted: #667085;
-  --line: #d9e1ec;
-  --blue: #2563eb;
-  --blue-dark: #1e40af;
-  --green: #0f8a5f;
-  --green-soft: #dff7ed;
-  --red: #c8333b;
-  --red-soft: #ffe8ea;
-  --yellow: #9a6a00;
-  --yellow-soft: #fff4d7;
-  --shadow: 0 12px 30px rgba(23, 32, 51, 0.08);
-  color-scheme: light;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: Inter, "Segoe UI", Arial, sans-serif;
-  font-size: 15px;
-}
-
-.login-screen {
-  align-items: center;
-  display: none;
-  min-height: 100vh;
-  padding: 28px clamp(14px, 4vw, 40px);
-}
-
-.login-screen.is-active {
-  display: flex;
-}
-
-.login-card {
-  margin: 0 auto;
-  max-width: 980px;
-  width: 100%;
-}
-
-.login-brand {
-  margin-bottom: 18px;
-}
-
-.login-grid {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.login-panel {
-  display: grid;
-  gap: 12px;
-}
-
-.form-message {
-  color: var(--muted);
-  margin: 0;
-  min-height: 20px;
-}
-
-.form-message.success {
-  color: var(--green);
-  font-weight: 700;
-}
-
-.form-message.error {
-  color: var(--red);
-  font-weight: 700;
-}
-
-.compact-note {
-  margin-top: 0;
-}
-
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
-
-button {
-  cursor: pointer;
-}
-
-.topbar {
-  align-items: center;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  gap: 18px;
-  justify-content: space-between;
-  min-height: 78px;
-  padding: 14px clamp(16px, 4vw, 40px);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.brand {
-  align-items: center;
-  display: flex;
-  gap: 12px;
-  min-width: 0;
-}
-
-.brand-mark {
-  align-items: center;
-  background: #b91c35;
-  border-radius: 8px;
-  color: #fff;
-  display: inline-flex;
-  font-weight: 800;
-  height: 44px;
-  justify-content: center;
-  letter-spacing: 0;
-  width: 44px;
-}
-
-.brand h1,
-.brand p,
-.panel h2,
-.panel p {
-  margin: 0;
-}
-
-.brand h1 {
-  font-size: 21px;
-  line-height: 1.1;
-}
-
-.brand p,
-.panel p,
-.date-block span,
-.metric span,
-label,
-.subtle {
-  color: var(--muted);
-}
-
-.session-panel {
-  align-items: center;
-  display: flex;
-  gap: 10px;
-  min-width: 430px;
-}
-
-.session-panel label {
-  white-space: nowrap;
-}
-
-.role-pill,
-.status-pill,
-.priority-pill {
-  align-items: center;
-  border-radius: 999px;
-  display: inline-flex;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1;
-  padding: 7px 10px;
-  white-space: nowrap;
-}
-
-.role-pill {
-  background: var(--surface-strong);
-  color: var(--blue-dark);
-}
-
-.app-shell {
-  margin: 0 auto;
-  max-width: 1280px;
-  padding: 22px clamp(16px, 4vw, 40px) 36px;
-}
-
-.dashboard {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: 1.3fr 1.7fr repeat(3, minmax(130px, 1fr));
-  margin-bottom: 16px;
-}
-
-.date-block,
-.metric,
-.panel {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
-}
-
-.date-block,
-.metric {
-  min-height: 94px;
-  padding: 16px;
-}
-
-.date-block {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.date-block strong {
-  font-size: 26px;
-}
-
-.metric {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  justify-content: center;
-}
-
-.metric strong {
-  font-size: 28px;
-}
-
-.meter {
-  background: #e9eef6;
-  border-radius: 999px;
-  height: 8px;
-  overflow: hidden;
-}
-
-.meter span {
-  background: var(--green);
-  display: block;
-  height: 100%;
-  transition: width 180ms ease;
-  width: 0;
-}
-
-.tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-  overflow-x: auto;
-}
-
-.tab {
-  background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  color: var(--ink);
-  min-height: 42px;
-  padding: 0 16px;
-}
-
-.tab.is-active {
-  background: var(--blue);
-  border-color: var(--blue);
-  color: #fff;
-}
-
-.view {
-  display: none;
-}
-
-.view.is-active {
-  display: block;
-}
-
-.two-column {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr);
-}
-
-.panel {
-  padding: 18px;
-}
-
-.panel-header {
-  align-items: flex-start;
-  display: flex;
-  gap: 12px;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.panel h2 {
-  font-size: 20px;
-}
-
-.form-grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-label {
-  display: flex;
-  flex-direction: column;
-  font-size: 13px;
-  font-weight: 700;
-  gap: 6px;
-}
-
-input,
-select,
-textarea {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  color: var(--ink);
-  min-height: 42px;
-  padding: 9px 11px;
-  width: 100%;
-}
-
-textarea {
-  min-height: 110px;
-  resize: vertical;
-}
-
-input:focus,
-select:focus,
-textarea:focus,
-button:focus-visible {
-  outline: 3px solid rgba(37, 99, 235, 0.18);
-  outline-offset: 2px;
-}
-
-.wide {
-  grid-column: 1 / -1;
-}
-
-.primary-button,
-.ghost-button,
-.small-button {
-  border-radius: 8px;
-  font-weight: 800;
-  min-height: 42px;
-  padding: 0 14px;
-}
-
-.primary-button {
-  background: var(--blue);
-  border: 1px solid var(--blue);
-  color: #fff;
-}
-
-.primary-button:hover {
-  background: var(--blue-dark);
-}
-
-.ghost-button,
-.small-button {
-  background: #fff;
-  border: 1px solid var(--line);
-  color: var(--ink);
-}
-
-.small-button {
-  min-height: 34px;
-  padding: 0 10px;
-}
-
-.filters {
-  align-items: end;
-  border-top: 1px solid var(--line);
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: 18px;
-  padding-top: 16px;
-}
-
-.list,
-.progress-list,
-.team-list {
-  display: grid;
-  gap: 10px;
-}
-
-.filters + .list,
-.panel-header + .list,
-.form-grid + .list {
-  margin-top: 16px;
-}
-
-.task-card,
-.announcement-card,
-.request-card,
-.person-card {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 14px;
-}
-
-.task-card {
-  align-items: flex-start;
-  display: grid;
-  gap: 12px;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-}
-
-.task-card input[type="checkbox"] {
-  height: 22px;
-  margin-top: 3px;
-  min-height: auto;
-  width: 22px;
-}
-
-.task-card.is-done {
-  background: #f8fbfa;
-}
-
-.task-title {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.task-title strong {
-  line-height: 1.35;
-}
-
-.meta-row {
-  color: var(--muted);
-  display: flex;
-  flex-wrap: wrap;
-  font-size: 13px;
-  gap: 8px 12px;
-}
-
-.status-pill.done {
-  background: var(--green-soft);
-  color: var(--green);
-}
-
-.status-pill.open {
-  background: var(--yellow-soft);
-  color: var(--yellow);
-}
-
-.priority-pill.alta,
-.priority-pill.urgente {
-  background: var(--red-soft);
-  color: var(--red);
-}
-
-.priority-pill.media,
-.priority-pill.importante {
-  background: var(--yellow-soft);
-  color: var(--yellow);
-}
-
-.priority-pill.baja,
-.priority-pill.normal {
-  background: var(--surface-strong);
-  color: var(--blue-dark);
-}
-
-.progress-row {
-  display: grid;
-  gap: 8px;
-}
-
-.progress-top {
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
-}
-
-.progress-name {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.note-box {
-  background: #f6f9fd;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  margin-top: 16px;
-  padding: 14px;
-}
-
-.note-box p {
-  color: var(--muted);
-  margin-top: 6px;
-}
-
-.section-divider {
-  border-top: 1px solid var(--line);
-  margin: 18px 0;
-}
-
-.stacked-form {
-  display: grid;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.admin-only {
-  display: none;
-}
-
-.admin-only.is-visible {
-  display: block;
-}
-
-.announcement-card,
-.request-card,
-.person-card {
-  display: grid;
-  gap: 10px;
-}
-
-.card-top {
-  align-items: flex-start;
-  display: flex;
-  gap: 10px;
-  justify-content: space-between;
-}
-
-.card-top h3 {
-  font-size: 16px;
-  line-height: 1.3;
-  margin: 0;
-}
-
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.empty-state {
-  background: #fff;
-  border: 1px dashed var(--line);
-  border-radius: 8px;
-  color: var(--muted);
-  padding: 24px;
-  text-align: center;
-}
-
-.empty-state strong {
-  color: var(--ink);
-  display: block;
-  margin-bottom: 6px;
-}
-
-.product-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.product-tabs button {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  min-height: 38px;
-  padding: 0 12px;
-}
-
-.product-tabs button.is-active {
-  background: var(--green);
-  border-color: var(--green);
-  color: #fff;
-}
-
-.product-info {
-  display: grid;
-  gap: 14px;
-}
-
-.feature-grid {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.feature-box {
-  background: #f8fbff;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 12px;
-}
-
-.feature-box strong {
-  display: block;
-  margin-bottom: 6px;
-}
-
-.checklist {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-}
-
-.checklist li {
-  align-items: flex-start;
-  display: flex;
-  gap: 8px;
-  list-style: none;
-}
-
-.checklist input {
-  height: 18px;
-  margin-top: 2px;
-  min-height: auto;
-  width: 18px;
-}
-
-.quiz-box {
-  display: grid;
-  gap: 12px;
-}
-
-.quiz-options {
-  display: grid;
-  gap: 8px;
-}
-
-.quiz-options button {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  min-height: 42px;
-  padding: 8px 10px;
-  text-align: left;
-}
-
-.quiz-options button.correct {
-  background: var(--green-soft);
-  border-color: var(--green);
-}
-
-.quiz-options button.incorrect {
-  background: var(--red-soft);
-  border-color: var(--red);
-}
-
-@media (max-width: 980px) {
-  .topbar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .session-panel {
-    min-width: 0;
-    width: 100%;
-  }
-
-  .login-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .dashboard,
-  .two-column {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 680px) {
-  .app-shell {
-    padding-inline: 12px;
-  }
-
-  .date-block,
-  .metric {
-    min-height: 78px;
-  }
-
-  .form-grid,
-  .filters,
-  .feature-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .task-card {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .task-card .actions {
-    grid-column: 1 / -1;
-  }
-
-  .panel-header {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .session-panel {
-    align-items: stretch;
-    flex-direction: column;
-  }
-}
-
-</style>
+      :root {
+        --bg: #f4f7fb;
+        --card: #ffffff;
+        --ink: #172033;
+        --muted: #667085;
+        --line: #d8e0ec;
+        --blue: #2563eb;
+        --blue-dark: #1d4ed8;
+        --green: #0f8a5f;
+        --green-soft: #dcf7ea;
+        --red: #c8333b;
+        --red-soft: #ffe7ea;
+        --yellow: #9a6a00;
+        --yellow-soft: #fff4d7;
+        --soft: #eef4ff;
+        --shadow: 0 12px 28px rgba(23, 32, 51, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: Inter, "Segoe UI", Arial, sans-serif;
+        font-size: 15px;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      .muted,
+      label,
+      .meta {
+        color: var(--muted);
+      }
+
+      .login-screen {
+        align-items: center;
+        display: flex;
+        min-height: 100vh;
+        padding: 28px clamp(14px, 4vw, 38px);
+      }
+
+      .login-card {
+        margin: 0 auto;
+        max-width: 1040px;
+        width: 100%;
+      }
+
+      .brand {
+        align-items: center;
+        display: flex;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .brand-mark {
+        align-items: center;
+        background: #b91c35;
+        border-radius: 8px;
+        color: #fff;
+        display: inline-flex;
+        font-weight: 900;
+        height: 44px;
+        justify-content: center;
+        width: 44px;
+      }
+
+      .brand h1 {
+        font-size: 22px;
+        line-height: 1.05;
+      }
+
+      .login-brand {
+        margin-bottom: 18px;
+      }
+
+      .login-grid,
+      .two-col {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+
+      .panel,
+      .metric,
+      .date-card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+      }
+
+      .panel {
+        padding: 18px;
+      }
+
+      .panel-header {
+        align-items: flex-start;
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+
+      .stack {
+        display: grid;
+        gap: 12px;
+      }
+
+      .form-grid {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .wide {
+        grid-column: 1 / -1;
+      }
+
+      label {
+        display: flex;
+        flex-direction: column;
+        font-size: 13px;
+        font-weight: 800;
+        gap: 6px;
+      }
+
+      input,
+      select,
+      textarea {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--ink);
+        min-height: 42px;
+        padding: 9px 11px;
+        width: 100%;
+      }
+
+      textarea {
+        min-height: 96px;
+        resize: vertical;
+      }
+
+      input:focus,
+      select:focus,
+      textarea:focus,
+      button:focus-visible {
+        outline: 3px solid rgba(37, 99, 235, 0.18);
+        outline-offset: 2px;
+      }
+
+      .primary,
+      .ghost,
+      .small {
+        border-radius: 8px;
+        font-weight: 900;
+        min-height: 42px;
+        padding: 0 14px;
+      }
+
+      .primary {
+        background: var(--blue);
+        border: 1px solid var(--blue);
+        color: #fff;
+      }
+
+      .primary:hover {
+        background: var(--blue-dark);
+      }
+
+      .ghost,
+      .small {
+        background: #fff;
+        border: 1px solid var(--line);
+        color: var(--ink);
+      }
+
+      .small {
+        min-height: 34px;
+        padding: 0 10px;
+      }
+
+      .topbar {
+        align-items: center;
+        background: #fff;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 16px;
+        justify-content: space-between;
+        min-height: 78px;
+        padding: 14px clamp(14px, 4vw, 38px);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+
+      .session {
+        align-items: center;
+        display: flex;
+        gap: 10px;
+        min-width: 360px;
+      }
+
+      .shell {
+        margin: 0 auto;
+        max-width: 1280px;
+        padding: 22px clamp(12px, 4vw, 38px) 42px;
+      }
+
+      .dashboard {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: 1.25fr 1.7fr repeat(4, minmax(120px, 1fr));
+        margin-bottom: 16px;
+      }
+
+      .date-card,
+      .metric {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        justify-content: center;
+        min-height: 92px;
+        padding: 16px;
+      }
+
+      .date-card strong,
+      .metric strong {
+        font-size: 27px;
+      }
+
+      .meter {
+        background: #e9eef6;
+        border-radius: 999px;
+        height: 8px;
+        overflow: hidden;
+      }
+
+      .meter span {
+        background: var(--green);
+        display: block;
+        height: 100%;
+        transition: width 180ms ease;
+        width: 0;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+        overflow-x: auto;
+      }
+
+      .tab {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--ink);
+        min-height: 42px;
+        padding: 0 16px;
+        white-space: nowrap;
+      }
+
+      .tab.active {
+        background: var(--blue);
+        border-color: var(--blue);
+        color: #fff;
+      }
+
+      .view {
+        display: none;
+      }
+
+      .view.active {
+        display: block;
+      }
+
+      .list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .item {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        display: grid;
+        gap: 10px;
+        padding: 14px;
+      }
+
+      .task-item {
+        grid-template-columns: minmax(0, 1fr) auto;
+      }
+
+      .title-row,
+      .meta,
+      .actions {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+      }
+
+      .meta {
+        font-size: 13px;
+      }
+
+      .pill {
+        align-items: center;
+        background: var(--soft);
+        border-radius: 999px;
+        color: var(--blue-dark);
+        display: inline-flex;
+        font-size: 12px;
+        font-weight: 900;
+        line-height: 1;
+        padding: 7px 10px;
+        white-space: nowrap;
+      }
+
+      .pill.pending,
+      .pill.process,
+      .pill.review,
+      .pill.medium {
+        background: var(--yellow-soft);
+        color: var(--yellow);
+      }
+
+      .pill.done,
+      .pill.approved {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .pill.high,
+      .pill.observed {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .empty {
+        background: #fff;
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        color: var(--muted);
+        padding: 22px;
+        text-align: center;
+      }
+
+      .empty strong {
+        color: var(--ink);
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      .note {
+        background: #f6f9fd;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 13px;
+      }
+
+      .divider {
+        border-top: 1px solid var(--line);
+        margin: 16px 0;
+      }
+
+      .message {
+        color: var(--muted);
+        min-height: 20px;
+      }
+
+      .message.ok {
+        color: var(--green);
+        font-weight: 900;
+      }
+
+      .message.err {
+        color: var(--red);
+        font-weight: 900;
+      }
+
+      .evidence-photo {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        max-height: 220px;
+        max-width: 100%;
+        object-fit: cover;
+      }
+
+      .product-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 16px 0;
+      }
+
+      .product-tabs button {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        min-height: 38px;
+        padding: 0 12px;
+      }
+
+      .product-tabs button.active {
+        background: var(--green);
+        border-color: var(--green);
+        color: #fff;
+      }
+
+      .feature-grid {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .feature-box {
+        background: #f8fbff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+      }
+
+      @media (max-width: 1060px) {
+        .dashboard,
+        .two-col {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar,
+        .session {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .session {
+          min-width: 0;
+          width: 100%;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .login-grid,
+        .form-grid,
+        .feature-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .task-item {
+          grid-template-columns: 1fr;
+        }
+
+        .panel-header {
+          flex-direction: column;
+        }
+      }
+    </style>
   </head>
   <body>
     <section id="loginScreen" class="login-screen">
@@ -720,142 +496,138 @@ button:focus-visible {
           <span class="brand-mark">LG</span>
           <div>
             <h1>Task Hub</h1>
-            <p>Acceso web para coordinador y entrenadores</p>
+            <p class="muted">Gestion diaria de tareas y sustentos LG</p>
           </div>
         </div>
 
         <div class="login-grid">
-          <form id="loginForm" class="panel login-panel">
-            <div class="panel-header">
-              <div>
-                <h2>Ingresar</h2>
-                <p>Usa tu correo y clave asignada.</p>
-              </div>
+          <form id="loginForm" class="panel stack">
+            <div>
+              <h2>Ingresar</h2>
+              <p class="muted">Acceso para coordinador y trainers.</p>
             </div>
             <label>
               Correo
-              <input id="loginEmail" type="email" placeholder="admin@lg-taskhub.demo" required />
+              <input id="loginEmail" type="email" placeholder="pablo.ramos@lg-taskhub.local" required />
             </label>
             <label>
               Clave
-              <input id="loginPassword" type="password" placeholder="Tu clave" required />
+              <input id="loginPassword" type="password" placeholder="Clave de acceso" required />
             </label>
-            <button class="primary-button" type="submit">Entrar</button>
-            <button id="adminQuickLogin" class="ghost-button" type="button">Entrar como administrador demo</button>
-            <p id="loginStatus" class="form-message" aria-live="polite"></p>
-            <div class="note-box compact-note">
-              <strong>Acceso administrador demo</strong>
-              <p>Correo: admin@lg-taskhub.demo<br />Clave: LG2026Admin</p>
+            <button class="primary" type="submit">Entrar</button>
+            <button id="quickCoordinator" class="ghost" type="button">Entrar como Pablo Ramos</button>
+            <p id="loginMessage" class="message" aria-live="polite"></p>
+            <div class="note">
+              <strong>Coordinador inicial</strong>
+              <p class="muted">Pablo Ramos puede aprobar trainers y asignar tareas.</p>
+              <p>Correo: <strong>pablo.ramos@lg-taskhub.local</strong><br />Clave: <strong>Pablo2026</strong></p>
             </div>
           </form>
 
-          <form id="trainerRegistrationForm" class="panel login-panel">
-            <div class="panel-header">
-              <div>
-                <h2>Registro de entrenador</h2>
-                <p>Solicita acceso para que el coordinador lo apruebe.</p>
-              </div>
+          <form id="registrationForm" class="panel stack">
+            <div>
+              <h2>Registro de trainer</h2>
+              <p class="muted">El coordinador aprueba la solicitud antes del acceso.</p>
             </div>
             <label>
               Nombre completo
-              <input id="regName" type="text" placeholder="Ej. Luis Garcia" required />
+              <input id="regName" type="text" placeholder="Nombre del trainer" required />
             </label>
             <label>
               Correo
-              <input id="regEmail" type="email" placeholder="nombre@empresa.com" required />
+              <input id="regEmail" type="email" placeholder="correo@empresa.com" required />
             </label>
             <label>
-              Zona o tienda
-              <input id="regZone" type="text" placeholder="Ej. Zona Norte" required />
+              Zona o tienda base
+              <input id="regZone" type="text" placeholder="Ej. Zona Norte / Tienda Centro" required />
             </label>
             <label>
               Crear clave
               <input id="regPassword" type="password" minlength="6" placeholder="Minimo 6 caracteres" required />
             </label>
-            <button class="primary-button" type="submit">Solicitar registro</button>
-            <p id="registrationStatus" class="form-message" aria-live="polite"></p>
+            <button class="primary" type="submit">Solicitar acceso</button>
+            <p id="registrationMessage" class="message" aria-live="polite"></p>
           </form>
         </div>
       </div>
     </section>
 
-    <header id="appHeader" class="topbar">
+    <header id="appHeader" class="topbar hidden">
       <div class="brand">
         <span class="brand-mark">LG</span>
         <div>
           <h1>Task Hub</h1>
-          <p>Cuenta LG | Operacion diaria de entrenadores</p>
+          <p class="muted">Operacion diaria de cuenta LG</p>
         </div>
       </div>
-
-      <div class="session-panel">
-        <label for="activeUser">Sesion</label>
-        <select id="activeUser"></select>
-        <span id="sessionName" class="subtle">Activo</span>
-        <span id="activeRole" class="role-pill">Coordinador</span>
-        <button id="logoutButton" class="ghost-button" type="button">Salir</button>
+      <div class="session">
+        <span id="sessionName" class="muted"></span>
+        <span id="sessionRole" class="pill"></span>
+        <button id="logoutButton" class="ghost" type="button">Salir</button>
       </div>
     </header>
 
-    <main id="appShell" class="app-shell">
-      <section class="dashboard" aria-label="Resumen del dia">
-        <div class="date-block">
-          <span id="todayLabel">Hoy</span>
+    <main id="appShell" class="shell hidden">
+      <section class="dashboard">
+        <div class="date-card">
+          <span id="todayLabel" class="muted"></span>
           <strong>Tablero diario</strong>
         </div>
         <div class="metric">
-          <span>Avance general</span>
-          <strong id="globalProgress">0%</strong>
-          <div class="meter" aria-hidden="true"><span id="globalProgressBar"></span></div>
+          <span class="muted">Avance</span>
+          <strong id="progressPercent">0%</strong>
+          <div class="meter"><span id="progressBar"></span></div>
         </div>
         <div class="metric">
-          <span>Tareas abiertas</span>
-          <strong id="openTasks">0</strong>
+          <span class="muted">Pendientes</span>
+          <strong id="pendingCount">0</strong>
         </div>
         <div class="metric">
-          <span>Vencen hoy</span>
-          <strong id="dueToday">0</strong>
+          <span class="muted">En revision</span>
+          <strong id="reviewCount">0</strong>
         </div>
         <div class="metric">
-          <span>Anuncios visibles</span>
-          <strong id="visibleAnnouncements">0</strong>
+          <span class="muted">Cumplidas</span>
+          <strong id="doneCount">0</strong>
+        </div>
+        <div class="metric">
+          <span class="muted">Trainers</span>
+          <strong id="trainerCount">0</strong>
         </div>
       </section>
 
       <nav class="tabs" aria-label="Vistas principales">
-        <button class="tab is-active" data-view="tasks">Tareas</button>
-        <button class="tab" data-view="announcements">Anuncios</button>
-        <button class="tab" data-view="team">Equipo</button>
-        <button class="tab" data-view="lg">Info LG</button>
+        <button class="tab active" data-view="tasksView">Tareas</button>
+        <button class="tab" data-view="evidenceView">Sustentos</button>
+        <button class="tab" data-view="teamView">Equipo</button>
+        <button class="tab" data-view="announcementsView">Comunicados</button>
+        <button class="tab" data-view="requestsView">Solicitudes</button>
+        <button class="tab" data-view="infoView">Info LG</button>
       </nav>
 
-      <section id="tasksView" class="view is-active">
-        <div class="two-column">
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <h2>Tareas del dia</h2>
-                <p>Asignacion, seguimiento y cierre de actividades.</p>
-              </div>
-              <button id="resetDemo" class="ghost-button" type="button">Restaurar demo</button>
+      <section id="tasksView" class="view active">
+        <div class="two-col">
+          <section id="coordinatorTaskPanel" class="panel stack">
+            <div>
+              <h2>Asignar tarea</h2>
+              <p class="muted">Pablo Ramos asigna actividades diarias a los trainers.</p>
             </div>
-
             <form id="taskForm" class="form-grid">
               <label>
-                Tarea
+                Titulo de tarea
                 <input id="taskTitle" type="text" placeholder="Ej. Validar exhibicion OLED" required />
               </label>
               <label>
-                Responsable
-                <select id="taskOwner"></select>
+                Trainer responsable
+                <select id="taskOwner" required></select>
               </label>
               <label>
                 Categoria
                 <select id="taskCategory">
-                  <option>Entrenamiento</option>
                   <option>PDV</option>
-                  <option>Reporte</option>
+                  <option>Entrenamiento</option>
                   <option>Producto</option>
+                  <option>Reporte</option>
                   <option>Coordinacion</option>
                 </select>
               </label>
@@ -869,75 +641,173 @@ button:focus-visible {
               </label>
               <label>
                 Fecha limite
-                <input id="taskDue" type="date" required />
+                <input id="taskDueDate" type="date" required />
+              </label>
+              <label>
+                Producto LG
+                <input id="taskProduct" type="text" placeholder="Ej. OLED / Lavadoras / Audio" />
               </label>
               <label class="wide">
-                Nota
-                <input id="taskNotes" type="text" placeholder="Detalle corto para el responsable" />
+                Instrucciones
+                <textarea id="taskDescription" placeholder="Detalle de lo que debe revisar o ejecutar el trainer"></textarea>
               </label>
-              <button class="primary-button wide" type="submit">Agregar tarea</button>
+              <button class="primary wide" type="submit">Asignar tarea</button>
             </form>
-
-            <div class="filters">
-              <label>
-                Estado
-                <select id="statusFilter">
-                  <option value="all">Todas</option>
-                  <option value="open">Pendientes</option>
-                  <option value="done">Completadas</option>
-                </select>
-              </label>
-              <label>
-                Persona
-                <select id="personFilter">
-                  <option value="all">Todo el equipo</option>
-                </select>
-              </label>
-            </div>
-
-            <div id="taskList" class="list" aria-live="polite"></div>
+            <p id="taskMessage" class="message" aria-live="polite"></p>
           </section>
 
-          <aside class="panel">
-            <div class="panel-header">
-              <div>
-                <h2>Avance por persona</h2>
-                <p>Lectura rapida para coordinacion y seguimiento.</p>
-              </div>
+          <aside class="panel stack">
+            <div>
+              <h2>Mis tareas / Seguimiento</h2>
+              <p class="muted">El coordinador ve todas; cada trainer ve solo las suyas.</p>
             </div>
-            <div id="peopleProgress" class="progress-list"></div>
-            <div class="note-box">
-              <strong>Uso sugerido</strong>
-              <p>El coordinador revisa el avance general. Cada entrenador ve sus tareas y puede cerrar actividades en tiempo real.</p>
+            <div class="form-grid">
+              <label>
+                Estado
+                <select id="taskStatusFilter">
+                  <option value="all">Todas</option>
+                  <option value="Pendiente">Pendientes</option>
+                  <option value="En proceso">En proceso</option>
+                  <option value="En revision">En revision</option>
+                  <option value="Cumplida">Cumplidas</option>
+                  <option value="Observada">Observadas</option>
+                </select>
+              </label>
+              <label id="trainerFilterWrap">
+                Trainer
+                <select id="taskTrainerFilter"></select>
+              </label>
+            </div>
+            <div id="taskList" class="list"></div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="evidenceView" class="view">
+        <div class="two-col">
+          <section class="panel stack">
+            <div>
+              <h2>Enviar sustento</h2>
+              <p class="muted">Carga foto y formulario basico para demostrar cumplimiento.</p>
+            </div>
+            <form id="evidenceForm" class="form-grid">
+              <label class="wide">
+                Tarea
+                <select id="evidenceTask" required></select>
+              </label>
+              <label>
+                Tienda / PDV
+                <input id="evidenceStore" type="text" placeholder="Nombre de tienda o punto de venta" required />
+              </label>
+              <label>
+                Producto revisado
+                <input id="evidenceProduct" type="text" placeholder="Producto LG trabajado" />
+              </label>
+              <label>
+                Resultado
+                <select id="evidenceResult">
+                  <option>Cumplida</option>
+                  <option>Cumplida parcialmente</option>
+                  <option>No se pudo cumplir</option>
+                </select>
+              </label>
+              <label>
+                Foto de sustento
+                <input id="evidencePhoto" type="file" accept="image/*" />
+              </label>
+              <label class="wide">
+                Observaciones
+                <textarea id="evidenceNotes" placeholder="Describe que se realizo, hallazgos, incidencias o acuerdos"></textarea>
+              </label>
+              <button class="primary wide" type="submit">Enviar sustento</button>
+            </form>
+            <p id="evidenceMessage" class="message" aria-live="polite"></p>
+          </section>
+
+          <aside class="panel stack">
+            <div>
+              <h2>Sustentos recibidos</h2>
+              <p class="muted">Pablo aprueba u observa los sustentos enviados.</p>
+            </div>
+            <div id="evidenceList" class="list"></div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="teamView" class="view">
+        <div class="two-col">
+          <section id="coordinatorTeamPanel" class="panel stack">
+            <div>
+              <h2>Alta de trainers</h2>
+              <p class="muted">Crear usuarios o aprobar solicitudes de registro.</p>
+            </div>
+            <form id="createTrainerForm" class="form-grid">
+              <label>
+                Nombre
+                <input id="newTrainerName" type="text" required />
+              </label>
+              <label>
+                Correo
+                <input id="newTrainerEmail" type="email" required />
+              </label>
+              <label>
+                Zona / tienda base
+                <input id="newTrainerZone" type="text" required />
+              </label>
+              <label>
+                Clave temporal
+                <input id="newTrainerPassword" type="text" value="LG2026" required />
+              </label>
+              <button class="primary wide" type="submit">Crear trainer</button>
+            </form>
+            <p id="trainerMessage" class="message" aria-live="polite"></p>
+            <div class="divider"></div>
+            <h3>Solicitudes pendientes</h3>
+            <div id="pendingRegistrations" class="list"></div>
+          </section>
+
+          <aside class="panel stack">
+            <div>
+              <h2>Equipo activo</h2>
+              <p class="muted">Usuarios habilitados para operar la pagina.</p>
+            </div>
+            <div id="teamList" class="list"></div>
+            <div id="backupTools" class="note stack">
+              <strong>Respaldo temporal</strong>
+              <p class="muted">Mientras no haya base de datos, estos botones ayudan a mover informacion entre equipos.</p>
+              <div class="actions">
+                <button id="exportData" class="small" type="button">Exportar datos</button>
+                <label class="small" style="display:inline-flex;align-items:center;gap:8px">
+                  Importar datos
+                  <input id="importData" type="file" accept="application/json" class="hidden" />
+                </label>
+              </div>
             </div>
           </aside>
         </div>
       </section>
 
       <section id="announcementsView" class="view">
-        <div class="two-column">
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <h2>Enviar anuncio</h2>
-                <p>Comunicados generales o mensajes directos por persona.</p>
-              </div>
+        <div class="two-col">
+          <section id="coordinatorAnnouncementPanel" class="panel stack">
+            <div>
+              <h2>Crear comunicado</h2>
+              <p class="muted">Mensaje general o individual para un trainer.</p>
             </div>
-
             <form id="announcementForm" class="form-grid">
               <label>
                 Titulo
-                <input id="announcementTitle" type="text" placeholder="Ej. Cambio de horario de capacitacion" required />
+                <input id="announcementTitle" type="text" required />
               </label>
               <label>
                 Alcance
                 <select id="announcementAudience">
-                  <option value="general">General</option>
-                  <option value="individual">Individual</option>
+                  <option value="all">Todo el equipo</option>
+                  <option value="person">Trainer especifico</option>
                 </select>
               </label>
               <label id="announcementTargetWrap">
-                Persona
+                Trainer
                 <select id="announcementTarget"></select>
               </label>
               <label>
@@ -950,1203 +820,1031 @@ button:focus-visible {
               </label>
               <label class="wide">
                 Mensaje
-                <textarea id="announcementBody" rows="4" placeholder="Escribe el comunicado para el equipo" required></textarea>
+                <textarea id="announcementBody" required></textarea>
               </label>
-              <button class="primary-button wide" type="submit">Publicar anuncio</button>
+              <button class="primary wide" type="submit">Publicar comunicado</button>
             </form>
           </section>
 
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <h2>Bandeja de anuncios</h2>
-                <p>Filtrada segun el usuario activo.</p>
-              </div>
+          <aside class="panel stack">
+            <div>
+              <h2>Bandeja de comunicados</h2>
+              <p class="muted">Cada usuario ve lo que le corresponde.</p>
             </div>
             <div id="announcementList" class="list"></div>
-          </section>
-        </div>
-      </section>
-
-      <section id="teamView" class="view">
-        <div class="two-column">
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <h2>Solicitudes entre roles</h2>
-                <p>Entrenadores y coordinador pueden pedir apoyo o enviar encargos.</p>
-              </div>
-            </div>
-
-            <form id="requestForm" class="form-grid">
-              <label>
-                Para
-                <select id="requestTo"></select>
-              </label>
-              <label>
-                Tipo
-                <select id="requestType">
-                  <option>Seguimiento</option>
-                  <option>Capacitacion</option>
-                  <option>Validacion</option>
-                  <option>Reporte</option>
-                </select>
-              </label>
-              <label class="wide">
-                Solicitud
-                <input id="requestTitle" type="text" placeholder="Ej. Revisar evidencia de modulo LG" required />
-              </label>
-              <button class="primary-button wide" type="submit">Crear solicitud</button>
-            </form>
-
-            <div id="requestList" class="list"></div>
-          </section>
-
-          <aside class="panel">
-            <div class="panel-header">
-              <div>
-                <h2>Equipo LG</h2>
-                <p>Roles activos y cobertura de trabajo.</p>
-              </div>
-            </div>
-            <div id="teamList" class="team-list"></div>
-
-            <div class="admin-only">
-              <div class="section-divider"></div>
-              <h2>Alta de entrenadores</h2>
-              <p>Crear usuarios o aprobar solicitudes de registro.</p>
-              <form id="trainerCreateForm" class="stacked-form">
-                <label>
-                  Nombre completo
-                  <input id="newTrainerName" type="text" placeholder="Nombre del entrenador" required />
-                </label>
-                <label>
-                  Correo
-                  <input id="newTrainerEmail" type="email" placeholder="correo@empresa.com" required />
-                </label>
-                <label>
-                  Zona o tienda
-                  <input id="newTrainerZone" type="text" placeholder="Zona asignada" required />
-                </label>
-                <label>
-                  Clave temporal
-                  <input id="newTrainerPassword" type="text" value="LG2026" required />
-                </label>
-                <button class="primary-button" type="submit">Crear entrenador</button>
-              </form>
-              <div id="registrationRequestsList" class="list"></div>
-            </div>
           </aside>
         </div>
       </section>
 
-      <section id="lgView" class="view">
-        <div class="two-column">
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <h2>Informacion interactiva LG</h2>
-                <p>Consulta rapida para especialistas de producto.</p>
-              </div>
+      <section id="requestsView" class="view">
+        <div class="two-col">
+          <section class="panel stack">
+            <div>
+              <h2>Solicitudes internas</h2>
+              <p class="muted">Pablo y trainers pueden solicitar apoyo, revision o informacion.</p>
             </div>
-
-            <div id="productTabs" class="product-tabs"></div>
-            <div id="productInfo" class="product-info"></div>
+            <form id="supportRequestForm" class="form-grid">
+              <label>
+                Para
+                <select id="supportTo" required></select>
+              </label>
+              <label>
+                Tipo
+                <select id="supportType">
+                  <option>Seguimiento</option>
+                  <option>Validacion</option>
+                  <option>Material</option>
+                  <option>Capacitacion</option>
+                </select>
+              </label>
+              <label class="wide">
+                Solicitud
+                <input id="supportTitle" type="text" required />
+              </label>
+              <label class="wide">
+                Detalle
+                <textarea id="supportDetail"></textarea>
+              </label>
+              <button class="primary wide" type="submit">Enviar solicitud</button>
+            </form>
           </section>
 
-          <aside class="panel">
-            <div class="panel-header">
-              <div>
-                <h2>Practica de venta</h2>
-                <p>Pregunta rapida para reforzar argumentos.</p>
-              </div>
+          <aside class="panel stack">
+            <div>
+              <h2>Listado de solicitudes</h2>
+              <p class="muted">Seguimiento de pedidos entre roles.</p>
             </div>
+            <div id="supportList" class="list"></div>
+          </aside>
+        </div>
+      </section>
 
-            <div id="quizBox" class="quiz-box"></div>
-            <div class="note-box">
-              <strong>Base de conocimiento</strong>
-              <p>Esta seccion se puede ampliar con fichas tecnicas, videos, promociones, lanzamientos y guiones por categoria.</p>
+      <section id="infoView" class="view">
+        <div class="two-col">
+          <section class="panel">
+            <h2>Informacion LG</h2>
+            <p class="muted">Consulta rapida para reforzar argumentos de producto.</p>
+            <div id="productTabs" class="product-tabs"></div>
+            <div id="productInfo" class="stack"></div>
+          </section>
+          <aside class="panel stack">
+            <h2>Checklist de visita</h2>
+            <div class="item">
+              <strong>Antes de cerrar una tarea</strong>
+              <p class="muted">Verifica exhibicion, precio, disponibilidad, limpieza, material POP y evidencia fotografica.</p>
             </div>
+            <div id="quizBox" class="stack"></div>
           </aside>
         </div>
       </section>
     </main>
 
-    <template id="emptyStateTemplate">
-      <div class="empty-state">
-        <strong>No hay elementos para mostrar</strong>
-        <p>Agrega informacion nueva o cambia los filtros.</p>
-      </div>
-    </template>
-
     <script>
-const storageKey = "lg-task-hub-v1";
+      const STORAGE_KEY = "lg-task-hub-operativo-v2";
+      const todayIso = new Date().toISOString().slice(0, 10);
 
-const defaultPeople = [
-  { id: "ana", name: "Ana Torres", role: "Coordinador", zone: "Cuenta LG" },
-  { id: "carlos", name: "Carlos Ruiz", role: "Entrenador", zone: "Zona Norte" },
-  { id: "maria", name: "Maria Perez", role: "Entrenador", zone: "Zona Centro" },
-  { id: "jose", name: "Jose Ramos", role: "Entrenador", zone: "Zona Sur" }
-];
+      const initialState = {
+        version: 2,
+        activeUserId: "",
+        selectedProduct: "oled",
+        users: [
+          {
+            id: "pablo-ramos",
+            name: "Pablo Ramos",
+            email: "pablo.ramos@lg-taskhub.local",
+            password: "Pablo2026",
+            role: "Coordinador",
+            zone: "Cuenta LG",
+            status: "Activo",
+            createdAt: Date.now()
+          }
+        ],
+        registrationRequests: [],
+        tasks: [],
+        announcements: [],
+        supportRequests: []
+      };
 
-const todayIso = new Date().toISOString().slice(0, 10);
+      const products = [
+        {
+          id: "oled",
+          name: "TV OLED",
+          promise: "Pixeles autoiluminados para contraste superior, negros profundos y experiencia premium.",
+          features: [
+            ["Argumento clave", "Cada pixel se enciende de forma independiente para mejorar contraste y detalle."],
+            ["Cliente ideal", "Cine en casa, gamers y usuarios que buscan imagen premium."],
+            ["Demo sugerida", "Mostrar una escena oscura y explicar el detalle en sombras."],
+            ["Cierre", "Vender inmersion, calidad de imagen y diferenciacion tecnologica."]
+          ],
+          quiz: {
+            question: "Que debe destacar primero el trainer en OLED?",
+            answer: "Contraste y pixeles autoiluminados",
+            options: ["Contraste y pixeles autoiluminados", "Solo el tamano", "Unicamente el control remoto"]
+          }
+        },
+        {
+          id: "linea-blanca",
+          name: "Linea blanca",
+          promise: "Ahorro, cuidado, capacidad y conveniencia para el hogar.",
+          features: [
+            ["Argumento clave", "Conectar tecnologia con beneficios diarios: ahorro, cuidado y facilidad."],
+            ["Cliente ideal", "Familias o usuarios que buscan durabilidad y practicidad."],
+            ["Demo sugerida", "Preguntar necesidad del hogar y explicar capacidad con ejemplos."],
+            ["Cierre", "Reforzar respaldo de marca y beneficio economico."]
+          ],
+          quiz: {
+            question: "Que debe guiar una venta de linea blanca?",
+            answer: "Necesidad del hogar y ahorro diario",
+            options: ["Necesidad del hogar y ahorro diario", "Solo el color", "La ubicacion del almacen"]
+          }
+        },
+        {
+          id: "audio",
+          name: "Audio",
+          promise: "Sonido envolvente para complementar TV, videojuegos, peliculas y musica.",
+          features: [
+            ["Argumento clave", "Una barra mejora claridad, potencia e inmersion frente al audio del TV."],
+            ["Cliente ideal", "Compradores de TV, gamers y usuarios de entretenimiento."],
+            ["Demo sugerida", "Usar una escena con dialogo, bajos y efectos."],
+            ["Cierre", "Proponer combo TV + audio para elevar experiencia."]
+          ],
+          quiz: {
+            question: "Cuando conviene ofrecer audio?",
+            answer: "Cuando el cliente busca mejorar entretenimiento",
+            options: ["Cuando el cliente busca mejorar entretenimiento", "Solo cuando no hay TV", "Solo en linea blanca"]
+          }
+        },
+        {
+          id: "monitores",
+          name: "Monitores",
+          promise: "Productividad, gaming y creacion con foco en fluidez, color y espacio de trabajo.",
+          features: [
+            ["Argumento clave", "Recomendar por uso: gaming, multitarea, estudio u oficina."],
+            ["Cliente ideal", "Gamers, estudiantes, oficinas y creadores de contenido."],
+            ["Demo sugerida", "Mostrar tasa de refresco, resolucion o formato UltraWide."],
+            ["Cierre", "No vender solo pulgadas; vender beneficio por actividad."]
+          ],
+          quiz: {
+            question: "Que define la recomendacion de un monitor?",
+            answer: "El uso principal del cliente",
+            options: ["El uso principal del cliente", "El color de la caja", "La distancia al almacen"]
+          }
+        }
+      ];
 
-const demoData = {
-  activeUserId: "ana",
-  isLoggedIn: false,
-  people: defaultPeople,
-  accounts: [
-    { personId: "ana", email: "admin@lg-taskhub.demo", password: "LG2026Admin" },
-    { personId: "carlos", email: "carlos@lg-taskhub.demo", password: "LG2026" },
-    { personId: "maria", email: "maria@lg-taskhub.demo", password: "LG2026" },
-    { personId: "jose", email: "jose@lg-taskhub.demo", password: "LG2026" }
-  ],
-  registrationRequests: [],
-  selectedProduct: "oled",
-  tasks: [
-    {
-      id: "task-1",
-      title: "Validar exhibicion OLED y tomar evidencia",
-      ownerId: "carlos",
-      createdById: "ana",
-      category: "PDV",
-      priority: "Alta",
-      dueDate: todayIso,
-      notes: "Subir foto y observacion del modulo.",
-      done: false,
-      createdAt: Date.now() - 3600000
-    },
-    {
-      id: "task-2",
-      title: "Actualizar argumento de venta para lavadoras",
-      ownerId: "maria",
-      createdById: "ana",
-      category: "Producto",
-      priority: "Media",
-      dueDate: todayIso,
-      notes: "Incluir beneficio de ahorro y cuidado de prendas.",
-      done: true,
-      createdAt: Date.now() - 7200000
-    },
-    {
-      id: "task-3",
-      title: "Enviar reporte de asistencia a capacitacion",
-      ownerId: "ana",
-      createdById: "jose",
-      category: "Reporte",
-      priority: "Media",
-      dueDate: todayIso,
-      notes: "Consolidar participantes por tienda.",
-      done: false,
-      createdAt: Date.now() - 2400000
-    },
-    {
-      id: "task-4",
-      title: "Reforzar demo de AI DD con promotores nuevos",
-      ownerId: "jose",
-      createdById: "ana",
-      category: "Entrenamiento",
-      priority: "Baja",
-      dueDate: todayIso,
-      notes: "Usar guion de 3 preguntas al cliente.",
-      done: false,
-      createdAt: Date.now() - 5400000
-    }
-  ],
-  announcements: [
-    {
-      id: "ann-1",
-      title: "Prioridad de la semana: experiencia OLED",
-      audience: "general",
-      targetId: "",
-      priority: "Importante",
-      body: "En cada visita validar exhibicion, demo activa y argumento de contraste. Reportar quiebres antes de las 5:00 p. m.",
-      createdById: "ana",
-      createdAt: Date.now() - 5000000,
-      readBy: []
-    },
-    {
-      id: "ann-2",
-      title: "Seguimiento a capacitacion de linea blanca",
-      audience: "individual",
-      targetId: "maria",
-      priority: "Normal",
-      body: "Maria, por favor comparte el avance de participantes certificados antes del cierre.",
-      createdById: "ana",
-      createdAt: Date.now() - 3000000,
-      readBy: []
-    }
-  ],
-  requests: [
-    {
-      id: "req-1",
-      title: "Revisar evidencia de exhibicion en tienda principal",
-      fromId: "carlos",
-      toId: "ana",
-      type: "Validacion",
-      status: "Abierta",
-      createdAt: Date.now() - 2800000
-    },
-    {
-      id: "req-2",
-      title: "Enviar material de apoyo para monitores UltraGear",
-      fromId: "ana",
-      toId: "jose",
-      type: "Capacitacion",
-      status: "Abierta",
-      createdAt: Date.now() - 1800000
-    }
-  ],
-  quiz: {
-    answered: false,
-    selected: ""
-  }
-};
+      let state = loadState();
 
-const products = [
-  {
-    id: "oled",
-    name: "TV OLED",
-    promise: "Negros perfectos, contraste preciso y experiencia premium para cine, gaming y deportes.",
-    features: [
-      ["Argumento clave", "Cada pixel se ilumina de forma independiente para mejorar contraste y profundidad."],
-      ["Cliente ideal", "Usuario que busca maxima calidad de imagen, videojuegos o cine en casa."],
-      ["Demo sugerida", "Mostrar una escena oscura y comparar detalle en sombras frente a pantallas convencionales."],
-      ["Cierre", "Enfatizar inmersion, diseño delgado y tecnologia diferenciada."]
-    ],
-    checklist: [
-      "Confirmar modo demo activo.",
-      "Validar conexion de contenido 4K.",
-      "Explicar diferencia entre OLED, QNED y UHD.",
-      "Preguntar uso principal del cliente."
-    ],
-    quiz: {
-      question: "Cual es el beneficio principal de una TV OLED?",
-      answer: "Contraste alto gracias a pixeles autoiluminados",
-      options: [
-        "Contraste alto gracias a pixeles autoiluminados",
-        "Mayor peso para estabilidad",
-        "Solo funciona con contenido HD"
-      ]
-    }
-  },
-  {
-    id: "white-line",
-    name: "Linea blanca",
-    promise: "Soluciones para el hogar enfocadas en ahorro, cuidado, capacidad y conveniencia.",
-    features: [
-      ["Argumento clave", "Tecnologias como AI DD y compresores eficientes ayudan a cuidar prendas y energia."],
-      ["Cliente ideal", "Familias que necesitan capacidad, durabilidad y facilidad de uso."],
-      ["Demo sugerida", "Conectar necesidad del cliente con ahorro, garantia y practicidad diaria."],
-      ["Cierre", "Resumir beneficio economico, cuidado del hogar y respaldo de marca."]
-    ],
-    checklist: [
-      "Revisar etiquetas de precio y promocion.",
-      "Confirmar disponibilidad de modelos clave.",
-      "Explicar capacidad con ejemplos reales.",
-      "Validar que el equipo este limpio y presentable."
-    ],
-    quiz: {
-      question: "Que debe conectar el especialista al vender linea blanca?",
-      answer: "Necesidad del hogar, ahorro y cuidado diario",
-      options: [
-        "Solo el color disponible",
-        "Necesidad del hogar, ahorro y cuidado diario",
-        "Unicamente el precio final"
-      ]
-    }
-  },
-  {
-    id: "audio",
-    name: "Audio",
-    promise: "Sonido envolvente y facil conexion para complementar television, musica y entretenimiento.",
-    features: [
-      ["Argumento clave", "Una barra de sonido mejora claridad, potencia y sensacion envolvente frente al audio del TV."],
-      ["Cliente ideal", "Clientes que compran TV, gamers o usuarios que consumen peliculas y musica."],
-      ["Demo sugerida", "Activar una escena con dialogo y efectos para comparar claridad y profundidad."],
-      ["Cierre", "Proponer combo con TV para elevar el ticket y la experiencia."]
-    ],
-    checklist: [
-      "Verificar que el equipo tenga corriente y fuente conectada.",
-      "Preparar demo corta con dialogo y bajos.",
-      "Ofrecer combo junto a TV.",
-      "Confirmar compatibilidad de conexion."
-    ],
-    quiz: {
-      question: "Cuando conviene ofrecer una barra de sonido?",
-      answer: "Al vender una TV o mejorar la experiencia de entretenimiento",
-      options: [
-        "Solo cuando no hay televisores",
-        "Al vender una TV o mejorar la experiencia de entretenimiento",
-        "Unicamente en productos de cocina"
-      ]
-    }
-  },
-  {
-    id: "monitors",
-    name: "Monitores",
-    promise: "Pantallas para productividad, gaming y creadores con foco en fluidez, color y espacio de trabajo.",
-    features: [
-      ["Argumento clave", "UltraWide y UltraGear responden a necesidades distintas: multitarea o juego fluido."],
-      ["Cliente ideal", "Gamers, estudiantes, oficinas, creadores de contenido y usuarios multitarea."],
-      ["Demo sugerida", "Preguntar uso principal y mostrar tasa de refresco, resolucion o formato."],
-      ["Cierre", "Recomendar por actividad, no solo por pulgadas."]
-    ],
-    checklist: [
-      "Separar argumento gamer y productividad.",
-      "Validar cable correcto para tasa de refresco.",
-      "Mostrar beneficio de pantalla amplia.",
-      "Comparar resolucion segun uso."
-    ],
-    quiz: {
-      question: "Que debe guiar la recomendacion de un monitor?",
-      answer: "El uso principal del cliente",
-      options: ["El uso principal del cliente", "El color de la caja", "La ubicacion del almacen"]
-    }
-  },
-  {
-    id: "air",
-    name: "Aire acondicionado",
-    promise: "Confort, eficiencia y control para hogares y espacios de trabajo.",
-    features: [
-      ["Argumento clave", "La eficiencia y el control de temperatura impactan comodidad y consumo."],
-      ["Cliente ideal", "Clientes que buscan enfriar rapido, ahorrar energia o controlar humedad."],
-      ["Demo sugerida", "Explicar capacidad segun tamano del ambiente y habitos de uso."],
-      ["Cierre", "Reforzar confort, eficiencia y correcta instalacion."]
-    ],
-    checklist: [
-      "Preguntar tamano del ambiente.",
-      "Explicar eficiencia y consumo.",
-      "Validar condiciones de instalacion.",
-      "Recordar mantenimiento preventivo."
-    ],
-    quiz: {
-      question: "Que dato es basico antes de recomendar aire acondicionado?",
-      answer: "Tamano del ambiente y necesidad de enfriamiento",
-      options: [
-        "Tamano del ambiente y necesidad de enfriamiento",
-        "Cantidad de televisores en casa",
-        "Marca del celular del cliente"
-      ]
-    }
-  }
-];
+      const els = {
+        loginScreen: document.querySelector("#loginScreen"),
+        appHeader: document.querySelector("#appHeader"),
+        appShell: document.querySelector("#appShell"),
+        loginForm: document.querySelector("#loginForm"),
+        loginEmail: document.querySelector("#loginEmail"),
+        loginPassword: document.querySelector("#loginPassword"),
+        quickCoordinator: document.querySelector("#quickCoordinator"),
+        loginMessage: document.querySelector("#loginMessage"),
+        registrationForm: document.querySelector("#registrationForm"),
+        regName: document.querySelector("#regName"),
+        regEmail: document.querySelector("#regEmail"),
+        regZone: document.querySelector("#regZone"),
+        regPassword: document.querySelector("#regPassword"),
+        registrationMessage: document.querySelector("#registrationMessage"),
+        sessionName: document.querySelector("#sessionName"),
+        sessionRole: document.querySelector("#sessionRole"),
+        logoutButton: document.querySelector("#logoutButton"),
+        todayLabel: document.querySelector("#todayLabel"),
+        progressPercent: document.querySelector("#progressPercent"),
+        progressBar: document.querySelector("#progressBar"),
+        pendingCount: document.querySelector("#pendingCount"),
+        reviewCount: document.querySelector("#reviewCount"),
+        doneCount: document.querySelector("#doneCount"),
+        trainerCount: document.querySelector("#trainerCount"),
+        coordinatorTaskPanel: document.querySelector("#coordinatorTaskPanel"),
+        taskForm: document.querySelector("#taskForm"),
+        taskTitle: document.querySelector("#taskTitle"),
+        taskOwner: document.querySelector("#taskOwner"),
+        taskCategory: document.querySelector("#taskCategory"),
+        taskPriority: document.querySelector("#taskPriority"),
+        taskDueDate: document.querySelector("#taskDueDate"),
+        taskProduct: document.querySelector("#taskProduct"),
+        taskDescription: document.querySelector("#taskDescription"),
+        taskMessage: document.querySelector("#taskMessage"),
+        taskStatusFilter: document.querySelector("#taskStatusFilter"),
+        trainerFilterWrap: document.querySelector("#trainerFilterWrap"),
+        taskTrainerFilter: document.querySelector("#taskTrainerFilter"),
+        taskList: document.querySelector("#taskList"),
+        evidenceForm: document.querySelector("#evidenceForm"),
+        evidenceTask: document.querySelector("#evidenceTask"),
+        evidenceStore: document.querySelector("#evidenceStore"),
+        evidenceProduct: document.querySelector("#evidenceProduct"),
+        evidenceResult: document.querySelector("#evidenceResult"),
+        evidencePhoto: document.querySelector("#evidencePhoto"),
+        evidenceNotes: document.querySelector("#evidenceNotes"),
+        evidenceMessage: document.querySelector("#evidenceMessage"),
+        evidenceList: document.querySelector("#evidenceList"),
+        coordinatorTeamPanel: document.querySelector("#coordinatorTeamPanel"),
+        createTrainerForm: document.querySelector("#createTrainerForm"),
+        newTrainerName: document.querySelector("#newTrainerName"),
+        newTrainerEmail: document.querySelector("#newTrainerEmail"),
+        newTrainerZone: document.querySelector("#newTrainerZone"),
+        newTrainerPassword: document.querySelector("#newTrainerPassword"),
+        trainerMessage: document.querySelector("#trainerMessage"),
+        pendingRegistrations: document.querySelector("#pendingRegistrations"),
+        teamList: document.querySelector("#teamList"),
+        backupTools: document.querySelector("#backupTools"),
+        exportData: document.querySelector("#exportData"),
+        importData: document.querySelector("#importData"),
+        coordinatorAnnouncementPanel: document.querySelector("#coordinatorAnnouncementPanel"),
+        announcementForm: document.querySelector("#announcementForm"),
+        announcementTitle: document.querySelector("#announcementTitle"),
+        announcementAudience: document.querySelector("#announcementAudience"),
+        announcementTargetWrap: document.querySelector("#announcementTargetWrap"),
+        announcementTarget: document.querySelector("#announcementTarget"),
+        announcementPriority: document.querySelector("#announcementPriority"),
+        announcementBody: document.querySelector("#announcementBody"),
+        announcementList: document.querySelector("#announcementList"),
+        supportRequestForm: document.querySelector("#supportRequestForm"),
+        supportTo: document.querySelector("#supportTo"),
+        supportType: document.querySelector("#supportType"),
+        supportTitle: document.querySelector("#supportTitle"),
+        supportDetail: document.querySelector("#supportDetail"),
+        supportList: document.querySelector("#supportList"),
+        productTabs: document.querySelector("#productTabs"),
+        productInfo: document.querySelector("#productInfo"),
+        quizBox: document.querySelector("#quizBox")
+      };
 
-let state = loadState();
-let people = state.people || defaultPeople;
-
-const els = {
-  loginScreen: document.querySelector("#loginScreen"),
-  appHeader: document.querySelector("#appHeader"),
-  appShell: document.querySelector("#appShell"),
-  loginForm: document.querySelector("#loginForm"),
-  loginEmail: document.querySelector("#loginEmail"),
-  loginPassword: document.querySelector("#loginPassword"),
-  adminQuickLogin: document.querySelector("#adminQuickLogin"),
-  loginStatus: document.querySelector("#loginStatus"),
-  trainerRegistrationForm: document.querySelector("#trainerRegistrationForm"),
-  regName: document.querySelector("#regName"),
-  regEmail: document.querySelector("#regEmail"),
-  regZone: document.querySelector("#regZone"),
-  regPassword: document.querySelector("#regPassword"),
-  registrationStatus: document.querySelector("#registrationStatus"),
-  activeUser: document.querySelector("#activeUser"),
-  activeRole: document.querySelector("#activeRole"),
-  sessionName: document.querySelector("#sessionName"),
-  logoutButton: document.querySelector("#logoutButton"),
-  todayLabel: document.querySelector("#todayLabel"),
-  globalProgress: document.querySelector("#globalProgress"),
-  globalProgressBar: document.querySelector("#globalProgressBar"),
-  openTasks: document.querySelector("#openTasks"),
-  dueToday: document.querySelector("#dueToday"),
-  visibleAnnouncements: document.querySelector("#visibleAnnouncements"),
-  tabs: document.querySelectorAll(".tab"),
-  views: document.querySelectorAll(".view"),
-  taskForm: document.querySelector("#taskForm"),
-  taskTitle: document.querySelector("#taskTitle"),
-  taskOwner: document.querySelector("#taskOwner"),
-  taskCategory: document.querySelector("#taskCategory"),
-  taskPriority: document.querySelector("#taskPriority"),
-  taskDue: document.querySelector("#taskDue"),
-  taskNotes: document.querySelector("#taskNotes"),
-  statusFilter: document.querySelector("#statusFilter"),
-  personFilter: document.querySelector("#personFilter"),
-  taskList: document.querySelector("#taskList"),
-  peopleProgress: document.querySelector("#peopleProgress"),
-  resetDemo: document.querySelector("#resetDemo"),
-  announcementForm: document.querySelector("#announcementForm"),
-  announcementTitle: document.querySelector("#announcementTitle"),
-  announcementAudience: document.querySelector("#announcementAudience"),
-  announcementTargetWrap: document.querySelector("#announcementTargetWrap"),
-  announcementTarget: document.querySelector("#announcementTarget"),
-  announcementPriority: document.querySelector("#announcementPriority"),
-  announcementBody: document.querySelector("#announcementBody"),
-  announcementList: document.querySelector("#announcementList"),
-  requestForm: document.querySelector("#requestForm"),
-  requestTo: document.querySelector("#requestTo"),
-  requestType: document.querySelector("#requestType"),
-  requestTitle: document.querySelector("#requestTitle"),
-  requestList: document.querySelector("#requestList"),
-  teamList: document.querySelector("#teamList"),
-  trainerCreateForm: document.querySelector("#trainerCreateForm"),
-  newTrainerName: document.querySelector("#newTrainerName"),
-  newTrainerEmail: document.querySelector("#newTrainerEmail"),
-  newTrainerZone: document.querySelector("#newTrainerZone"),
-  newTrainerPassword: document.querySelector("#newTrainerPassword"),
-  registrationRequestsList: document.querySelector("#registrationRequestsList"),
-  productTabs: document.querySelector("#productTabs"),
-  productInfo: document.querySelector("#productInfo"),
-  quizBox: document.querySelector("#quizBox"),
-  emptyStateTemplate: document.querySelector("#emptyStateTemplate")
-};
-
-function loadState() {
-  const saved = localStorage.getItem(storageKey);
-  if (!saved) return structuredClone(demoData);
-
-  try {
-    return normalizeState({ ...structuredClone(demoData), ...JSON.parse(saved) });
-  } catch {
-    return structuredClone(demoData);
-  }
-}
-
-function normalizeState(nextState) {
-  nextState.people = nextState.people?.length ? nextState.people : structuredClone(defaultPeople);
-  nextState.accounts = nextState.accounts?.length ? nextState.accounts : structuredClone(demoData.accounts);
-  nextState.registrationRequests = nextState.registrationRequests || [];
-  nextState.isLoggedIn = Boolean(nextState.isLoggedIn);
-  return nextState;
-}
-
-function saveState() {
-  localStorage.setItem(storageKey, JSON.stringify(state));
-}
-
-function syncPeople() {
-  people = state.people || defaultPeople;
-}
-
-function personName(id) {
-  return people.find((person) => person.id === id)?.name || "Sin asignar";
-}
-
-function personRole(id) {
-  return people.find((person) => person.id === id)?.role || "";
-}
-
-function activeUser() {
-  return people.find((person) => person.id === state.activeUserId) || people[0];
-}
-
-function canSeeAll() {
-  return activeUser().role === "Coordinador";
-}
-
-function visibleTasks() {
-  const status = els.statusFilter.value;
-  const person = els.personFilter.value;
-
-  return state.tasks
-    .filter((task) => canSeeAll() || task.ownerId === state.activeUserId || task.createdById === state.activeUserId)
-    .filter((task) => (status === "all" ? true : status === "done" ? task.done : !task.done))
-    .filter((task) => (person === "all" ? true : task.ownerId === person))
-    .sort((a, b) => Number(a.done) - Number(b.done) || priorityRank(a.priority) - priorityRank(b.priority));
-}
-
-function visibleAnnouncements() {
-  return state.announcements
-    .filter((announcement) => {
-      if (canSeeAll() || announcement.createdById === state.activeUserId) return true;
-      return announcement.audience === "general" || announcement.targetId === state.activeUserId;
-    })
-    .sort((a, b) => b.createdAt - a.createdAt);
-}
-
-function priorityRank(priority) {
-  const ranks = { Alta: 0, Urgente: 0, Importante: 1, Media: 1, Normal: 2, Baja: 3 };
-  return ranks[priority] ?? 2;
-}
-
-function formatDate(value) {
-  return new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "short" }).format(new Date(`${value}T12:00:00`));
-}
-
-function formatTime(value) {
-  return new Intl.DateTimeFormat("es-PE", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(new Date(value));
-}
-
-function emptyState() {
-  return els.emptyStateTemplate.content.firstElementChild.cloneNode(true);
-}
-
-function fillSelect(select, options, selected = "") {
-  select.innerHTML = "";
-  options.forEach((option) => {
-    const node = document.createElement("option");
-    node.value = option.value;
-    node.textContent = option.label;
-    if (option.value === selected) node.selected = true;
-    select.appendChild(node);
-  });
-}
-
-function initStaticControls() {
-  syncPeople();
-  const peopleOptions = people.map((person) => ({
-    value: person.id,
-    label: `${person.name} - ${person.role}`
-  }));
-
-  fillSelect(els.activeUser, peopleOptions, state.activeUserId);
-  fillSelect(els.taskOwner, peopleOptions, state.activeUserId);
-  fillSelect(els.announcementTarget, peopleOptions.filter((person) => person.value !== state.activeUserId));
-  fillSelect(els.requestTo, peopleOptions.filter((person) => person.value !== state.activeUserId));
-
-  fillSelect(els.personFilter, [
-    { value: "all", label: "Todo el equipo" },
-    ...people.map((person) => ({ value: person.id, label: person.name }))
-  ]);
-
-  els.taskDue.value = todayIso;
-  els.todayLabel.textContent = new Intl.DateTimeFormat("es-PE", {
-    weekday: "long",
-    day: "2-digit",
-    month: "long"
-  }).format(new Date());
-}
-
-function render() {
-  syncPeople();
-  renderAuthShell();
-  if (!state.isLoggedIn) return;
-
-  const user = activeUser();
-  els.activeUser.value = user.id;
-  els.activeUser.disabled = true;
-  els.sessionName.textContent = user.name;
-  els.activeRole.textContent = user.role;
-  els.activeRole.className = "role-pill";
-
-  refreshRoleDependentOptions();
-  renderDashboard();
-  renderTasks();
-  renderPeopleProgress();
-  renderAnnouncements();
-  renderRequests();
-  renderTeam();
-  renderProducts();
-}
-
-function renderAuthShell() {
-  const isLoggedIn = Boolean(state.isLoggedIn);
-  els.loginScreen.classList.toggle("is-active", !isLoggedIn);
-  els.appHeader.style.display = isLoggedIn ? "flex" : "none";
-  els.appShell.style.display = isLoggedIn ? "block" : "none";
-}
-
-function refreshRoleDependentOptions() {
-  const peopleOptions = people.map((person) => ({
-    value: person.id,
-    label: `${person.name} - ${person.role}`
-  }));
-  const otherPeopleOptions = peopleOptions.filter((person) => person.value !== state.activeUserId);
-
-  fillSelect(els.taskOwner, peopleOptions, els.taskOwner.value || state.activeUserId);
-  fillSelect(els.announcementTarget, otherPeopleOptions, els.announcementTarget.value || otherPeopleOptions[0]?.value);
-  fillSelect(els.requestTo, otherPeopleOptions, els.requestTo.value || otherPeopleOptions[0]?.value);
-
-  els.announcementTargetWrap.style.display = els.announcementAudience.value === "individual" ? "flex" : "none";
-}
-
-function renderDashboard() {
-  const tasks = canSeeAll()
-    ? state.tasks
-    : state.tasks.filter((task) => task.ownerId === state.activeUserId || task.createdById === state.activeUserId);
-  const total = tasks.length;
-  const done = tasks.filter((task) => task.done).length;
-  const progress = total ? Math.round((done / total) * 100) : 0;
-
-  els.globalProgress.textContent = `${progress}%`;
-  els.globalProgressBar.style.width = `${progress}%`;
-  els.openTasks.textContent = tasks.filter((task) => !task.done).length;
-  els.dueToday.textContent = tasks.filter((task) => !task.done && task.dueDate === todayIso).length;
-  els.visibleAnnouncements.textContent = visibleAnnouncements().length;
-}
-
-function renderTasks() {
-  const tasks = visibleTasks();
-  els.taskList.innerHTML = "";
-
-  if (!tasks.length) {
-    els.taskList.appendChild(emptyState());
-    return;
-  }
-
-  tasks.forEach((task) => {
-    const card = document.createElement("article");
-    card.className = `task-card ${task.done ? "is-done" : ""}`;
-
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = task.done;
-    checkbox.setAttribute("aria-label", `Marcar ${task.title}`);
-    checkbox.addEventListener("change", () => {
-      task.done = checkbox.checked;
-      saveState();
-      render();
-    });
-
-    const body = document.createElement("div");
-    body.innerHTML = `
-      <div class="task-title">
-        <strong>${escapeHtml(task.title)}</strong>
-        <span class="status-pill ${task.done ? "done" : "open"}">${task.done ? "Completada" : "Pendiente"}</span>
-        <span class="priority-pill ${task.priority.toLowerCase()}">${task.priority}</span>
-      </div>
-      <div class="meta-row">
-        <span>Responsable: ${escapeHtml(personName(task.ownerId))}</span>
-        <span>Asigno: ${escapeHtml(personName(task.createdById))}</span>
-        <span>${escapeHtml(task.category)}</span>
-        <span>Limite: ${formatDate(task.dueDate)}</span>
-      </div>
-      ${task.notes ? `<p class="subtle">${escapeHtml(task.notes)}</p>` : ""}
-    `;
-
-    const actions = document.createElement("div");
-    actions.className = "actions";
-
-    const deleteButton = document.createElement("button");
-    deleteButton.className = "small-button";
-    deleteButton.type = "button";
-    deleteButton.textContent = "Eliminar";
-    deleteButton.addEventListener("click", () => {
-      state.tasks = state.tasks.filter((item) => item.id !== task.id);
-      saveState();
-      render();
-    });
-    actions.appendChild(deleteButton);
-
-    card.append(checkbox, body, actions);
-    els.taskList.appendChild(card);
-  });
-}
-
-function renderPeopleProgress() {
-  els.peopleProgress.innerHTML = "";
-
-  people.forEach((person) => {
-    const tasks = state.tasks.filter((task) => task.ownerId === person.id);
-    const done = tasks.filter((task) => task.done).length;
-    const progress = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
-    const row = document.createElement("div");
-    row.className = "progress-row";
-    row.innerHTML = `
-      <div class="progress-top">
-        <div class="progress-name">
-          <strong>${escapeHtml(person.name)}</strong>
-          <span class="subtle">${escapeHtml(person.role)} | ${escapeHtml(person.zone)}</span>
-        </div>
-        <strong>${progress}%</strong>
-      </div>
-      <div class="meter" aria-hidden="true"><span style="width: ${progress}%"></span></div>
-      <span class="subtle">${done} de ${tasks.length} tareas completadas</span>
-    `;
-    els.peopleProgress.appendChild(row);
-  });
-}
-
-function renderAnnouncements() {
-  const announcements = visibleAnnouncements();
-  els.announcementList.innerHTML = "";
-
-  if (!announcements.length) {
-    els.announcementList.appendChild(emptyState());
-    return;
-  }
-
-  announcements.forEach((announcement) => {
-    const isRead = announcement.readBy.includes(state.activeUserId);
-    const card = document.createElement("article");
-    card.className = "announcement-card";
-    card.innerHTML = `
-      <div class="card-top">
-        <h3>${escapeHtml(announcement.title)}</h3>
-        <span class="priority-pill ${announcement.priority.toLowerCase()}">${escapeHtml(announcement.priority)}</span>
-      </div>
-      <p>${escapeHtml(announcement.body)}</p>
-      <div class="meta-row">
-        <span>${announcement.audience === "general" ? "General" : `Para ${escapeHtml(personName(announcement.targetId))}`}</span>
-        <span>Publicado por ${escapeHtml(personName(announcement.createdById))}</span>
-        <span>${formatTime(announcement.createdAt)}</span>
-        <span>${isRead ? "Leido" : "No leido"}</span>
-      </div>
-    `;
-
-    const actions = document.createElement("div");
-    actions.className = "actions";
-
-    const readButton = document.createElement("button");
-    readButton.className = "small-button";
-    readButton.type = "button";
-    readButton.textContent = isRead ? "Marcar no leido" : "Marcar leido";
-    readButton.addEventListener("click", () => {
-      if (isRead) {
-        announcement.readBy = announcement.readBy.filter((id) => id !== state.activeUserId);
-      } else {
-        announcement.readBy.push(state.activeUserId);
+      function loadState() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+          if (!saved) return structuredClone(initialState);
+          return normalizeState({ ...structuredClone(initialState), ...saved });
+        } catch {
+          return structuredClone(initialState);
+        }
       }
-      saveState();
-      render();
-    });
-    actions.appendChild(readButton);
 
-    if (canSeeAll() || announcement.createdById === state.activeUserId) {
-      const deleteButton = document.createElement("button");
-      deleteButton.className = "small-button";
-      deleteButton.type = "button";
-      deleteButton.textContent = "Eliminar";
-      deleteButton.addEventListener("click", () => {
-        state.announcements = state.announcements.filter((item) => item.id !== announcement.id);
+      function normalizeState(nextState) {
+        nextState.users = nextState.users?.length ? nextState.users : structuredClone(initialState.users);
+        nextState.registrationRequests = nextState.registrationRequests || [];
+        nextState.tasks = nextState.tasks || [];
+        nextState.announcements = nextState.announcements || [];
+        nextState.supportRequests = nextState.supportRequests || [];
+        return nextState;
+      }
+
+      function saveState() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      }
+
+      function id() {
+        return crypto.randomUUID ? crypto.randomUUID() : `id-${Date.now()}-${Math.round(Math.random() * 9999)}`;
+      }
+
+      function clean(value) {
+        return String(value || "").trim();
+      }
+
+      function escapeHtml(value) {
+        return String(value || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function activeUser() {
+        return state.users.find((user) => user.id === state.activeUserId) || null;
+      }
+
+      function isCoordinator() {
+        return activeUser()?.role === "Coordinador";
+      }
+
+      function trainers() {
+        return state.users.filter((user) => user.role === "Trainer" && user.status === "Activo");
+      }
+
+      function userName(userId) {
+        return state.users.find((user) => user.id === userId)?.name || "Sin usuario";
+      }
+
+      function userByEmail(email) {
+        return state.users.find((user) => user.email.toLowerCase() === clean(email).toLowerCase());
+      }
+
+      function setMessage(element, text, type = "") {
+        element.textContent = text;
+        element.className = `message ${type}`.trim();
+      }
+
+      function fillSelect(select, options, selected = "") {
+        select.innerHTML = "";
+        options.forEach((option) => {
+          const node = document.createElement("option");
+          node.value = option.value;
+          node.textContent = option.label;
+          if (option.value === selected) node.selected = true;
+          select.appendChild(node);
+        });
+      }
+
+      function taskStatusClass(status) {
+        if (status === "Cumplida") return "approved";
+        if (status === "Observada") return "observed";
+        if (status === "En revision") return "review";
+        if (status === "En proceso") return "process";
+        return "pending";
+      }
+
+      function priorityClass(priority) {
+        if (priority === "Alta") return "high";
+        if (priority === "Media") return "medium";
+        return "";
+      }
+
+      function formatDate(dateValue) {
+        if (!dateValue) return "Sin fecha";
+        return new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "short" }).format(new Date(`${dateValue}T12:00:00`));
+      }
+
+      function formatDateTime(value) {
+        return new Intl.DateTimeFormat("es-PE", {
+          day: "2-digit",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit"
+        }).format(new Date(value));
+      }
+
+      function emptyState(title, detail) {
+        return `<div class="empty"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(detail || "")}</p></div>`;
+      }
+
+      function render() {
+        const user = activeUser();
+        const logged = Boolean(user);
+        els.loginScreen.classList.toggle("hidden", logged);
+        els.appHeader.classList.toggle("hidden", !logged);
+        els.appShell.classList.toggle("hidden", !logged);
+
+        if (!logged) return;
+
+        els.sessionName.textContent = user.name;
+        els.sessionRole.textContent = user.role;
+        els.todayLabel.textContent = new Intl.DateTimeFormat("es-PE", {
+          weekday: "long",
+          day: "2-digit",
+          month: "long"
+        }).format(new Date());
+
+        els.coordinatorTaskPanel.classList.toggle("hidden", !isCoordinator());
+        els.trainerFilterWrap.classList.toggle("hidden", !isCoordinator());
+        els.coordinatorTeamPanel.classList.toggle("hidden", !isCoordinator());
+        els.backupTools.classList.toggle("hidden", !isCoordinator());
+        els.coordinatorAnnouncementPanel.classList.toggle("hidden", !isCoordinator());
+
+        refreshSelects();
+        renderDashboard();
+        renderTasks();
+        renderEvidence();
+        renderTeam();
+        renderAnnouncements();
+        renderSupportRequests();
+        renderProducts();
+      }
+
+      function refreshSelects() {
+        const trainerOptions = trainers().map((trainer) => ({ value: trainer.id, label: `${trainer.name} - ${trainer.zone}` }));
+        fillSelect(els.taskOwner, trainerOptions, els.taskOwner.value);
+        fillSelect(els.taskTrainerFilter, [{ value: "all", label: "Todo el equipo" }, ...trainerOptions], els.taskTrainerFilter.value || "all");
+        fillSelect(els.announcementTarget, trainerOptions, els.announcementTarget.value);
+
+        const otherUsers = state.users
+          .filter((user) => user.status === "Activo" && user.id !== state.activeUserId)
+          .map((user) => ({ value: user.id, label: `${user.name} - ${user.role}` }));
+        fillSelect(els.supportTo, otherUsers, els.supportTo.value);
+
+        const availableTasks = state.tasks
+          .filter((task) => !isCoordinator() && task.ownerId === state.activeUserId && task.status !== "Cumplida")
+          .map((task) => ({ value: task.id, label: `${task.title} (${formatDate(task.dueDate)})` }));
+        fillSelect(els.evidenceTask, availableTasks, els.evidenceTask.value);
+        els.taskDueDate.value = els.taskDueDate.value || todayIso;
+      }
+
+      function relevantTasks() {
+        return isCoordinator() ? state.tasks : state.tasks.filter((task) => task.ownerId === state.activeUserId);
+      }
+
+      function filteredTasks() {
+        const status = els.taskStatusFilter.value;
+        const trainer = els.taskTrainerFilter.value || "all";
+        return relevantTasks()
+          .filter((task) => status === "all" || task.status === status)
+          .filter((task) => !isCoordinator() || trainer === "all" || task.ownerId === trainer)
+          .sort((a, b) => b.createdAt - a.createdAt);
+      }
+
+      function renderDashboard() {
+        const tasks = relevantTasks();
+        const done = tasks.filter((task) => task.status === "Cumplida").length;
+        const review = tasks.filter((task) => task.status === "En revision").length;
+        const pending = tasks.filter((task) => task.status === "Pendiente" || task.status === "En proceso" || task.status === "Observada").length;
+        const percent = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+        els.progressPercent.textContent = `${percent}%`;
+        els.progressBar.style.width = `${percent}%`;
+        els.pendingCount.textContent = pending;
+        els.reviewCount.textContent = review;
+        els.doneCount.textContent = done;
+        els.trainerCount.textContent = trainers().length;
+      }
+
+      function renderTasks() {
+        const tasks = filteredTasks();
+        els.taskList.innerHTML = "";
+
+        if (!tasks.length) {
+          els.taskList.innerHTML = emptyState("No hay tareas para mostrar", isCoordinator() ? "Asigna una tarea nueva a un trainer." : "Cuando Pablo Ramos te asigne una tarea aparecera aqui.");
+          return;
+        }
+
+        tasks.forEach((task) => {
+          const card = document.createElement("article");
+          card.className = "item task-item";
+          const latestEvidence = task.evidence?.at(-1);
+          card.innerHTML = `
+            <div class="stack">
+              <div class="title-row">
+                <h3>${escapeHtml(task.title)}</h3>
+                <span class="pill ${taskStatusClass(task.status)}">${escapeHtml(task.status)}</span>
+                <span class="pill ${priorityClass(task.priority)}">${escapeHtml(task.priority)}</span>
+              </div>
+              <div class="meta">
+                <span>Trainer: ${escapeHtml(userName(task.ownerId))}</span>
+                <span>Fecha limite: ${formatDate(task.dueDate)}</span>
+                <span>${escapeHtml(task.category)}</span>
+                ${task.product ? `<span>Producto: ${escapeHtml(task.product)}</span>` : ""}
+              </div>
+              ${task.description ? `<p>${escapeHtml(task.description)}</p>` : ""}
+              ${
+                latestEvidence
+                  ? `<div class="note"><strong>Ultimo sustento:</strong><p class="muted">${escapeHtml(latestEvidence.result)} | ${escapeHtml(latestEvidence.store)} | ${formatDateTime(latestEvidence.submittedAt)}</p></div>`
+                  : ""
+              }
+            </div>
+            <div class="actions"></div>
+          `;
+
+          const actions = card.querySelector(".actions");
+          if (!isCoordinator() && task.status === "Pendiente") {
+            const startButton = document.createElement("button");
+            startButton.className = "small";
+            startButton.type = "button";
+            startButton.textContent = "Iniciar";
+            startButton.addEventListener("click", () => {
+              task.status = "En proceso";
+              saveState();
+              render();
+            });
+            actions.appendChild(startButton);
+          }
+
+          if (!isCoordinator() && task.status !== "Cumplida") {
+            const evidenceButton = document.createElement("button");
+            evidenceButton.className = "small";
+            evidenceButton.type = "button";
+            evidenceButton.textContent = "Enviar sustento";
+            evidenceButton.addEventListener("click", () => {
+              document.querySelector('[data-view="evidenceView"]').click();
+              els.evidenceTask.value = task.id;
+              els.evidenceStore.focus();
+            });
+            actions.appendChild(evidenceButton);
+          }
+
+          if (isCoordinator() && task.status === "En revision") {
+            const approveButton = document.createElement("button");
+            approveButton.className = "small";
+            approveButton.type = "button";
+            approveButton.textContent = "Aprobar";
+            approveButton.addEventListener("click", () => reviewTask(task.id, "Cumplida"));
+
+            const observeButton = document.createElement("button");
+            observeButton.className = "small";
+            observeButton.type = "button";
+            observeButton.textContent = "Observar";
+            observeButton.addEventListener("click", () => reviewTask(task.id, "Observada"));
+            actions.append(approveButton, observeButton);
+          }
+
+          if (isCoordinator()) {
+            const deleteButton = document.createElement("button");
+            deleteButton.className = "small";
+            deleteButton.type = "button";
+            deleteButton.textContent = "Eliminar";
+            deleteButton.addEventListener("click", () => {
+              state.tasks = state.tasks.filter((item) => item.id !== task.id);
+              saveState();
+              render();
+            });
+            actions.appendChild(deleteButton);
+          }
+
+          els.taskList.appendChild(card);
+        });
+      }
+
+      function reviewTask(taskId, status) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        if (!task) return;
+        task.status = status;
+        const latestEvidence = task.evidence?.at(-1);
+        if (latestEvidence) {
+          latestEvidence.review = status === "Cumplida" ? "Aprobado" : "Observado";
+          latestEvidence.reviewedById = state.activeUserId;
+          latestEvidence.reviewedAt = Date.now();
+        }
         saveState();
         render();
-      });
-      actions.appendChild(deleteButton);
-    }
+      }
 
-    card.appendChild(actions);
-    els.announcementList.appendChild(card);
-  });
-}
+      function renderEvidence() {
+        const allEvidence = relevantTasks()
+          .flatMap((task) => (task.evidence || []).map((evidence) => ({ ...evidence, task })))
+          .sort((a, b) => b.submittedAt - a.submittedAt);
 
-function renderRequests() {
-  els.requestList.innerHTML = "";
-  const requests = state.requests
-    .filter((request) => canSeeAll() || request.fromId === state.activeUserId || request.toId === state.activeUserId)
-    .sort((a, b) => b.createdAt - a.createdAt);
+        els.evidenceList.innerHTML = "";
+        if (!allEvidence.length) {
+          els.evidenceList.innerHTML = emptyState("No hay sustentos enviados", "Los sustentos apareceran cuando un trainer cargue evidencia.");
+          return;
+        }
 
-  if (!requests.length) {
-    els.requestList.appendChild(emptyState());
-    return;
-  }
+        allEvidence.forEach((entry) => {
+          const card = document.createElement("article");
+          card.className = "item";
+          card.innerHTML = `
+            <div class="title-row">
+              <h3>${escapeHtml(entry.task.title)}</h3>
+              <span class="pill ${entry.review === "Aprobado" ? "approved" : entry.review === "Observado" ? "observed" : "review"}">${escapeHtml(entry.review || "Pendiente")}</span>
+            </div>
+            <div class="meta">
+              <span>Trainer: ${escapeHtml(userName(entry.submittedById))}</span>
+              <span>PDV: ${escapeHtml(entry.store)}</span>
+              <span>Resultado: ${escapeHtml(entry.result)}</span>
+              <span>${formatDateTime(entry.submittedAt)}</span>
+            </div>
+            ${entry.product ? `<p><strong>Producto:</strong> ${escapeHtml(entry.product)}</p>` : ""}
+            ${entry.notes ? `<p>${escapeHtml(entry.notes)}</p>` : ""}
+            ${entry.photoData ? `<img class="evidence-photo" src="${entry.photoData}" alt="Foto de sustento" />` : ""}
+          `;
 
-  requests.forEach((request) => {
-    const card = document.createElement("article");
-    card.className = "request-card";
-    card.innerHTML = `
-      <div class="card-top">
-        <h3>${escapeHtml(request.title)}</h3>
-        <span class="status-pill ${request.status === "Cerrada" ? "done" : "open"}">${escapeHtml(request.status)}</span>
-      </div>
-      <div class="meta-row">
-        <span>De ${escapeHtml(personName(request.fromId))}</span>
-        <span>Para ${escapeHtml(personName(request.toId))}</span>
-        <span>${escapeHtml(request.type)}</span>
-        <span>${formatTime(request.createdAt)}</span>
-      </div>
-    `;
+          if (isCoordinator() && entry.review !== "Aprobado") {
+            const actions = document.createElement("div");
+            actions.className = "actions";
+            const approveButton = document.createElement("button");
+            approveButton.className = "small";
+            approveButton.type = "button";
+            approveButton.textContent = "Aprobar tarea";
+            approveButton.addEventListener("click", () => reviewTask(entry.task.id, "Cumplida"));
+            const observeButton = document.createElement("button");
+            observeButton.className = "small";
+            observeButton.type = "button";
+            observeButton.textContent = "Observar";
+            observeButton.addEventListener("click", () => reviewTask(entry.task.id, "Observada"));
+            actions.append(approveButton, observeButton);
+            card.appendChild(actions);
+          }
 
-    const actions = document.createElement("div");
-    actions.className = "actions";
+          els.evidenceList.appendChild(card);
+        });
+      }
 
-    const toggleButton = document.createElement("button");
-    toggleButton.className = "small-button";
-    toggleButton.type = "button";
-    toggleButton.textContent = request.status === "Cerrada" ? "Reabrir" : "Cerrar";
-    toggleButton.addEventListener("click", () => {
-      request.status = request.status === "Cerrada" ? "Abierta" : "Cerrada";
-      saveState();
-      render();
-    });
-    actions.appendChild(toggleButton);
+      function renderTeam() {
+        const pending = state.registrationRequests.filter((request) => request.status === "Pendiente");
+        els.pendingRegistrations.innerHTML = "";
+        if (!pending.length) {
+          els.pendingRegistrations.innerHTML = emptyState("No hay solicitudes pendientes", "Cuando un trainer solicite acceso aparecera aqui.");
+        } else {
+          pending.forEach((request) => {
+            const card = document.createElement("article");
+            card.className = "item";
+            card.innerHTML = `
+              <div class="title-row">
+                <h3>${escapeHtml(request.name)}</h3>
+                <span class="pill pending">Pendiente</span>
+              </div>
+              <div class="meta">
+                <span>${escapeHtml(request.email)}</span>
+                <span>${escapeHtml(request.zone)}</span>
+              </div>
+              <div class="actions"></div>
+            `;
+            const actions = card.querySelector(".actions");
+            const approveButton = document.createElement("button");
+            approveButton.className = "small";
+            approveButton.type = "button";
+            approveButton.textContent = "Aprobar";
+            approveButton.addEventListener("click", () => {
+              createTrainer(request.name, request.email, request.zone, request.password);
+              request.status = "Aprobada";
+              saveState();
+              render();
+            });
+            const rejectButton = document.createElement("button");
+            rejectButton.className = "small";
+            rejectButton.type = "button";
+            rejectButton.textContent = "Rechazar";
+            rejectButton.addEventListener("click", () => {
+              request.status = "Rechazada";
+              saveState();
+              render();
+            });
+            actions.append(approveButton, rejectButton);
+            els.pendingRegistrations.appendChild(card);
+          });
+        }
 
-    card.appendChild(actions);
-    els.requestList.appendChild(card);
-  });
-}
+        els.teamList.innerHTML = "";
+        state.users
+          .filter((user) => user.status === "Activo")
+          .forEach((user) => {
+            const assigned = state.tasks.filter((task) => task.ownerId === user.id);
+            const completed = assigned.filter((task) => task.status === "Cumplida").length;
+            const card = document.createElement("article");
+            card.className = "item";
+            card.innerHTML = `
+              <div class="title-row">
+                <h3>${escapeHtml(user.name)}</h3>
+                <span class="pill">${escapeHtml(user.role)}</span>
+              </div>
+              <div class="meta">
+                <span>${escapeHtml(user.zone)}</span>
+                <span>${escapeHtml(user.email)}</span>
+                <span>${completed}/${assigned.length} tareas cumplidas</span>
+              </div>
+            `;
+            els.teamList.appendChild(card);
+          });
+      }
 
-function renderTeam() {
-  els.teamList.innerHTML = "";
-  document.querySelectorAll(".admin-only").forEach((node) => node.classList.toggle("is-visible", canSeeAll()));
+      function renderAnnouncements() {
+        const visible = state.announcements
+          .filter((announcement) => isCoordinator() || announcement.audience === "all" || announcement.targetId === state.activeUserId)
+          .sort((a, b) => b.createdAt - a.createdAt);
+        els.announcementList.innerHTML = "";
 
-  people.forEach((person) => {
-    const assigned = state.tasks.filter((task) => task.ownerId === person.id);
-    const open = assigned.filter((task) => !task.done);
-    const card = document.createElement("article");
-    card.className = "person-card";
-    card.innerHTML = `
-      <div class="card-top">
-        <h3>${escapeHtml(person.name)}</h3>
-        <span class="role-pill">${escapeHtml(person.role)}</span>
-      </div>
-      <div class="meta-row">
-        <span>${escapeHtml(person.zone)}</span>
-        <span>${assigned.length} tareas</span>
-        <span>${open.length} pendientes</span>
-      </div>
-    `;
-    els.teamList.appendChild(card);
-  });
+        if (!visible.length) {
+          els.announcementList.innerHTML = emptyState("No hay comunicados", "Los comunicados de Pablo Ramos apareceran aqui.");
+          return;
+        }
 
-  renderRegistrationRequests();
-}
+        visible.forEach((announcement) => {
+          const card = document.createElement("article");
+          card.className = "item";
+          card.innerHTML = `
+            <div class="title-row">
+              <h3>${escapeHtml(announcement.title)}</h3>
+              <span class="pill ${announcement.priority === "Urgente" ? "high" : announcement.priority === "Importante" ? "medium" : ""}">${escapeHtml(announcement.priority)}</span>
+            </div>
+            <p>${escapeHtml(announcement.body)}</p>
+            <div class="meta">
+              <span>${announcement.audience === "all" ? "Todo el equipo" : `Para ${escapeHtml(userName(announcement.targetId))}`}</span>
+              <span>${formatDateTime(announcement.createdAt)}</span>
+            </div>
+          `;
+          els.announcementList.appendChild(card);
+        });
+      }
 
-function renderRegistrationRequests() {
-  els.registrationRequestsList.innerHTML = "";
-  if (!canSeeAll()) return;
+      function renderSupportRequests() {
+        const visible = state.supportRequests
+          .filter((request) => isCoordinator() || request.fromId === state.activeUserId || request.toId === state.activeUserId)
+          .sort((a, b) => b.createdAt - a.createdAt);
+        els.supportList.innerHTML = "";
 
-  const title = document.createElement("div");
-  title.className = "section-divider";
-  els.registrationRequestsList.appendChild(title);
+        if (!visible.length) {
+          els.supportList.innerHTML = emptyState("No hay solicitudes", "Crea una solicitud para pedir apoyo o seguimiento.");
+          return;
+        }
 
-  const pending = state.registrationRequests.filter((request) => request.status === "Pendiente");
-  if (!pending.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
-    empty.innerHTML = "<strong>No hay solicitudes pendientes</strong><p>Cuando un entrenador solicite acceso aparecera aqui.</p>";
-    els.registrationRequestsList.appendChild(empty);
-    return;
-  }
+        visible.forEach((request) => {
+          const card = document.createElement("article");
+          card.className = "item";
+          card.innerHTML = `
+            <div class="title-row">
+              <h3>${escapeHtml(request.title)}</h3>
+              <span class="pill ${request.status === "Cerrada" ? "done" : "pending"}">${escapeHtml(request.status)}</span>
+            </div>
+            <div class="meta">
+              <span>De ${escapeHtml(userName(request.fromId))}</span>
+              <span>Para ${escapeHtml(userName(request.toId))}</span>
+              <span>${escapeHtml(request.type)}</span>
+              <span>${formatDateTime(request.createdAt)}</span>
+            </div>
+            ${request.detail ? `<p>${escapeHtml(request.detail)}</p>` : ""}
+            <div class="actions"></div>
+          `;
+          const actions = card.querySelector(".actions");
+          const toggleButton = document.createElement("button");
+          toggleButton.className = "small";
+          toggleButton.type = "button";
+          toggleButton.textContent = request.status === "Cerrada" ? "Reabrir" : "Cerrar";
+          toggleButton.addEventListener("click", () => {
+            request.status = request.status === "Cerrada" ? "Abierta" : "Cerrada";
+            saveState();
+            render();
+          });
+          actions.appendChild(toggleButton);
+          els.supportList.appendChild(card);
+        });
+      }
 
-  pending.forEach((request) => {
-    const card = document.createElement("article");
-    card.className = "person-card";
-    card.innerHTML = `
-      <div class="card-top">
-        <h3>${escapeHtml(request.name)}</h3>
-        <span class="status-pill open">Pendiente</span>
-      </div>
-      <div class="meta-row">
-        <span>${escapeHtml(request.email)}</span>
-        <span>${escapeHtml(request.zone)}</span>
-      </div>
-    `;
+      function renderProducts() {
+        els.productTabs.innerHTML = "";
+        products.forEach((product) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = product.name;
+          button.className = product.id === state.selectedProduct ? "active" : "";
+          button.addEventListener("click", () => {
+            state.selectedProduct = product.id;
+            saveState();
+            renderProducts();
+          });
+          els.productTabs.appendChild(button);
+        });
 
-    const actions = document.createElement("div");
-    actions.className = "actions";
-
-    const approveButton = document.createElement("button");
-    approveButton.className = "small-button";
-    approveButton.type = "button";
-    approveButton.textContent = "Aprobar";
-    approveButton.addEventListener("click", () => {
-      createTrainerAccount(request.name, request.email, request.zone, request.password);
-      request.status = "Aprobada";
-      saveState();
-      initStaticControls();
-      render();
-    });
-
-    const rejectButton = document.createElement("button");
-    rejectButton.className = "small-button";
-    rejectButton.type = "button";
-    rejectButton.textContent = "Rechazar";
-    rejectButton.addEventListener("click", () => {
-      request.status = "Rechazada";
-      saveState();
-      render();
-    });
-
-    actions.append(approveButton, rejectButton);
-    card.appendChild(actions);
-    els.registrationRequestsList.appendChild(card);
-  });
-}
-
-function renderProducts() {
-  els.productTabs.innerHTML = "";
-
-  products.forEach((product) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = product.name;
-    button.className = product.id === state.selectedProduct ? "is-active" : "";
-    button.addEventListener("click", () => {
-      state.selectedProduct = product.id;
-      state.quiz = { answered: false, selected: "" };
-      saveState();
-      renderProducts();
-    });
-    els.productTabs.appendChild(button);
-  });
-
-  const product = products.find((item) => item.id === state.selectedProduct) || products[0];
-  els.productInfo.innerHTML = `
-    <div>
-      <h3>${escapeHtml(product.name)}</h3>
-      <p>${escapeHtml(product.promise)}</p>
-    </div>
-    <div class="feature-grid">
-      ${product.features
-        .map(
-          ([title, text]) => `
-          <div class="feature-box">
-            <strong>${escapeHtml(title)}</strong>
-            <span>${escapeHtml(text)}</span>
+        const product = products.find((item) => item.id === state.selectedProduct) || products[0];
+        els.productInfo.innerHTML = `
+          <h3>${escapeHtml(product.name)}</h3>
+          <p class="muted">${escapeHtml(product.promise)}</p>
+          <div class="feature-grid">
+            ${product.features
+              .map(
+                ([title, text]) => `
+                  <div class="feature-box">
+                    <strong>${escapeHtml(title)}</strong>
+                    <p>${escapeHtml(text)}</p>
+                  </div>
+                `
+              )
+              .join("")}
           </div>
-        `
-        )
-        .join("")}
-    </div>
-    <div>
-      <h3>Checklist de tienda</h3>
-      <ul class="checklist">
-        ${product.checklist
-          .map(
-            (item, index) => `
-          <li>
-            <input type="checkbox" id="${product.id}-check-${index}" />
-            <label for="${product.id}-check-${index}">${escapeHtml(item)}</label>
-          </li>
-        `
-          )
-          .join("")}
-      </ul>
-    </div>
-  `;
+        `;
 
-  renderQuiz(product);
-}
+        els.quizBox.innerHTML = `
+          <div class="item">
+            <strong>${escapeHtml(product.quiz.question)}</strong>
+            <div class="actions">
+              ${product.quiz.options.map((option) => `<button class="small" type="button" data-answer="${escapeHtml(option)}">${escapeHtml(option)}</button>`).join("")}
+            </div>
+            <p class="muted" id="quizResult">Selecciona una respuesta.</p>
+          </div>
+        `;
+        els.quizBox.querySelectorAll("button").forEach((button) => {
+          button.addEventListener("click", () => {
+            const result = els.quizBox.querySelector("#quizResult");
+            result.textContent = button.dataset.answer === product.quiz.answer ? "Correcto. Usa ese argumento en tienda." : `Respuesta correcta: ${product.quiz.answer}`;
+          });
+        });
+      }
 
-function renderQuiz(product) {
-  const quiz = product.quiz;
-  const answered = state.quiz.answered;
-  els.quizBox.innerHTML = `
-    <strong>${escapeHtml(quiz.question)}</strong>
-    <div class="quiz-options">
-      ${quiz.options
-        .map((option) => {
-          let className = "";
-          if (answered && option === quiz.answer) className = "correct";
-          if (answered && option === state.quiz.selected && option !== quiz.answer) className = "incorrect";
-          return `<button type="button" class="${className}" data-answer="${escapeHtml(option)}">${escapeHtml(option)}</button>`;
-        })
-        .join("")}
-    </div>
-    <p class="subtle">${
-      answered
-        ? state.quiz.selected === quiz.answer
-          ? "Correcto. Puedes usar este argumento en tienda."
-          : `Respuesta correcta: ${escapeHtml(quiz.answer)}.`
-        : "Selecciona una respuesta para validar conocimiento."
-    }</p>
-  `;
+      function createTrainer(name, email, zone, password) {
+        if (userByEmail(email)) {
+          return { ok: false, message: "Ese correo ya existe." };
+        }
+        state.users.push({
+          id: id(),
+          name: clean(name),
+          email: clean(email).toLowerCase(),
+          password,
+          role: "Trainer",
+          zone: clean(zone),
+          status: "Activo",
+          createdAt: Date.now()
+        });
+        return { ok: true };
+      }
 
-  els.quizBox.querySelectorAll("button").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.quiz = { answered: true, selected: button.dataset.answer };
-      saveState();
-      renderQuiz(product);
-    });
-  });
-}
+      async function compressImage(file) {
+        if (!file) return "";
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        const img = await new Promise((resolve, reject) => {
+          const image = new Image();
+          image.onload = () => resolve(image);
+          image.onerror = reject;
+          image.src = dataUrl;
+        });
+        const maxSize = 900;
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL("image/jpeg", 0.72);
+      }
 
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
+      function addEventListeners() {
+        els.loginForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const user = userByEmail(els.loginEmail.value);
+          if (!user || user.password !== els.loginPassword.value || user.status !== "Activo") {
+            setMessage(els.loginMessage, "Correo o clave incorrectos, o usuario no aprobado.", "err");
+            return;
+          }
+          state.activeUserId = user.id;
+          saveState();
+          render();
+        });
 
-function setMessage(element, message, type = "") {
-  element.textContent = message;
-  element.className = `form-message ${type}`.trim();
-}
+        els.quickCoordinator.addEventListener("click", () => {
+          els.loginEmail.value = "pablo.ramos@lg-taskhub.local";
+          els.loginPassword.value = "Pablo2026";
+          els.loginForm.requestSubmit();
+        });
 
-function findAccountByEmail(email) {
-  return state.accounts.find((account) => account.email.toLowerCase() === email.trim().toLowerCase());
-}
+        els.registrationForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const email = clean(els.regEmail.value).toLowerCase();
+          const alreadyPending = state.registrationRequests.some((request) => request.email === email && request.status === "Pendiente");
+          if (userByEmail(email) || alreadyPending) {
+            setMessage(els.registrationMessage, "Ese correo ya existe o esta pendiente de aprobacion.", "err");
+            return;
+          }
+          state.registrationRequests.push({
+            id: id(),
+            name: clean(els.regName.value),
+            email,
+            zone: clean(els.regZone.value),
+            password: els.regPassword.value,
+            status: "Pendiente",
+            createdAt: Date.now()
+          });
+          saveState();
+          els.registrationForm.reset();
+          setMessage(els.registrationMessage, "Solicitud enviada. Pablo Ramos debe aprobarla.", "ok");
+        });
 
-function createTrainerAccount(name, email, zone, password) {
-  const existing = findAccountByEmail(email);
-  if (existing) return { ok: false, message: "Ese correo ya tiene una cuenta creada." };
+        els.logoutButton.addEventListener("click", () => {
+          state.activeUserId = "";
+          saveState();
+          render();
+        });
 
-  const id = `trainer-${Date.now()}-${Math.round(Math.random() * 999)}`;
-  const person = { id, name: name.trim(), role: "Entrenador", zone: zone.trim() };
-  state.people.push(person);
-  state.accounts.push({ personId: id, email: email.trim().toLowerCase(), password });
-  syncPeople();
-  return { ok: true, person };
-}
+        document.querySelectorAll(".tab").forEach((tab) => {
+          tab.addEventListener("click", () => {
+            document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item === tab));
+            document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === tab.dataset.view));
+            render();
+          });
+        });
 
-function loginWithCredentials(email, password) {
-  const account = findAccountByEmail(email);
-  if (!account || account.password !== password) {
-    return { ok: false, message: "Correo o clave incorrectos." };
-  }
+        els.taskForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          if (!els.taskOwner.value) {
+            setMessage(els.taskMessage, "Primero crea o aprueba al menos un trainer.", "err");
+            return;
+          }
+          state.tasks.unshift({
+            id: id(),
+            title: clean(els.taskTitle.value),
+            ownerId: els.taskOwner.value,
+            createdById: state.activeUserId,
+            category: els.taskCategory.value,
+            priority: els.taskPriority.value,
+            dueDate: els.taskDueDate.value,
+            product: clean(els.taskProduct.value),
+            description: clean(els.taskDescription.value),
+            status: "Pendiente",
+            createdAt: Date.now(),
+            evidence: []
+          });
+          saveState();
+          els.taskForm.reset();
+          els.taskDueDate.value = todayIso;
+          setMessage(els.taskMessage, "Tarea asignada correctamente.", "ok");
+          render();
+        });
 
-  state.activeUserId = account.personId;
-  state.isLoggedIn = true;
-  saveState();
-  initStaticControls();
-  render();
-  return { ok: true };
-}
+        els.taskStatusFilter.addEventListener("change", renderTasks);
+        els.taskTrainerFilter.addEventListener("change", renderTasks);
 
-function addEventListeners() {
-  els.loginForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const result = loginWithCredentials(els.loginEmail.value, els.loginPassword.value);
-    if (!result.ok) setMessage(els.loginStatus, result.message, "error");
-  });
+        els.evidenceForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const task = state.tasks.find((item) => item.id === els.evidenceTask.value);
+          if (!task) {
+            setMessage(els.evidenceMessage, "No hay tarea seleccionada.", "err");
+            return;
+          }
+          setMessage(els.evidenceMessage, "Procesando sustento...", "");
+          const photoData = await compressImage(els.evidencePhoto.files[0]);
+          task.evidence = task.evidence || [];
+          task.evidence.push({
+            id: id(),
+            submittedById: state.activeUserId,
+            submittedAt: Date.now(),
+            store: clean(els.evidenceStore.value),
+            product: clean(els.evidenceProduct.value),
+            result: els.evidenceResult.value,
+            notes: clean(els.evidenceNotes.value),
+            photoData,
+            review: "Pendiente"
+          });
+          task.status = "En revision";
+          saveState();
+          els.evidenceForm.reset();
+          setMessage(els.evidenceMessage, "Sustento enviado. Queda pendiente de revision del coordinador.", "ok");
+          render();
+        });
 
-  els.adminQuickLogin.addEventListener("click", () => {
-    els.loginEmail.value = "admin@lg-taskhub.demo";
-    els.loginPassword.value = "LG2026Admin";
-    loginWithCredentials(els.loginEmail.value, els.loginPassword.value);
-  });
+        els.createTrainerForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const result = createTrainer(els.newTrainerName.value, els.newTrainerEmail.value, els.newTrainerZone.value, els.newTrainerPassword.value);
+          if (!result.ok) {
+            setMessage(els.trainerMessage, result.message, "err");
+            return;
+          }
+          saveState();
+          els.createTrainerForm.reset();
+          els.newTrainerPassword.value = "LG2026";
+          setMessage(els.trainerMessage, "Trainer creado correctamente.", "ok");
+          render();
+        });
 
-  els.trainerRegistrationForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const email = els.regEmail.value.trim().toLowerCase();
-    if (findAccountByEmail(email)) {
-      setMessage(els.registrationStatus, "Ese correo ya esta registrado.", "error");
-      return;
-    }
+        els.announcementAudience.addEventListener("change", () => {
+          els.announcementTargetWrap.classList.toggle("hidden", els.announcementAudience.value !== "person");
+        });
 
-    const alreadyPending = state.registrationRequests.some(
-      (request) => request.email.toLowerCase() === email && request.status === "Pendiente"
-    );
-    if (alreadyPending) {
-      setMessage(els.registrationStatus, "Ya existe una solicitud pendiente para ese correo.", "error");
-      return;
-    }
+        els.announcementForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          state.announcements.unshift({
+            id: id(),
+            title: clean(els.announcementTitle.value),
+            audience: els.announcementAudience.value,
+            targetId: els.announcementAudience.value === "person" ? els.announcementTarget.value : "",
+            priority: els.announcementPriority.value,
+            body: clean(els.announcementBody.value),
+            createdById: state.activeUserId,
+            createdAt: Date.now()
+          });
+          saveState();
+          els.announcementForm.reset();
+          render();
+        });
 
-    state.registrationRequests.push({
-      id: crypto.randomUUID(),
-      name: els.regName.value.trim(),
-      email,
-      zone: els.regZone.value.trim(),
-      password: els.regPassword.value,
-      status: "Pendiente",
-      createdAt: Date.now()
-    });
-    saveState();
-    els.trainerRegistrationForm.reset();
-    setMessage(els.registrationStatus, "Solicitud enviada. El coordinador debe aprobarla.", "success");
-  });
+        els.supportRequestForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          if (!els.supportTo.value) return;
+          state.supportRequests.unshift({
+            id: id(),
+            fromId: state.activeUserId,
+            toId: els.supportTo.value,
+            type: els.supportType.value,
+            title: clean(els.supportTitle.value),
+            detail: clean(els.supportDetail.value),
+            status: "Abierta",
+            createdAt: Date.now()
+          });
+          saveState();
+          els.supportRequestForm.reset();
+          render();
+        });
 
-  els.logoutButton.addEventListener("click", () => {
-    state.isLoggedIn = false;
-    saveState();
-    render();
-  });
+        els.exportData.addEventListener("click", () => {
+          const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `lg-task-hub-respaldo-${todayIso}.json`;
+          link.click();
+          URL.revokeObjectURL(url);
+        });
 
-  els.activeUser.addEventListener("change", () => {
-    state.activeUserId = els.activeUser.value;
-    saveState();
-    render();
-  });
+        els.importData.addEventListener("change", async () => {
+          const file = els.importData.files[0];
+          if (!file) return;
+          try {
+            const text = await file.text();
+            state = normalizeState(JSON.parse(text));
+            saveState();
+            render();
+          } catch {
+            window.alert("No se pudo importar el archivo.");
+          }
+        });
+      }
 
-  els.tabs.forEach((tab) => {
-    tab.addEventListener("click", () => {
-      els.tabs.forEach((item) => item.classList.toggle("is-active", item === tab));
-      els.views.forEach((view) => view.classList.toggle("is-active", view.id === `${tab.dataset.view}View`));
-    });
-  });
-
-  els.taskForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    state.tasks.unshift({
-      id: crypto.randomUUID(),
-      title: els.taskTitle.value.trim(),
-      ownerId: els.taskOwner.value,
-      createdById: state.activeUserId,
-      category: els.taskCategory.value,
-      priority: els.taskPriority.value,
-      dueDate: els.taskDue.value,
-      notes: els.taskNotes.value.trim(),
-      done: false,
-      createdAt: Date.now()
-    });
-    els.taskForm.reset();
-    els.taskDue.value = todayIso;
-    saveState();
-    render();
-  });
-
-  els.statusFilter.addEventListener("change", render);
-  els.personFilter.addEventListener("change", render);
-
-  els.announcementAudience.addEventListener("change", () => {
-    els.announcementTargetWrap.style.display = els.announcementAudience.value === "individual" ? "flex" : "none";
-  });
-
-  els.announcementForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    state.announcements.unshift({
-      id: crypto.randomUUID(),
-      title: els.announcementTitle.value.trim(),
-      audience: els.announcementAudience.value,
-      targetId: els.announcementAudience.value === "individual" ? els.announcementTarget.value : "",
-      priority: els.announcementPriority.value,
-      body: els.announcementBody.value.trim(),
-      createdById: state.activeUserId,
-      createdAt: Date.now(),
-      readBy: []
-    });
-    els.announcementForm.reset();
-    saveState();
-    render();
-  });
-
-  els.requestForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    state.requests.unshift({
-      id: crypto.randomUUID(),
-      title: els.requestTitle.value.trim(),
-      fromId: state.activeUserId,
-      toId: els.requestTo.value,
-      type: els.requestType.value,
-      status: "Abierta",
-      createdAt: Date.now()
-    });
-    els.requestForm.reset();
-    saveState();
-    render();
-  });
-
-  els.trainerCreateForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const result = createTrainerAccount(
-      els.newTrainerName.value,
-      els.newTrainerEmail.value,
-      els.newTrainerZone.value,
-      els.newTrainerPassword.value
-    );
-
-    if (!result.ok) {
-      window.alert(result.message);
-      return;
-    }
-
-    els.trainerCreateForm.reset();
-    els.newTrainerPassword.value = "LG2026";
-    saveState();
-    initStaticControls();
-    render();
-  });
-
-  els.resetDemo.addEventListener("click", () => {
-    state = structuredClone(demoData);
-    syncPeople();
-    saveState();
-    initStaticControls();
-    render();
-  });
-}
-
-initStaticControls();
-addEventListeners();
-render();
-
-</script>
+      els.announcementTargetWrap.classList.add("hidden");
+      els.taskDueDate.value = todayIso;
+      addEventListeners();
+      render();
+    </script>
   </body>
 </html>
