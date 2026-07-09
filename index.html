@@ -600,6 +600,16 @@
             </label>
             <button class="primary" type="submit">Entrar</button>
             <p id="loginMessage" class="message" aria-live="polite"></p>
+            <div class="divider"></div>
+            <button id="toggleRecovery" class="ghost" type="button">Olvide mi clave</button>
+            <div id="recoveryBox" class="stack hidden">
+              <label>
+                Correo registrado
+                <input id="recoveryEmail" type="email" placeholder="correo@empresa.com" autocomplete="off" />
+              </label>
+              <button id="recoverySubmit" class="small" type="button">Solicitar recuperacion</button>
+              <p id="recoveryMessage" class="message" aria-live="polite"></p>
+            </div>
           </form>
 
           <form id="registrationForm" class="panel stack" autocomplete="off">
@@ -723,7 +733,7 @@
                 <input id="taskTitle" type="text" placeholder="Ej. Validar exhibicion OLED" required />
               </label>
               <label>
-                Trainer responsable
+                Responsable
                 <select id="taskOwner" required></select>
               </label>
               <label>
@@ -876,6 +886,9 @@
             <div class="divider"></div>
             <h3>Solicitudes pendientes</h3>
             <div id="pendingRegistrations" class="list"></div>
+            <div class="divider"></div>
+            <h3>Recuperacion de claves</h3>
+            <div id="passwordRecoveryList" class="list"></div>
           </section>
 
           <aside class="panel stack">
@@ -1023,6 +1036,7 @@
         selectedWeekStart: "",
         users: [],
         registrationRequests: [],
+        passwordRecoveryRequests: [],
         tasks: [],
         announcements: [],
         supportRequests: []
@@ -1105,6 +1119,11 @@
         loginEmail: document.querySelector("#loginEmail"),
         loginPassword: document.querySelector("#loginPassword"),
         loginMessage: document.querySelector("#loginMessage"),
+        toggleRecovery: document.querySelector("#toggleRecovery"),
+        recoveryBox: document.querySelector("#recoveryBox"),
+        recoveryEmail: document.querySelector("#recoveryEmail"),
+        recoverySubmit: document.querySelector("#recoverySubmit"),
+        recoveryMessage: document.querySelector("#recoveryMessage"),
         registrationForm: document.querySelector("#registrationForm"),
         regName: document.querySelector("#regName"),
         regEmail: document.querySelector("#regEmail"),
@@ -1162,6 +1181,7 @@
         newTrainerPassword: document.querySelector("#newTrainerPassword"),
         trainerMessage: document.querySelector("#trainerMessage"),
         pendingRegistrations: document.querySelector("#pendingRegistrations"),
+        passwordRecoveryList: document.querySelector("#passwordRecoveryList"),
         teamList: document.querySelector("#teamList"),
         backupTools: document.querySelector("#backupTools"),
         exportData: document.querySelector("#exportData"),
@@ -1199,6 +1219,7 @@
       function normalizeState(nextState) {
         nextState.users = nextState.users?.length ? nextState.users : structuredClone(initialState.users);
         nextState.registrationRequests = nextState.registrationRequests || [];
+        nextState.passwordRecoveryRequests = nextState.passwordRecoveryRequests || [];
         nextState.tasks = nextState.tasks || [];
         nextState.announcements = nextState.announcements || [];
         nextState.supportRequests = nextState.supportRequests || [];
@@ -1237,6 +1258,15 @@
 
       function trainers() {
         return state.users.filter((user) => user.role === "Trainer" && user.status === "Activo");
+      }
+
+      function assignableUsers() {
+        const current = activeUser();
+        const people = trainers();
+        if (isCoordinator() && current && !people.some((user) => user.id === current.id)) {
+          return [current, ...people];
+        }
+        return people;
       }
 
       function userName(userId) {
@@ -1328,6 +1358,18 @@
         return `LG Task Hub / Sustentos / ${date} / ${folderSafe(userName(evidence.submittedById))} / ${folderSafe(task.title)}`;
       }
 
+      function generateTempPassword() {
+        return `LG-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+      }
+
+      function recoveryMailLink(user, tempPassword) {
+        const subject = encodeURIComponent("Recuperacion de clave - LG Task Hub");
+        const body = encodeURIComponent(
+          `Hola ${user.name},\n\nSe genero una clave temporal para ingresar a LG Task Hub.\n\nCorreo: ${user.email}\nClave temporal: ${tempPassword}\n\nIngresa a https://angelhoward12.github.io/ y cambia esta clave cuando el sistema ya este conectado a base de datos.\n\nMensaje enviado por coordinacion LG.`
+        );
+        return `mailto:${encodeURIComponent(user.email)}?subject=${subject}&body=${body}`;
+      }
+
       function emptyState(title, detail) {
         return `<div class="empty"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(detail || "")}</p></div>`;
       }
@@ -1370,8 +1412,9 @@
 
       function refreshSelects() {
         const trainerOptions = trainers().map((trainer) => ({ value: trainer.id, label: `${trainer.name} - ${trainer.zone}` }));
-        fillSelect(els.taskOwner, trainerOptions, els.taskOwner.value);
-        fillSelect(els.taskTrainerFilter, [{ value: "all", label: "Todo el equipo" }, ...trainerOptions], els.taskTrainerFilter.value || "all");
+        const assignableOptions = assignableUsers().map((user) => ({ value: user.id, label: `${user.name} - ${user.role === "Coordinador" ? "Coordinador" : user.zone}` }));
+        fillSelect(els.taskOwner, assignableOptions, els.taskOwner.value);
+        fillSelect(els.taskTrainerFilter, [{ value: "all", label: "Todo el equipo y coordinador" }, ...assignableOptions], els.taskTrainerFilter.value || "all");
         fillSelect(els.announcementTarget, trainerOptions, els.announcementTarget.value);
 
         const otherUsers = state.users
@@ -1778,9 +1821,11 @@
           });
         }
 
+        renderPasswordRecoveryRequests();
+
         els.teamList.innerHTML = "";
-        state.users
-          .filter((user) => user.status === "Activo")
+        const visibleUsers = isCoordinator() ? state.users.filter((user) => user.status === "Activo") : [activeUser()].filter(Boolean);
+        visibleUsers
           .forEach((user) => {
             const assigned = state.tasks.filter((task) => task.ownerId === user.id);
             const completed = assigned.filter((task) => task.status === "Cumplida").length;
@@ -1795,10 +1840,104 @@
                 <span>${escapeHtml(user.zone)}</span>
                 <span>${escapeHtml(user.email)}</span>
                 <span>${completed}/${assigned.length} tareas cumplidas</span>
+                <span>Clave actual: protegida</span>
               </div>
+              ${
+                isCoordinator()
+                  ? `<div class="note">
+                      <strong>Seguridad</strong>
+                      <p class="muted">No se muestran contrasenas actuales. Si el usuario olvido su clave, genera una temporal y enviala solo al correo registrado.</p>
+                      ${user.passwordResetTemp ? `<p><strong>Clave temporal:</strong> ${escapeHtml(user.passwordResetTemp)}</p>` : ""}
+                    </div>
+                    <div class="actions"></div>`
+                  : `<div class="note"><strong>Mi acceso</strong><p class="muted">Si olvidas tu clave, usa Olvide mi clave en la pantalla de ingreso.</p></div>`
+              }
             `;
+            const actions = card.querySelector(".actions");
+            if (isCoordinator() && actions) {
+              const resetButton = document.createElement("button");
+              resetButton.className = "small";
+              resetButton.type = "button";
+              resetButton.textContent = "Restablecer clave";
+              resetButton.addEventListener("click", () => resetUserPassword(user.id));
+              actions.appendChild(resetButton);
+              if (user.passwordResetTemp) {
+                const mailLink = document.createElement("a");
+                mailLink.className = "small";
+                mailLink.href = recoveryMailLink(user, user.passwordResetTemp);
+                mailLink.textContent = "Preparar correo";
+                actions.appendChild(mailLink);
+                const clearButton = document.createElement("button");
+                clearButton.className = "small";
+                clearButton.type = "button";
+                clearButton.textContent = "Ocultar temporal";
+                clearButton.addEventListener("click", () => {
+                  user.passwordResetTemp = "";
+                  saveState();
+                  render();
+                });
+                actions.appendChild(clearButton);
+              }
+            }
             els.teamList.appendChild(card);
           });
+      }
+
+      function renderPasswordRecoveryRequests() {
+        const requests = state.passwordRecoveryRequests
+          .filter((request) => request.status !== "Cerrada")
+          .sort((a, b) => b.createdAt - a.createdAt);
+        els.passwordRecoveryList.innerHTML = "";
+
+        if (!requests.length) {
+          els.passwordRecoveryList.innerHTML = emptyState("No hay solicitudes de recuperacion", "Cuando alguien use Olvide mi clave aparecera aqui.");
+          return;
+        }
+
+        requests.forEach((request) => {
+          const user = state.users.find((item) => item.id === request.userId);
+          const card = document.createElement("article");
+          card.className = "item";
+          card.innerHTML = `
+            <div class="title-row">
+              <h3>${escapeHtml(user?.name || request.email)}</h3>
+              <span class="pill ${request.status === "Clave temporal generada" ? "approved" : "pending"}">${escapeHtml(request.status)}</span>
+            </div>
+            <div class="meta">
+              <span>${escapeHtml(request.email)}</span>
+              <span>${formatDateTime(request.createdAt)}</span>
+            </div>
+            ${request.tempPassword ? `<div class="note"><strong>Clave temporal:</strong><p>${escapeHtml(request.tempPassword)}</p></div>` : ""}
+            <div class="actions"></div>
+          `;
+          const actions = card.querySelector(".actions");
+          if (user) {
+            const resetButton = document.createElement("button");
+            resetButton.className = "small";
+            resetButton.type = "button";
+            resetButton.textContent = request.tempPassword ? "Generar otra clave" : "Generar clave temporal";
+            resetButton.addEventListener("click", () => resetUserPassword(user.id, request.id));
+            actions.appendChild(resetButton);
+            if (request.tempPassword) {
+              const mailLink = document.createElement("a");
+              mailLink.className = "small";
+              mailLink.href = recoveryMailLink(user, request.tempPassword);
+              mailLink.textContent = "Preparar correo";
+              actions.appendChild(mailLink);
+            }
+          }
+          const closeButton = document.createElement("button");
+          closeButton.className = "small";
+          closeButton.type = "button";
+          closeButton.textContent = "Cerrar solicitud";
+          closeButton.addEventListener("click", () => {
+            request.status = "Cerrada";
+            saveState();
+            render();
+          });
+          actions.appendChild(closeButton);
+          els.passwordRecoveryList.appendChild(card);
+        });
       }
 
       function renderAnnouncements() {
@@ -1957,6 +2096,31 @@
         return { ok: true };
       }
 
+      function resetUserPassword(userId, requestId = "") {
+        if (!isCoordinator()) return;
+        const user = state.users.find((item) => item.id === userId);
+        if (!user) return;
+        const tempPassword = generateTempPassword();
+        user.password = tempPassword;
+        user.passwordResetTemp = tempPassword;
+        user.mustChangePassword = true;
+        user.passwordResetAt = Date.now();
+
+        if (requestId) {
+          const request = state.passwordRecoveryRequests.find((item) => item.id === requestId);
+          if (request) {
+            request.status = "Clave temporal generada";
+            request.tempPassword = tempPassword;
+            request.resolvedAt = Date.now();
+            request.resolvedById = state.activeUserId;
+          }
+        }
+
+        saveState();
+        setMessage(els.trainerMessage, `Clave temporal para ${user.name}: ${tempPassword}. Envia esta clave solo al correo registrado.`, "ok");
+        render();
+      }
+
       async function compressImage(file) {
         if (!file) return "";
         const dataUrl = await new Promise((resolve, reject) => {
@@ -1996,6 +2160,38 @@
           els.coordinatorCodeWrap.classList.toggle("hidden", !isCoordinator);
           els.coordinatorCode.required = isCoordinator;
           if (!isCoordinator) els.coordinatorCode.value = "";
+        });
+
+        els.toggleRecovery.addEventListener("click", () => {
+          els.recoveryBox.classList.toggle("hidden");
+          if (!els.recoveryBox.classList.contains("hidden")) {
+            els.recoveryEmail.value = els.loginEmail.value;
+            els.recoveryEmail.focus();
+          }
+        });
+
+        els.recoverySubmit.addEventListener("click", () => {
+          const email = clean(els.recoveryEmail.value).toLowerCase();
+          if (!email) {
+            setMessage(els.recoveryMessage, "Escribe el correo registrado.", "err");
+            return;
+          }
+          const user = userByEmail(email);
+          if (user) {
+            const alreadyPending = state.passwordRecoveryRequests.some((request) => request.userId === user.id && request.status === "Pendiente");
+            if (!alreadyPending) {
+              state.passwordRecoveryRequests.unshift({
+                id: id(),
+                userId: user.id,
+                email: user.email,
+                status: "Pendiente",
+                createdAt: Date.now()
+              });
+              saveState();
+            }
+          }
+          setMessage(els.recoveryMessage, "Si el correo esta registrado, Pablo vera la solicitud y podra enviarte una clave temporal.", "ok");
+          els.recoveryEmail.value = "";
         });
 
         els.loginForm.addEventListener("submit", (event) => {
@@ -2064,7 +2260,7 @@
         els.taskForm.addEventListener("submit", (event) => {
           event.preventDefault();
           if (!els.taskOwner.value) {
-            setMessage(els.taskMessage, "Primero crea o aprueba al menos un trainer.", "err");
+            setMessage(els.taskMessage, "Primero registra un responsable activo.", "err");
             return;
           }
           state.tasks.unshift({
