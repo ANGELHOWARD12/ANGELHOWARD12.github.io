@@ -47,8 +47,8 @@ export async function onRequest(context) {
 }
 
 async function ensureSchema(db) {
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
+  await db.batch([
+    db.prepare(`CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       email TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -58,24 +58,23 @@ async function ensureSchema(db) {
       password_hash TEXT NOT NULL,
       password_salt TEXT NOT NULL,
       created_at INTEGER NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS sessions (
+    )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS sessions (
       token_hash TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
       expires_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    );
-    CREATE TABLE IF NOT EXISTS app_data (
+    )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS app_data (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       data TEXT NOT NULL,
       updated_at INTEGER NOT NULL
-    );
-    INSERT OR IGNORE INTO app_data (id, data, updated_at)
-    VALUES (1, '${JSON.stringify(EMPTY_DATA)}', 0);
-    CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
-    CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at);
-  `);
+    )`),
+    db.prepare("INSERT OR IGNORE INTO app_data (id, data, updated_at) VALUES (1, ?, 0)").bind(JSON.stringify(EMPTY_DATA)),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at)")
+  ]);
 }
 
 async function register(request, db) {
