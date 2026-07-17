@@ -1063,6 +1063,2586 @@
 
     <script>
       const STORAGE_KEY = "lg-task-hub-ui-v1";
+      const API_BASE = "/cloud";
+      const WORKDAY_START = "08:30";
+      const WORKDAY_END = "18:00";
+      const todayIso = new Date().toISOString().slice(0, 10);
+
+      const initialState = {
+        version: 4,
+        activeUserId: "",
+        selectedProduct: "oled",
+        selectedWeekStart: "",
+        users: [],
+        registrationRequests: [],
+        passwordRecoveryRequests: [],
+        tasks: [],
+        announcements: [],
+        supportRequests: []
+      };
+
+      const products = [
+        {
+          id: "oled",
+          name: "TV OLED",
+          promise: "Pixeles autoiluminados para contraste superior, negros profundos y experiencia premium.",
+          features: [
+            ["Argumento clave", "Cada pixel se enciende de forma independiente para mejorar contraste y detalle."],
+            ["Cliente ideal", "Cine en casa, gamers y usuarios que buscan imagen premium."],
+            ["Demo sugerida", "Mostrar una escena oscura y explicar el detalle en sombras."],
+            ["Cierre", "Vender inmersion, calidad de imagen y diferenciacion tecnologica."]
+          ],
+          quiz: {
+            question: "Que debe destacar primero el trainer en OLED?",
+            answer: "Contraste y pixeles autoiluminados",
+            options: ["Contraste y pixeles autoiluminados", "Solo el tamano", "Unicamente el control remoto"]
+          }
+        },
+        {
+          id: "linea-blanca",
+          name: "Linea blanca",
+          promise: "Ahorro, cuidado, capacidad y conveniencia para el hogar.",
+          features: [
+            ["Argumento clave", "Conectar tecnologia con beneficios diarios: ahorro, cuidado y facilidad."],
+            ["Cliente ideal", "Familias o usuarios que buscan durabilidad y practicidad."],
+            ["Demo sugerida", "Preguntar necesidad del hogar y explicar capacidad con ejemplos."],
+            ["Cierre", "Reforzar respaldo de marca y beneficio economico."]
+          ],
+          quiz: {
+            question: "Que debe guiar una venta de linea blanca?",
+            answer: "Necesidad del hogar y ahorro diario",
+            options: ["Necesidad del hogar y ahorro diario", "Solo el color", "La ubicacion del almacen"]
+          }
+        },
+        {
+          id: "audio",
+          name: "Audio",
+          promise: "Sonido envolvente para complementar TV, videojuegos, peliculas y musica.",
+          features: [
+            ["Argumento clave", "Una barra mejora claridad, potencia e inmersion frente al audio del TV."],
+            ["Cliente ideal", "Compradores de TV, gamers y usuarios de entretenimiento."],
+            ["Demo sugerida", "Usar una escena con dialogo, bajos y efectos."],
+            ["Cierre", "Proponer combo TV + audio para elevar experiencia."]
+          ],
+          quiz: {
+            question: "Cuando conviene ofrecer audio?",
+            answer: "Cuando el cliente busca mejorar entretenimiento",
+            options: ["Cuando el cliente busca mejorar entretenimiento", "Solo cuando no hay TV", "Solo en linea blanca"]
+          }
+        },
+        {
+          id: "monitores",
+          name: "Monitores",
+          promise: "Productividad, gaming y creacion con foco en fluidez, color y espacio de trabajo.",
+          features: [
+            ["Argumento clave", "Recomendar por uso: gaming, multitarea, estudio u oficina."],
+            ["Cliente ideal", "Gamers, estudiantes, oficinas y creadores de contenido."],
+            ["Demo sugerida", "Mostrar tasa de refresco, resolucion o formato UltraWide."],
+            ["Cierre", "No vender solo pulgadas; vender beneficio por actividad."]
+          ],
+          quiz: {
+            question: "Que define la recomendacion de un monitor?",
+            answer: "El uso principal del cliente",
+            options: ["El uso principal del cliente", "El color de la caja", "La distancia al almacen"]
+          }
+        }
+      ];
+
+      let state = loadState();
+      let syncTimer = 0;
+      let syncInFlight = null;
+
+      const els = {
+        loginScreen: document.querySelector("#loginScreen"),
+        appHeader: document.querySelector("#appHeader"),
+        appShell: document.querySelector("#appShell"),
+        loginForm: document.querySelector("#loginForm"),
+        loginEmail: document.querySelector("#loginEmail"),
+        loginPassword: document.querySelector("#loginPassword"),
+        loginMessage: document.querySelector("#loginMessage"),
+        toggleRecovery: document.querySelector("#toggleRecovery"),
+        recoveryBox: document.querySelector("#recoveryBox"),
+        recoveryEmail: document.querySelector("#recoveryEmail"),
+        recoverySubmit: document.querySelector("#recoverySubmit"),
+        recoveryMessage: document.querySelector("#recoveryMessage"),
+        registrationForm: document.querySelector("#registrationForm"),
+        regName: document.querySelector("#regName"),
+        regEmail: document.querySelector("#regEmail"),
+        regZone: document.querySelector("#regZone"),
+        regRole: document.querySelector("#regRole"),
+        coordinatorCodeWrap: document.querySelector("#coordinatorCodeWrap"),
+        coordinatorCode: document.querySelector("#coordinatorCode"),
+        regPassword: document.querySelector("#regPassword"),
+        registrationMessage: document.querySelector("#registrationMessage"),
+        sessionName: document.querySelector("#sessionName"),
+        sessionRole: document.querySelector("#sessionRole"),
+        logoutButton: document.querySelector("#logoutButton"),
+        todayLabel: document.querySelector("#todayLabel"),
+        progressPercent: document.querySelector("#progressPercent"),
+        progressBar: document.querySelector("#progressBar"),
+        pendingCount: document.querySelector("#pendingCount"),
+        reviewCount: document.querySelector("#reviewCount"),
+        doneCount: document.querySelector("#doneCount"),
+        trainerCount: document.querySelector("#trainerCount"),
+        coordinatorWeekPanel: document.querySelector("#coordinatorWeekPanel"),
+        prevWeek: document.querySelector("#prevWeek"),
+        todayWeek: document.querySelector("#todayWeek"),
+        nextWeek: document.querySelector("#nextWeek"),
+        weekLabel: document.querySelector("#weekLabel"),
+        weeklySummary: document.querySelector("#weeklySummary"),
+        coordinatorTaskPanel: document.querySelector("#coordinatorTaskPanel"),
+        taskForm: document.querySelector("#taskForm"),
+        taskTitle: document.querySelector("#taskTitle"),
+        taskOwner: document.querySelector("#taskOwner"),
+        taskCategory: document.querySelector("#taskCategory"),
+        taskPriority: document.querySelector("#taskPriority"),
+        taskDueDate: document.querySelector("#taskDueDate"),
+        taskStartTime: document.querySelector("#taskStartTime"),
+        taskEndTime: document.querySelector("#taskEndTime"),
+        taskProduct: document.querySelector("#taskProduct"),
+        taskDescription: document.querySelector("#taskDescription"),
+        taskMessage: document.querySelector("#taskMessage"),
+        taskStatusFilter: document.querySelector("#taskStatusFilter"),
+        trainerFilterWrap: document.querySelector("#trainerFilterWrap"),
+        taskTrainerFilter: document.querySelector("#taskTrainerFilter"),
+        taskList: document.querySelector("#taskList"),
+        evidenceForm: document.querySelector("#evidenceForm"),
+        evidenceTask: document.querySelector("#evidenceTask"),
+        evidenceStore: document.querySelector("#evidenceStore"),
+        evidenceProduct: document.querySelector("#evidenceProduct"),
+        evidenceResult: document.querySelector("#evidenceResult"),
+        evidencePhoto: document.querySelector("#evidencePhoto"),
+        evidenceNotes: document.querySelector("#evidenceNotes"),
+        evidenceMessage: document.querySelector("#evidenceMessage"),
+        cloudPlanPanel: document.querySelector("#cloudPlanPanel"),
+        evidenceList: document.querySelector("#evidenceList"),
+        coordinatorTeamPanel: document.querySelector("#coordinatorTeamPanel"),
+        createTrainerForm: document.querySelector("#createTrainerForm"),
+        newTrainerName: document.querySelector("#newTrainerName"),
+        newTrainerEmail: document.querySelector("#newTrainerEmail"),
+        newTrainerZone: document.querySelector("#newTrainerZone"),
+        newTrainerPassword: document.querySelector("#newTrainerPassword"),
+        trainerMessage: document.querySelector("#trainerMessage"),
+        pendingRegistrations: document.querySelector("#pendingRegistrations"),
+        passwordRecoveryList: document.querySelector("#passwordRecoveryList"),
+        teamList: document.querySelector("#teamList"),
+        backupTools: document.querySelector("#backupTools"),
+        exportData: document.querySelector("#exportData"),
+        importData: document.querySelector("#importData"),
+        coordinatorAnnouncementPanel: document.querySelector("#coordinatorAnnouncementPanel"),
+        announcementForm: document.querySelector("#announcementForm"),
+        announcementTitle: document.querySelector("#announcementTitle"),
+        announcementAudience: document.querySelector("#announcementAudience"),
+        announcementTargetWrap: document.querySelector("#announcementTargetWrap"),
+        announcementTarget: document.querySelector("#announcementTarget"),
+        announcementPriority: document.querySelector("#announcementPriority"),
+        announcementBody: document.querySelector("#announcementBody"),
+        announcementList: document.querySelector("#announcementList"),
+        supportRequestForm: document.querySelector("#supportRequestForm"),
+        supportTo: document.querySelector("#supportTo"),
+        supportType: document.querySelector("#supportType"),
+        supportTitle: document.querySelector("#supportTitle"),
+        supportDetail: document.querySelector("#supportDetail"),
+        supportList: document.querySelector("#supportList"),
+        productTabs: document.querySelector("#productTabs"),
+        productInfo: document.querySelector("#productInfo"),
+        quizBox: document.querySelector("#quizBox")
+      };
+
+      function loadState() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+          return normalizeState({
+            ...structuredClone(initialState),
+            selectedProduct: saved.selectedProduct || initialState.selectedProduct,
+            selectedWeekStart: saved.selectedWeekStart || ""
+          });
+        } catch {
+          return structuredClone(initialState);
+        }
+      }
+
+      function normalizeState(nextState) {
+        nextState.users = nextState.users?.length ? nextState.users : structuredClone(initialState.users);
+        nextState.registrationRequests = nextState.registrationRequests || [];
+        nextState.passwordRecoveryRequests = nextState.passwordRecoveryRequests || [];
+        nextState.tasks = (nextState.tasks || []).map((task) => ({
+          ...task,
+          startTime: task.startTime || "08:30",
+          endTime: task.endTime || "09:30"
+        }));
+        nextState.announcements = nextState.announcements || [];
+        nextState.supportRequests = nextState.supportRequests || [];
+        nextState.selectedWeekStart = nextState.selectedWeekStart || weekStartIso(todayIso);
+        return nextState;
+      }
+
+      function saveState() {
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({ selectedProduct: state.selectedProduct, selectedWeekStart: state.selectedWeekStart })
+        );
+        if (!state.activeUserId) return;
+        window.clearTimeout(syncTimer);
+        syncTimer = window.setTimeout(() => {
+          syncState().catch((error) => console.error("No se pudo sincronizar", error));
+        }, 150);
+      }
+
+      async function apiRequest(path, options = {}) {
+        const response = await fetch(`${API_BASE}${path}`, {
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+          ...options
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const error = new Error(data.message || `No se pudo conectar con la nube (HTTP ${response.status}).`);
+          error.status = response.status;
+          throw error;
+        }
+        return data;
+      }
+
+      function applyCloudState(nextState) {
+        const selectedProduct = state.selectedProduct;
+        const selectedWeekStart = state.selectedWeekStart;
+        state = normalizeState({
+          ...structuredClone(initialState),
+          ...nextState,
+          selectedProduct,
+          selectedWeekStart: selectedWeekStart || nextState.selectedWeekStart
+        });
+      }
+
+      async function refreshStateFromServer({ quiet = false } = {}) {
+        try {
+          const data = await apiRequest("/state");
+          applyCloudState(data.state);
+          if (!quiet) render();
+          return true;
+        } catch (error) {
+          if (error.status === 401) {
+            state.activeUserId = "";
+            state.users = [];
+            state.tasks = [];
+            if (!quiet) render();
+            return false;
+          }
+          if (!quiet) setMessage(els.loginMessage, error.message, "err");
+          return false;
+        }
+      }
+
+      async function syncState() {
+        if (!state.activeUserId) return;
+        if (syncInFlight) return syncInFlight;
+        const snapshot = JSON.parse(JSON.stringify(state));
+        syncInFlight = apiRequest("/state", { method: "PUT", body: JSON.stringify({ state: snapshot }) })
+          .then((data) => {
+            applyCloudState(data.state);
+            render();
+          })
+          .finally(() => {
+            syncInFlight = null;
+          });
+        return syncInFlight;
+      }
+
+      function id() {
+        return crypto.randomUUID ? crypto.randomUUID() : `id-${Date.now()}-${Math.round(Math.random() * 9999)}`;
+      }
+
+      function clean(value) {
+        return String(value || "").trim();
+      }
+
+      function escapeHtml(value) {
+        return String(value || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function activeUser() {
+        return state.users.find((user) => user.id === state.activeUserId) || null;
+      }
+
+      function isCoordinator() {
+        return activeUser()?.role === "Coordinador";
+      }
+
+      function trainers() {
+        return state.users.filter((user) => user.role === "Trainer" && user.status === "Activo");
+      }
+
+      function assignableUsers() {
+        const current = activeUser();
+        const people = trainers();
+        if (isCoordinator() && current && !people.some((user) => user.id === current.id)) {
+          return [current, ...people];
+        }
+        return people;
+      }
+
+      function userName(userId) {
+        return state.users.find((user) => user.id === userId)?.name || "Sin usuario";
+      }
+
+      function setMessage(element, text, type = "") {
+        element.textContent = text;
+        element.className = `message ${type}`.trim();
+      }
+
+      function fillSelect(select, options, selected = "") {
+        select.innerHTML = "";
+        options.forEach((option) => {
+          const node = document.createElement("option");
+          node.value = option.value;
+          node.textContent = option.label;
+          if (option.value === selected) node.selected = true;
+          select.appendChild(node);
+        });
+      }
+
+      function taskStatusClass(status) {
+        if (status === "Cumplida") return "approved";
+        if (status === "Observada") return "observed";
+        if (status === "No disponible") return "observed";
+        if (status === "En revision") return "review";
+        if (status === "En proceso") return "process";
+        return "pending";
+      }
+
+      function priorityClass(priority) {
+        if (priority === "Alta") return "high";
+        if (priority === "Media") return "medium";
+        return "";
+      }
+
+      function formatDate(dateValue) {
+        if (!dateValue) return "Sin fecha";
+        return new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "short" }).format(new Date(`${dateValue}T12:00:00`));
+      }
+
+      function timeToMinutes(value) {
+        const [hours, minutes] = String(value || "00:00").split(":").map(Number);
+        return hours * 60 + minutes;
+      }
+
+      function taskTimeLabel(task) {
+        return `${task.startTime || WORKDAY_START} - ${task.endTime || "09:30"}`;
+      }
+
+      function hasScheduleConflict(ownerId, dateValue, startTime, endTime, excludeTaskId = "") {
+        const start = timeToMinutes(startTime);
+        const end = timeToMinutes(endTime);
+        return state.tasks.some((task) => {
+          if (task.id === excludeTaskId || task.ownerId !== ownerId || task.dueDate !== dateValue || task.status === "No disponible") return false;
+          const taskStart = timeToMinutes(task.startTime || WORKDAY_START);
+          const taskEnd = timeToMinutes(task.endTime || "09:30");
+          return start < taskEnd && end > taskStart;
+        });
+      }
+
+      function formatShortDate(dateValue) {
+        return new Intl.DateTimeFormat("es-PE", { weekday: "short", day: "2-digit", month: "short" }).format(new Date(`${dateValue}T12:00:00`));
+      }
+
+      function formatDateTime(value) {
+        return new Intl.DateTimeFormat("es-PE", {
+          day: "2-digit",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit"
+        }).format(new Date(value));
+      }
+
+      function addDaysIso(dateValue, days) {
+        const date = new Date(`${dateValue}T12:00:00`);
+        date.setDate(date.getDate() + days);
+        return date.toISOString().slice(0, 10);
+      }
+
+      function weekStartIso(dateValue) {
+        const date = new Date(`${dateValue}T12:00:00`);
+        const day = date.getDay() || 7;
+        date.setDate(date.getDate() - day + 1);
+        return date.toISOString().slice(0, 10);
+      }
+
+      function selectedWeekDates() {
+        const start = state.selectedWeekStart || weekStartIso(todayIso);
+        return Array.from({ length: 7 }, (_, index) => addDaysIso(start, index));
+      }
+
+      function folderSafe(value) {
+        return clean(value)
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[\\/:*?"<>|#%{}~&]/g, "-")
+          .replace(/\s+/g, " ")
+          .slice(0, 70) || "sin-dato";
+      }
+
+      function cloudFolderForEvidence(evidence, task) {
+        const date = new Date(evidence.submittedAt || Date.now()).toISOString().slice(0, 10);
+        return `LG Task Hub / Sustentos / ${date} / ${folderSafe(userName(evidence.submittedById))} / ${folderSafe(task.title)}`;
+      }
+
+      function recoveryMailLink(user, tempPassword) {
+        const subject = encodeURIComponent("Recuperacion de clave - LG Task Hub");
+        const body = encodeURIComponent(
+          `Hola ${user.name},\n\nSe genero una clave temporal para ingresar a LGTASK.\n\nCorreo: ${user.email}\nClave temporal: ${tempPassword}\n\nIngresa a https://lgtask.pages.dev/ con estos datos.\n\nMensaje enviado por coordinacion LG.`
+        );
+        return `mailto:${encodeURIComponent(user.email)}?subject=${subject}&body=${body}`;
+      }
+
+      function emptyState(title, detail) {
+        return `<div class="empty"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(detail || "")}</p></div>`;
+      }
+
+      function render() {
+        const user = activeUser();
+        const logged = Boolean(user);
+        els.loginScreen.classList.toggle("hidden", logged);
+        els.appHeader.classList.toggle("hidden", !logged);
+        els.appShell.classList.toggle("hidden", !logged);
+
+        if (!logged) return;
+
+        els.sessionName.textContent = user.name;
+        els.sessionRole.textContent = user.role;
+        els.todayLabel.textContent = new Intl.DateTimeFormat("es-PE", {
+          weekday: "long",
+          day: "2-digit",
+          month: "long"
+        }).format(new Date());
+
+        els.coordinatorTaskPanel.classList.toggle("hidden", !isCoordinator());
+        els.coordinatorWeekPanel.classList.toggle("hidden", !isCoordinator());
+        els.trainerFilterWrap.classList.toggle("hidden", !isCoordinator());
+        els.coordinatorTeamPanel.classList.toggle("hidden", !isCoordinator());
+        els.backupTools.classList.toggle("hidden", !isCoordinator());
+        els.coordinatorAnnouncementPanel.classList.toggle("hidden", !isCoordinator());
+        els.cloudPlanPanel.classList.toggle("hidden", !isCoordinator());
+
+        refreshSelects();
+        renderDashboard();
+        renderWeeklyCalendar();
+        renderTasks();
+        renderEvidence();
+        renderTeam();
+        renderAnnouncements();
+        renderSupportRequests();
+        renderProducts();
+      }
+
+      function refreshSelects() {
+        const trainerOptions = trainers().map((trainer) => ({ value: trainer.id, label: `${trainer.name} - ${trainer.zone}` }));
+        const assignableOptions = assignableUsers().map((user) => ({ value: user.id, label: `${user.name} - ${user.role === "Coordinador" ? "Coordinador" : user.zone}` }));
+        fillSelect(els.taskOwner, assignableOptions, els.taskOwner.value);
+        fillSelect(els.taskTrainerFilter, [{ value: "all", label: "Todo el equipo y coordinador" }, ...assignableOptions], els.taskTrainerFilter.value || "all");
+        fillSelect(els.announcementTarget, trainerOptions, els.announcementTarget.value);
+
+        const otherUsers = state.users
+          .filter((user) => user.status === "Activo" && user.id !== state.activeUserId)
+          .map((user) => ({ value: user.id, label: `${user.name} - ${user.role}` }));
+        fillSelect(els.supportTo, otherUsers, els.supportTo.value);
+
+        const availableTasks = state.tasks
+          .filter((task) => !isCoordinator() && task.ownerId === state.activeUserId && task.status !== "Cumplida" && task.status !== "No disponible")
+          .map((task) => ({ value: task.id, label: `${task.title} (${formatDate(task.dueDate)} | ${taskTimeLabel(task)})` }));
+        fillSelect(els.evidenceTask, availableTasks, els.evidenceTask.value);
+        els.taskDueDate.value = els.taskDueDate.value || todayIso;
+        els.taskStartTime.value = els.taskStartTime.value || WORKDAY_START;
+        els.taskEndTime.value = els.taskEndTime.value || "09:30";
+      }
+
+      function relevantTasks() {
+        return isCoordinator() ? state.tasks : state.tasks.filter((task) => task.ownerId === state.activeUserId);
+      }
+
+      function filteredTasks() {
+        const status = els.taskStatusFilter.value;
+        const trainer = els.taskTrainerFilter.value || "all";
+        return relevantTasks()
+          .filter((task) => status === "all" || task.status === status)
+          .filter((task) => !isCoordinator() || trainer === "all" || task.ownerId === trainer)
+          .sort((a, b) => b.dueDate.localeCompare(a.dueDate) || (a.startTime || WORKDAY_START).localeCompare(b.startTime || WORKDAY_START));
+      }
+
+      function trainerWorkloadOnDate(trainerId, dateValue, excludeTaskId = "") {
+        return state.tasks.filter((task) => {
+          if (task.id === excludeTaskId) return false;
+          if (task.ownerId !== trainerId || task.dueDate !== dateValue) return false;
+          return task.status !== "Cumplida" && task.status !== "No disponible";
+        }).length;
+      }
+
+      function availableTrainersForTask(task) {
+        return trainers()
+          .filter((trainer) => trainer.id !== task.ownerId)
+          .map((trainer) => ({
+            ...trainer,
+            workload: trainerWorkloadOnDate(trainer.id, task.dueDate, task.id)
+          }))
+          .sort((a, b) => a.workload - b.workload || a.name.localeCompare(b.name));
+      }
+
+      function reassignTask(taskId, newOwnerId) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        const nextOwner = state.users.find((user) => user.id === newOwnerId);
+        if (!task || !nextOwner || !isCoordinator()) return;
+        if (hasScheduleConflict(newOwnerId, task.dueDate, task.startTime, task.endTime, task.id)) {
+          window.alert(`${nextOwner.name} ya tiene una tarea entre ${taskTimeLabel(task)}.`);
+          return;
+        }
+        const previousOwnerId = task.ownerId;
+        task.history = task.history || [];
+        task.history.push({
+          type: "Reasignacion",
+          fromId: previousOwnerId,
+          toId: newOwnerId,
+          reason: task.blockedReason || "Reasignacion operativa del coordinador",
+          byId: state.activeUserId,
+          at: Date.now()
+        });
+        task.ownerId = newOwnerId;
+        task.status = "Pendiente";
+        task.blockedReason = "";
+        task.blockedAt = "";
+        saveState();
+        render();
+      }
+
+      function renderReassignControl(container, task) {
+        const options = availableTrainersForTask(task);
+        if (!options.length) return;
+        const box = document.createElement("div");
+        box.className = "reassign-box";
+        const select = document.createElement("select");
+        options.forEach((trainer) => {
+          const option = document.createElement("option");
+          option.value = trainer.id;
+          option.textContent = `${trainer.name} (${trainer.workload} tareas ese dia)`;
+          select.appendChild(option);
+        });
+        const button = document.createElement("button");
+        button.className = "small";
+        button.type = "button";
+        button.textContent = "Reasignar";
+        button.addEventListener("click", () => reassignTask(task.id, select.value));
+        box.append(select, button);
+        container.appendChild(box);
+      }
+
+      function markTaskBlocked(taskId) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        if (!task || isCoordinator()) return;
+        document.querySelector('[data-view="evidenceView"]').click();
+        els.evidenceTask.value = task.id;
+        els.evidenceResult.value = "No se pudo cumplir";
+        els.evidenceNotes.focus();
+        setMessage(els.evidenceMessage, "Escribe el motivo. Pablo vera este feedback para reasignar o dar seguimiento.", "err");
+      }
+
+      function focusTaskFormForDate(dateValue) {
+        els.taskDueDate.value = dateValue;
+        els.taskStartTime.value = els.taskStartTime.value || WORKDAY_START;
+        els.taskEndTime.value = els.taskEndTime.value || "09:30";
+        els.taskTitle.focus();
+        setMessage(els.taskMessage, `Nueva tarea para ${formatDate(dateValue)}. Define responsable y horario.`, "ok");
+      }
+
+      function renderWeeklyCalendar() {
+        if (!isCoordinator()) return;
+        const days = selectedWeekDates();
+        els.weekLabel.textContent = `${formatShortDate(days[0])} - ${formatShortDate(days[6])}`;
+        els.weeklySummary.innerHTML = "";
+
+        days.forEach((day) => {
+          const tasks = state.tasks
+            .filter((task) => task.dueDate === day)
+            .sort((a, b) => (a.startTime || WORKDAY_START).localeCompare(b.startTime || WORKDAY_START) || userName(a.ownerId).localeCompare(userName(b.ownerId)));
+          const done = tasks.filter((task) => task.status === "Cumplida").length;
+          const blocked = tasks.filter((task) => task.status === "No disponible").length;
+          const column = document.createElement("article");
+          column.className = `day-column ${day === todayIso ? "today" : ""}`;
+          column.innerHTML = `
+            <div class="day-head">
+              <strong>${formatShortDate(day)}</strong>
+              <div class="day-stats">
+                <span class="pill">${tasks.length} tareas</span>
+                <span class="pill approved">${done} ok</span>
+                ${blocked ? `<span class="pill observed">${blocked} bloqueo</span>` : ""}
+              </div>
+            </div>
+            <div class="day-hours">Jornada ${WORKDAY_START} - ${WORKDAY_END}</div>
+            <button class="small" type="button" data-new-task="${day}">Agregar tarea</button>
+            <div class="day-tasks"></div>
+          `;
+          column.querySelector("[data-new-task]").addEventListener("click", () => focusTaskFormForDate(day));
+          const taskWrap = column.querySelector(".day-tasks");
+
+          if (!tasks.length) {
+            taskWrap.innerHTML = `<div class="empty"><strong>Libre</strong><p>Sin tareas programadas.</p></div>`;
+          } else {
+            tasks.forEach((task) => {
+              const timeline = document.createElement("div");
+              timeline.className = "timeline-entry";
+              const mini = document.createElement("div");
+              mini.className = "mini-task";
+              mini.innerHTML = `
+                <div class="title-row">
+                  <h3>${escapeHtml(task.title)}</h3>
+                  <span class="pill ${taskStatusClass(task.status)}">${escapeHtml(task.status)}</span>
+                </div>
+                <div class="meta">
+                  <span>${escapeHtml(userName(task.ownerId))}</span>
+                  <span>Horario: ${escapeHtml(taskTimeLabel(task))}</span>
+                  <span>${escapeHtml(task.category)}${task.product ? ` | ${escapeHtml(task.product)}` : ""}</span>
+                  ${task.blockedReason ? `<span>Motivo: ${escapeHtml(task.blockedReason)}</span>` : ""}
+                </div>
+                <div class="actions"></div>
+              `;
+              const actions = mini.querySelector(".actions");
+              renderReassignControl(actions, task);
+              const deleteButton = document.createElement("button");
+              deleteButton.className = "small";
+              deleteButton.type = "button";
+              deleteButton.textContent = "Eliminar";
+              deleteButton.addEventListener("click", () => {
+                state.tasks = state.tasks.filter((item) => item.id !== task.id);
+                saveState();
+                render();
+              });
+              actions.appendChild(deleteButton);
+              const time = document.createElement("div");
+              time.className = "timeline-time";
+              time.innerHTML = `<span>${escapeHtml(task.startTime || WORKDAY_START)}</span><span>${escapeHtml(task.endTime || "09:30")}</span>`;
+              timeline.append(time, mini);
+              taskWrap.appendChild(timeline);
+            });
+          }
+          els.weeklySummary.appendChild(column);
+        });
+      }
+
+      function renderDashboard() {
+        const tasks = relevantTasks();
+        const done = tasks.filter((task) => task.status === "Cumplida").length;
+        const review = tasks.filter((task) => task.status === "En revision").length;
+        const pending = tasks.filter((task) => task.status === "Pendiente" || task.status === "En proceso" || task.status === "Observada" || task.status === "No disponible").length;
+        const percent = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+        els.progressPercent.textContent = `${percent}%`;
+        els.progressBar.style.width = `${percent}%`;
+        els.pendingCount.textContent = pending;
+        els.reviewCount.textContent = review;
+        els.doneCount.textContent = done;
+        els.trainerCount.textContent = trainers().length;
+      }
+
+      function renderTasks() {
+        const tasks = filteredTasks();
+        els.taskList.innerHTML = "";
+
+        if (!tasks.length) {
+          els.taskList.innerHTML = emptyState("No hay tareas para mostrar", isCoordinator() ? "Asigna una tarea nueva a un trainer." : "Cuando el coordinador te asigne una tarea aparecera aqui.");
+          return;
+        }
+
+        tasks.forEach((task) => {
+          const card = document.createElement("article");
+          card.className = "item task-item";
+          const latestEvidence = task.evidence?.at(-1);
+          card.innerHTML = `
+            <div class="stack">
+              <div class="title-row">
+                <h3>${escapeHtml(task.title)}</h3>
+                <span class="pill ${taskStatusClass(task.status)}">${escapeHtml(task.status)}</span>
+                <span class="pill ${priorityClass(task.priority)}">${escapeHtml(task.priority)}</span>
+              </div>
+              <div class="meta">
+                <span>Trainer: ${escapeHtml(userName(task.ownerId))}</span>
+                <span>Fecha limite: ${formatDate(task.dueDate)}</span>
+                <span>Horario: ${escapeHtml(taskTimeLabel(task))}</span>
+                <span>${escapeHtml(task.category)}</span>
+                ${task.product ? `<span>Producto: ${escapeHtml(task.product)}</span>` : ""}
+              </div>
+              ${task.description ? `<p>${escapeHtml(task.description)}</p>` : ""}
+              ${task.blockedReason ? `<div class="note"><strong>No puede cumplir:</strong><p class="muted">${escapeHtml(task.blockedReason)}${task.blockedAt ? ` | ${formatDateTime(task.blockedAt)}` : ""}</p></div>` : ""}
+              ${
+                task.history?.length
+                  ? `<div class="note"><strong>Ultimo movimiento:</strong><p class="muted">${escapeHtml(task.history.at(-1).type)}${task.history.at(-1).toId ? ` a ${escapeHtml(userName(task.history.at(-1).toId))}` : ""} | ${formatDateTime(task.history.at(-1).at)}</p></div>`
+                  : ""
+              }
+              ${
+                latestEvidence
+                  ? `<div class="note"><strong>Ultimo sustento:</strong><p class="muted">${escapeHtml(latestEvidence.result)} | ${escapeHtml(latestEvidence.store)} | ${formatDateTime(latestEvidence.submittedAt)}</p></div>`
+                  : ""
+              }
+            </div>
+            <div class="actions"></div>
+          `;
+
+          const actions = card.querySelector(".actions");
+          if (!isCoordinator() && task.status === "Pendiente") {
+            const startButton = document.createElement("button");
+            startButton.className = "small";
+            startButton.type = "button";
+            startButton.textContent = "Iniciar";
+            startButton.addEventListener("click", () => {
+              task.status = "En proceso";
+              saveState();
+              render();
+            });
+            actions.appendChild(startButton);
+          }
+
+          if (!isCoordinator() && task.status !== "Cumplida" && task.status !== "No disponible") {
+            const evidenceButton = document.createElement("button");
+            evidenceButton.className = "small";
+            evidenceButton.type = "button";
+            evidenceButton.textContent = "Enviar sustento";
+            evidenceButton.addEventListener("click", () => {
+              document.querySelector('[data-view="evidenceView"]').click();
+              els.evidenceTask.value = task.id;
+              els.evidenceStore.focus();
+            });
+            actions.appendChild(evidenceButton);
+          }
+
+          if (!isCoordinator() && task.status !== "Cumplida" && task.status !== "En revision" && task.status !== "No disponible") {
+            const blockedButton = document.createElement("button");
+            blockedButton.className = "small";
+            blockedButton.type = "button";
+            blockedButton.textContent = "No puedo cumplir";
+            blockedButton.addEventListener("click", () => markTaskBlocked(task.id));
+            actions.appendChild(blockedButton);
+          }
+
+          if (isCoordinator() && task.status === "En revision") {
+            const approveButton = document.createElement("button");
+            approveButton.className = "small";
+            approveButton.type = "button";
+            approveButton.textContent = "Aprobar";
+            approveButton.addEventListener("click", () => reviewTask(task.id, "Cumplida"));
+
+            const observeButton = document.createElement("button");
+            observeButton.className = "small";
+            observeButton.type = "button";
+            observeButton.textContent = "Observar";
+            observeButton.addEventListener("click", () => reviewTask(task.id, "Observada"));
+            actions.append(approveButton, observeButton);
+          }
+
+          if (isCoordinator()) {
+            renderReassignControl(actions, task);
+            const deleteButton = document.createElement("button");
+            deleteButton.className = "small";
+            deleteButton.type = "button";
+            deleteButton.textContent = "Eliminar";
+            deleteButton.addEventListener("click", () => {
+              state.tasks = state.tasks.filter((item) => item.id !== task.id);
+              saveState();
+              render();
+            });
+            actions.appendChild(deleteButton);
+          }
+
+          els.taskList.appendChild(card);
+        });
+      }
+
+      function reviewTask(taskId, status) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        if (!task) return;
+        task.status = status;
+        const latestEvidence = task.evidence?.at(-1);
+        if (latestEvidence) {
+          latestEvidence.review = status === "Cumplida" ? "Aprobado" : "Observado";
+          latestEvidence.reviewedById = state.activeUserId;
+          latestEvidence.reviewedAt = Date.now();
+        }
+        saveState();
+        render();
+      }
+
+      function renderEvidence() {
+        const allEvidence = relevantTasks()
+          .flatMap((task) => (task.evidence || []).map((evidence) => ({ ...evidence, task })))
+          .sort((a, b) => b.submittedAt - a.submittedAt);
+
+        els.evidenceList.innerHTML = "";
+        if (!allEvidence.length) {
+          els.evidenceList.innerHTML = emptyState("No hay sustentos enviados", "Los sustentos apareceran cuando un trainer cargue evidencia.");
+          return;
+        }
+
+        allEvidence.forEach((entry) => {
+          const card = document.createElement("article");
+          card.className = "item";
+          card.innerHTML = `
+            <div class="title-row">
+              <h3>${escapeHtml(entry.task.title)}</h3>
+              <span class="pill ${entry.review === "Aprobado" ? "approved" : entry.review === "Observado" ? "observed" : "review"}">${escapeHtml(entry.review || "Pendiente")}</span>
+            </div>
+            <div class="meta">
+              <span>Trainer: ${escapeHtml(userName(entry.submittedById))}</span>
+              <span>PDV: ${escapeHtml(entry.store)}</span>
+              <span>Resultado: ${escapeHtml(entry.result)}</span>
+              <span>${formatDateTime(entry.submittedAt)}</span>
+            </div>
+            ${entry.product ? `<p><strong>Producto:</strong> ${escapeHtml(entry.product)}</p>` : ""}
+            ${entry.notes ? `<p>${escapeHtml(entry.notes)}</p>` : ""}
+            <div class="cloud-path">${escapeHtml(entry.cloudPath || cloudFolderForEvidence(entry, entry.task))}</div>
+            ${entry.photoData ? `<img class="evidence-photo" src="${entry.photoData}" alt="Foto de sustento" />` : ""}
+          `;
+
+          if (isCoordinator() && entry.review !== "Aprobado") {
+            const actions = document.createElement("div");
+            actions.className = "actions";
+            const approveButton = document.createElement("button");
+            approveButton.className = "small";
+            approveButton.type = "button";
+            approveButton.textContent = "Aprobar tarea";
+            approveButton.addEventListener("click", () => reviewTask(entry.task.id, "Cumplida"));
+            const observeButton = document.createElement("button");
+            observeButton.className = "small";
+            observeButton.type = "button";
+            observeButton.textContent = "Observar";
+            observeButton.addEventListener("click", () => reviewTask(entry.task.id, "Observada"));
+            actions.append(approveButton, observeButton);
+            card.appendChild(actions);
+          }
+
+          els.evidenceList.appendChild(card);
+        });
+      }
+
+      function renderTeam() {
+        const pending = state.registrationRequests.filter((request) => request.status === "Pendiente");
+        els.pendingRegistrations.innerHTML = "";
+        if (!pending.length) {
+          els.pendingRegistrations.innerHTML = emptyState("No hay solicitudes pendientes", "Cuando un trainer solicite acceso aparecera aqui.");
+        } else {
+          pending.forEach((request) => {
+            const card = document.createElement("article");
+            card.className = "item";
+            card.innerHTML = `
+              <div class="title-row">
+                <h3>${escapeHtml(request.name)}</h3>
+                <span class="pill pending">Pendiente</span>
+              </div>
+              <div class="meta">
+                <span>${escapeHtml(request.email)}</span>
+                <span>${escapeHtml(request.zone)}</span>
+              </div>
+              <div class="actions"></div>
+            `;
+            const actions = card.querySelector(".actions");
+            const approveButton = document.createElement("button");
+            approveButton.className = "small";
+            approveButton.type = "button";
+            approveButton.textContent = "Aprobar";
+            approveButton.addEventListener("click", () => {
+              createTrainer(request.name, request.email, request.zone, request.password);
+              request.status = "Aprobada";
+              saveState();
+              render();
+            });
+            const rejectButton = document.createElement("button");
+            rejectButton.className = "small";
+            rejectButton.type = "button";
+            rejectButton.textContent = "Rechazar";
+            rejectButton.addEventListener("click", () => {
+              request.status = "Rechazada";
+              saveState();
+              render();
+            });
+            actions.append(approveButton, rejectButton);
+            els.pendingRegistrations.appendChild(card);
+          });
+        }
+
+        renderPasswordRecoveryRequests();
+
+        els.teamList.innerHTML = "";
+        const visibleUsers = isCoordinator() ? state.users.filter((user) => user.status === "Activo") : [activeUser()].filter(Boolean);
+        visibleUsers
+          .forEach((user) => {
+            const assigned = state.tasks.filter((task) => task.ownerId === user.id);
+            const completed = assigned.filter((task) => task.status === "Cumplida").length;
+            const card = document.createElement("article");
+            card.className = "item";
+            card.innerHTML = `
+              <div class="title-row">
+                <h3>${escapeHtml(user.name)}</h3>
+                <span class="pill">${escapeHtml(user.role)}</span>
+              </div>
+              <div class="meta">
+                <span>${escapeHtml(user.zone)}</span>
+                <span>${escapeHtml(user.email)}</span>
+                <span>${completed}/${assigned.length} tareas cumplidas</span>
+                <span>Clave actual: protegida</span>
+              </div>
+              ${
+                isCoordinator()
+                  ? `<div class="note">
+                      <strong>Seguridad</strong>
+                      <p class="muted">No se muestran contrasenas actuales. Si el usuario olvido su clave, genera una temporal y enviala solo al correo registrado.</p>
+                      ${user.passwordResetTemp ? `<p><strong>Clave temporal:</strong> ${escapeHtml(user.passwordResetTemp)}</p>` : ""}
+                    </div>
+                    <div class="actions"></div>`
+                  : `<div class="note"><strong>Mi acceso</strong><p class="muted">Si olvidas tu clave, usa Olvide mi clave en la pantalla de ingreso.</p></div>`
+              }
+            `;
+            const actions = card.querySelector(".actions");
+            if (isCoordinator() && actions) {
+              const resetButton = document.createElement("button");
+              resetButton.className = "small";
+              resetButton.type = "button";
+              resetButton.textContent = "Restablecer clave";
+              resetButton.addEventListener("click", () => resetUserPassword(user.id));
+              actions.appendChild(resetButton);
+              if (user.passwordResetTemp) {
+                const mailLink = document.createElement("a");
+                mailLink.className = "small";
+                mailLink.href = recoveryMailLink(user, user.passwordResetTemp);
+                mailLink.textContent = "Preparar correo";
+                actions.appendChild(mailLink);
+                const clearButton = document.createElement("button");
+                clearButton.className = "small";
+                clearButton.type = "button";
+                clearButton.textContent = "Ocultar temporal";
+                clearButton.addEventListener("click", () => {
+                  user.passwordResetTemp = "";
+                  saveState();
+                  render();
+                });
+                actions.appendChild(clearButton);
+              }
+            }
+            els.teamList.appendChild(card);
+          });
+      }
+
+      function renderPasswordRecoveryRequests() {
+        const requests = state.passwordRecoveryRequests
+          .filter((request) => request.status !== "Cerrada")
+          .sort((a, b) => b.createdAt - a.createdAt);
+        els.passwordRecoveryList.innerHTML = "";
+
+        if (!requests.length) {
+          els.passwordRecoveryList.innerHTML = emptyState("No hay solicitudes de recuperacion", "Cuando alguien use Olvide mi clave aparecera aqui.");
+          return;
+        }
+
+        requests.forEach((request) => {
+          const user = state.users.find((item) => item.id === request.userId);
+          const card = document.createElement("article");
+          card.className = "item";
+          card.innerHTML = `
+            <div class="title-row">
+              <h3>${escapeHtml(user?.name || request.email)}</h3>
+              <span class="pill ${request.status === "Clave temporal generada" ? "approved" : "pending"}">${escapeHtml(request.status)}</span>
+            </div>
+            <div class="meta">
+              <span>${escapeHtml(request.email)}</span>
+              <span>${formatDateTime(request.createdAt)}</span>
+            </div>
+            ${request.tempPassword ? `<div class="note"><strong>Clave temporal:</strong><p>${escapeHtml(request.tempPassword)}</p></div>` : ""}
+            <div class="actions"></div>
+          `;
+          const actions = card.querySelector(".actions");
+          if (user) {
+            const resetButton = document.createElement("button");
+            resetButton.className = "small";
+            resetButton.type = "button";
+            resetButton.textContent = request.tempPassword ? "Generar otra clave" : "Generar clave temporal";
+            resetButton.addEventListener("click", () => resetUserPassword(user.id, request.id));
+            actions.appendChild(resetButton);
+            if (request.tempPassword) {
+              const mailLink = document.createElement("a");
+              mailLink.className = "small";
+              mailLink.href = recoveryMailLink(user, request.tempPassword);
+              mailLink.textContent = "Preparar correo";
+              actions.appendChild(mailLink);
+            }
+          }
+          const closeButton = document.createElement("button");
+          closeButton.className = "small";
+          closeButton.type = "button";
+          closeButton.textContent = "Cerrar solicitud";
+          closeButton.addEventListener("click", () => {
+            request.status = "Cerrada";
+            saveState();
+            render();
+          });
+          actions.appendChild(closeButton);
+          els.passwordRecoveryList.appendChild(card);
+        });
+      }
+
+      function renderAnnouncements() {
+        const visible = state.announcements
+          .filter((announcement) => isCoordinator() || announcement.audience === "all" || announcement.targetId === state.activeUserId)
+          .sort((a, b) => b.createdAt - a.createdAt);
+        els.announcementList.innerHTML = "";
+
+        if (!visible.length) {
+          els.announcementList.innerHTML = emptyState("No hay comunicados", "Los comunicados del coordinador apareceran aqui.");
+          return;
+        }
+
+        visible.forEach((announcement) => {
+          const card = document.createElement("article");
+          card.className = "item";
+          card.innerHTML = `
+            <div class="title-row">
+              <h3>${escapeHtml(announcement.title)}</h3>
+              <span class="pill ${announcement.priority === "Urgente" ? "high" : announcement.priority === "Importante" ? "medium" : ""}">${escapeHtml(announcement.priority)}</span>
+            </div>
+            <p>${escapeHtml(announcement.body)}</p>
+            <div class="meta">
+              <span>${announcement.audience === "all" ? "Todo el equipo" : `Para ${escapeHtml(userName(announcement.targetId))}`}</span>
+              <span>${formatDateTime(announcement.createdAt)}</span>
+            </div>
+          `;
+          els.announcementList.appendChild(card);
+        });
+      }
+
+      function renderSupportRequests() {
+        const visible = state.supportRequests
+          .filter((request) => isCoordinator() || request.fromId === state.activeUserId || request.toId === state.activeUserId)
+          .sort((a, b) => b.createdAt - a.createdAt);
+        els.supportList.innerHTML = "";
+
+        if (!visible.length) {
+          els.supportList.innerHTML = emptyState("No hay solicitudes", "Crea una solicitud para pedir apoyo o seguimiento.");
+          return;
+        }
+
+        visible.forEach((request) => {
+          const card = document.createElement("article");
+          card.className = "item";
+          card.innerHTML = `
+            <div class="title-row">
+              <h3>${escapeHtml(request.title)}</h3>
+              <span class="pill ${request.status === "Cerrada" ? "done" : "pending"}">${escapeHtml(request.status)}</span>
+            </div>
+            <div class="meta">
+              <span>De ${escapeHtml(userName(request.fromId))}</span>
+              <span>Para ${escapeHtml(userName(request.toId))}</span>
+              <span>${escapeHtml(request.type)}</span>
+              <span>${formatDateTime(request.createdAt)}</span>
+            </div>
+            ${request.detail ? `<p>${escapeHtml(request.detail)}</p>` : ""}
+            <div class="actions"></div>
+          `;
+          const actions = card.querySelector(".actions");
+          const toggleButton = document.createElement("button");
+          toggleButton.className = "small";
+          toggleButton.type = "button";
+          toggleButton.textContent = request.status === "Cerrada" ? "Reabrir" : "Cerrar";
+          toggleButton.addEventListener("click", () => {
+            request.status = request.status === "Cerrada" ? "Abierta" : "Cerrada";
+            saveState();
+            render();
+          });
+          actions.appendChild(toggleButton);
+          els.supportList.appendChild(card);
+        });
+      }
+
+      function renderProducts() {
+        els.productTabs.innerHTML = "";
+        products.forEach((product) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = product.name;
+          button.className = product.id === state.selectedProduct ? "active" : "";
+          button.addEventListener("click", () => {
+            state.selectedProduct = product.id;
+            saveState();
+            renderProducts();
+          });
+          els.productTabs.appendChild(button);
+        });
+
+        const product = products.find((item) => item.id === state.selectedProduct) || products[0];
+        els.productInfo.innerHTML = `
+          <h3>${escapeHtml(product.name)}</h3>
+          <p class="muted">${escapeHtml(product.promise)}</p>
+          <div class="feature-grid">
+            ${product.features
+              .map(
+                ([title, text]) => `
+                  <div class="feature-box">
+                    <strong>${escapeHtml(title)}</strong>
+                    <p>${escapeHtml(text)}</p>
+                  </div>
+                `
+              )
+              .join("")}
+          </div>
+        `;
+
+        els.quizBox.innerHTML = `
+          <div class="item">
+            <strong>${escapeHtml(product.quiz.question)}</strong>
+            <div class="actions">
+              ${product.quiz.options.map((option) => `<button class="small" type="button" data-answer="${escapeHtml(option)}">${escapeHtml(option)}</button>`).join("")}
+            </div>
+            <p class="muted" id="quizResult">Selecciona una respuesta.</p>
+          </div>
+        `;
+        els.quizBox.querySelectorAll("button").forEach((button) => {
+          button.addEventListener("click", () => {
+            const result = els.quizBox.querySelector("#quizResult");
+            result.textContent = button.dataset.answer === product.quiz.answer ? "Correcto. Usa ese argumento en tienda." : `Respuesta correcta: ${product.quiz.answer}`;
+          });
+        });
+      }
+
+      async function resetUserPassword(userId, requestId = "") {
+        if (!isCoordinator()) return;
+        const user = state.users.find((item) => item.id === userId);
+        if (!user) return;
+        try {
+          const data = await apiRequest("/admin/reset-password", {
+            method: "POST",
+            body: JSON.stringify({ userId, requestId })
+          });
+          user.passwordResetTemp = data.tempPassword;
+          if (requestId) {
+            const request = state.passwordRecoveryRequests.find((item) => item.id === requestId);
+            if (request) request.status = "Clave temporal generada";
+          }
+          setMessage(els.trainerMessage, `Clave temporal para ${user.name}: ${data.tempPassword}. Envia esta clave solo al correo registrado.`, "ok");
+          await refreshStateFromServer();
+        } catch (error) {
+          setMessage(els.trainerMessage, error.message, "err");
+        }
+      }
+
+      async function compressImage(file) {
+        if (!file) return "";
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        const img = await new Promise((resolve, reject) => {
+          const image = new Image();
+          image.onload = () => resolve(image);
+          image.onerror = reject;
+          image.src = dataUrl;
+        });
+        const maxSize = 900;
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL("image/jpeg", 0.72);
+      }
+
+      function addEventListeners() {
+        els.loginEmail.value = "";
+        els.loginPassword.value = "";
+        window.setTimeout(() => {
+          if (!state.activeUserId) {
+            els.loginEmail.value = "";
+            els.loginPassword.value = "";
+          }
+        }, 250);
+
+        els.regRole.addEventListener("change", () => {
+          const isCoordinator = els.regRole.value === "Coordinador";
+          els.coordinatorCodeWrap.classList.toggle("hidden", !isCoordinator);
+          els.coordinatorCode.required = isCoordinator;
+          if (!isCoordinator) els.coordinatorCode.value = "";
+        });
+
+        els.toggleRecovery.addEventListener("click", () => {
+          els.recoveryBox.classList.toggle("hidden");
+          if (!els.recoveryBox.classList.contains("hidden")) {
+            els.recoveryEmail.value = els.loginEmail.value;
+            els.recoveryEmail.focus();
+          }
+        });
+
+        els.recoverySubmit.addEventListener("click", async () => {
+          const email = clean(els.recoveryEmail.value).toLowerCase();
+          if (!email) {
+            setMessage(els.recoveryMessage, "Escribe el correo registrado.", "err");
+            return;
+          }
+          try {
+            const data = await apiRequest("/auth/recovery", { method: "POST", body: JSON.stringify({ email }) });
+            setMessage(els.recoveryMessage, data.message, "ok");
+            els.recoveryEmail.value = "";
+          } catch (error) {
+            setMessage(els.recoveryMessage, error.message, "err");
+          }
+        });
+
+        els.loginForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          setMessage(els.loginMessage, "Conectando con LGTASK...", "");
+          try {
+            const data = await apiRequest("/auth/login", {
+              method: "POST",
+              body: JSON.stringify({ email: els.loginEmail.value, password: els.loginPassword.value })
+            });
+            applyCloudState(data.state);
+            els.loginPassword.value = "";
+            setMessage(els.loginMessage, "", "");
+            render();
+          } catch (error) {
+            setMessage(els.loginMessage, error.message, "err");
+          }
+        });
+
+        els.registrationForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const email = clean(els.regEmail.value).toLowerCase();
+          const role = els.regRole.value;
+          setMessage(els.registrationMessage, "Creando cuenta en la nube...", "");
+          try {
+            await apiRequest("/auth/register", {
+              method: "POST",
+              body: JSON.stringify({
+                name: els.regName.value,
+                email,
+                zone: els.regZone.value,
+                role,
+                password: els.regPassword.value,
+                coordinatorCode: els.coordinatorCode.value
+              })
+            });
+            els.registrationForm.reset();
+            els.coordinatorCodeWrap.classList.add("hidden");
+            setMessage(els.registrationMessage, "Registro creado en la nube. Ya puedes ingresar desde cualquier dispositivo.", "ok");
+          } catch (error) {
+            setMessage(els.registrationMessage, error.message, "err");
+          }
+        });
+
+        els.logoutButton.addEventListener("click", async () => {
+          try {
+            await apiRequest("/auth/logout", { method: "POST", body: "{}" });
+          } catch {
+            // The local session is still cleared when the network is unavailable.
+          }
+          state.activeUserId = "";
+          state.users = [];
+          state.tasks = [];
+          render();
+        });
+
+        document.querySelectorAll(".tab").forEach((tab) => {
+          tab.addEventListener("click", () => {
+            document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item === tab));
+            document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === tab.dataset.view));
+            render();
+          });
+        });
+
+        els.prevWeek.addEventListener("click", () => {
+          state.selectedWeekStart = addDaysIso(state.selectedWeekStart || weekStartIso(todayIso), -7);
+          saveState();
+          render();
+        });
+
+        els.todayWeek.addEventListener("click", () => {
+          state.selectedWeekStart = weekStartIso(todayIso);
+          saveState();
+          render();
+        });
+
+        els.nextWeek.addEventListener("click", () => {
+          state.selectedWeekStart = addDaysIso(state.selectedWeekStart || weekStartIso(todayIso), 7);
+          saveState();
+          render();
+        });
+
+        els.taskForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          if (!els.taskOwner.value) {
+            setMessage(els.taskMessage, "Primero registra un responsable activo.", "err");
+            return;
+          }
+          const startTime = els.taskStartTime.value;
+          const endTime = els.taskEndTime.value;
+          if (
+            timeToMinutes(startTime) < timeToMinutes(WORKDAY_START) ||
+            timeToMinutes(endTime) > timeToMinutes(WORKDAY_END) ||
+            timeToMinutes(endTime) <= timeToMinutes(startTime)
+          ) {
+            setMessage(els.taskMessage, `El horario debe estar entre ${WORKDAY_START} y ${WORKDAY_END}, con una hora de cierre posterior al inicio.`, "err");
+            return;
+          }
+          if (hasScheduleConflict(els.taskOwner.value, els.taskDueDate.value, startTime, endTime)) {
+            setMessage(els.taskMessage, "El responsable ya tiene otra tarea asignada en ese horario.", "err");
+            return;
+          }
+          state.tasks.unshift({
+            id: id(),
+            title: clean(els.taskTitle.value),
+            ownerId: els.taskOwner.value,
+            createdById: state.activeUserId,
+            category: els.taskCategory.value,
+            priority: els.taskPriority.value,
+            dueDate: els.taskDueDate.value,
+            startTime,
+            endTime,
+            product: clean(els.taskProduct.value),
+            description: clean(els.taskDescription.value),
+            status: "Pendiente",
+            createdAt: Date.now(),
+            history: [],
+            evidence: []
+          });
+          saveState();
+          els.taskForm.reset();
+          els.taskDueDate.value = todayIso;
+          els.taskStartTime.value = WORKDAY_START;
+          els.taskEndTime.value = "09:30";
+          setMessage(els.taskMessage, "Tarea asignada correctamente.", "ok");
+          render();
+        });
+
+        els.taskStatusFilter.addEventListener("change", renderTasks);
+        els.taskTrainerFilter.addEventListener("change", renderTasks);
+
+        els.evidenceForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const task = state.tasks.find((item) => item.id === els.evidenceTask.value);
+          if (!task) {
+            setMessage(els.evidenceMessage, "No hay tarea seleccionada.", "err");
+            return;
+          }
+          const notes = clean(els.evidenceNotes.value);
+          if (els.evidenceResult.value === "No se pudo cumplir" && !notes) {
+            setMessage(els.evidenceMessage, "Explica el motivo para que el coordinador pueda reasignar o dar seguimiento.", "err");
+            return;
+          }
+          setMessage(els.evidenceMessage, "Procesando sustento...", "");
+          const photoData = await compressImage(els.evidencePhoto.files[0]);
+          const evidence = {
+            id: id(),
+            submittedById: state.activeUserId,
+            submittedAt: Date.now(),
+            store: clean(els.evidenceStore.value),
+            product: clean(els.evidenceProduct.value),
+            result: els.evidenceResult.value,
+            notes,
+            photoData,
+            review: "Pendiente"
+          };
+          evidence.cloudPath = cloudFolderForEvidence(evidence, task);
+          task.evidence = task.evidence || [];
+          task.evidence.push(evidence);
+          if (els.evidenceResult.value === "No se pudo cumplir") {
+            task.status = "No disponible";
+            task.blockedReason = notes;
+            task.blockedAt = Date.now();
+            task.history = task.history || [];
+            task.history.push({
+              type: "Bloqueo",
+              fromId: state.activeUserId,
+              reason: notes,
+              at: Date.now()
+            });
+          } else {
+            task.status = "En revision";
+          }
+          saveState();
+          els.evidenceForm.reset();
+          setMessage(
+            els.evidenceMessage,
+            evidence.result === "No se pudo cumplir" ? "Feedback enviado. La tarea queda disponible para reasignacion del coordinador." : "Sustento enviado. Queda pendiente de revision del coordinador.",
+            "ok"
+          );
+          render();
+        });
+
+        els.createTrainerForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          try {
+            await apiRequest("/admin/users", {
+              method: "POST",
+              body: JSON.stringify({
+                name: els.newTrainerName.value,
+                email: els.newTrainerEmail.value,
+                zone: els.newTrainerZone.value,
+                password: els.newTrainerPassword.value
+              })
+            });
+            els.createTrainerForm.reset();
+            els.newTrainerPassword.value = "LG2026";
+            setMessage(els.trainerMessage, "Trainer creado correctamente en la nube.", "ok");
+            await refreshStateFromServer();
+          } catch (error) {
+            setMessage(els.trainerMessage, error.message, "err");
+          }
+        });
+
+        els.announcementAudience.addEventListener("change", () => {
+          els.announcementTargetWrap.classList.toggle("hidden", els.announcementAudience.value !== "person");
+        });
+
+        els.announcementForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          state.announcements.unshift({
+            id: id(),
+            title: clean(els.announcementTitle.value),
+            audience: els.announcementAudience.value,
+            targetId: els.announcementAudience.value === "person" ? els.announcementTarget.value : "",
+            priority: els.announcementPriority.value,
+            body: clean(els.announcementBody.value),
+            createdById: state.activeUserId,
+            createdAt: Date.now()
+          });
+          saveState();
+          els.announcementForm.reset();
+          render();
+        });
+
+        els.supportRequestForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          if (!els.supportTo.value) return;
+          state.supportRequests.unshift({
+            id: id(),
+            fromId: state.activeUserId,
+            toId: els.supportTo.value,
+            type: els.supportType.value,
+            title: clean(els.supportTitle.value),
+            detail: clean(els.supportDetail.value),
+            status: "Abierta",
+            createdAt: Date.now()
+          });
+          saveState();
+          els.supportRequestForm.reset();
+          render();
+        });
+
+        els.exportData.addEventListener("click", () => {
+          const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `lg-task-hub-respaldo-${todayIso}.json`;
+          link.click();
+          URL.revokeObjectURL(url);
+        });
+
+        els.importData.addEventListener("change", async () => {
+          const file = els.importData.files[0];
+          if (!file) return;
+          try {
+            const text = await file.text();
+            state = normalizeState(JSON.parse(text));
+            saveState();
+            render();
+          } catch {
+            window.alert("No se pudo importar el archivo.");
+          }
+        });
+      }
+
+      els.announcementTargetWrap.classList.add("hidden");
+      els.taskDueDate.value = todayIso;
+      els.taskStartTime.value = WORKDAY_START;
+      els.taskEndTime.value = "09:30";
+      async function bootstrap() {
+        addEventListeners();
+        render();
+        await refreshStateFromServer();
+        window.setInterval(() => {
+          if (state.activeUserId && !document.hidden && !syncInFlight) {
+            refreshStateFromServer().catch(() => {});
+          }
+        }, 10000);
+      }
+
+      bootstrap();
+    </script>
+  </body>
+</html>
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LG Task Hub</title>
+    <style>
+      :root {
+        --bg: #f4f7fb;
+        --card: #ffffff;
+        --ink: #172033;
+        --muted: #667085;
+        --line: #d8e0ec;
+        --blue: #2563eb;
+        --blue-dark: #1d4ed8;
+        --green: #0f8a5f;
+        --green-soft: #dcf7ea;
+        --red: #c8333b;
+        --red-soft: #ffe7ea;
+        --yellow: #9a6a00;
+        --yellow-soft: #fff4d7;
+        --soft: #eef4ff;
+        --shadow: 0 12px 28px rgba(23, 32, 51, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: Inter, "Segoe UI", Arial, sans-serif;
+        font-size: 15px;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      .muted,
+      label,
+      .meta {
+        color: var(--muted);
+      }
+
+      .login-screen {
+        align-items: center;
+        display: flex;
+        min-height: 100vh;
+        padding: 28px clamp(14px, 4vw, 38px);
+      }
+
+      .login-card {
+        margin: 0 auto;
+        max-width: 1040px;
+        width: 100%;
+      }
+
+      .brand {
+        align-items: center;
+        display: flex;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .brand-mark {
+        align-items: center;
+        background: #b91c35;
+        border-radius: 8px;
+        color: #fff;
+        display: inline-flex;
+        font-weight: 900;
+        height: 44px;
+        justify-content: center;
+        width: 44px;
+      }
+
+      .brand h1 {
+        font-size: 22px;
+        line-height: 1.05;
+      }
+
+      .login-brand {
+        margin-bottom: 18px;
+      }
+
+      .login-grid,
+      .two-col {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+
+      .panel,
+      .metric,
+      .date-card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+      }
+
+      .panel {
+        padding: 18px;
+      }
+
+      .panel-header {
+        align-items: flex-start;
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+
+      .stack {
+        display: grid;
+        gap: 12px;
+      }
+
+      .form-grid {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .wide {
+        grid-column: 1 / -1;
+      }
+
+      label {
+        display: flex;
+        flex-direction: column;
+        font-size: 13px;
+        font-weight: 800;
+        gap: 6px;
+      }
+
+      input,
+      select,
+      textarea {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--ink);
+        min-height: 42px;
+        padding: 9px 11px;
+        width: 100%;
+      }
+
+      textarea {
+        min-height: 96px;
+        resize: vertical;
+      }
+
+      input:focus,
+      select:focus,
+      textarea:focus,
+      button:focus-visible {
+        outline: 3px solid rgba(37, 99, 235, 0.18);
+        outline-offset: 2px;
+      }
+
+      .primary,
+      .ghost,
+      .small {
+        border-radius: 8px;
+        font-weight: 900;
+        min-height: 42px;
+        padding: 0 14px;
+      }
+
+      .primary {
+        background: var(--blue);
+        border: 1px solid var(--blue);
+        color: #fff;
+      }
+
+      .primary:hover {
+        background: var(--blue-dark);
+      }
+
+      .ghost,
+      .small {
+        background: #fff;
+        border: 1px solid var(--line);
+        color: var(--ink);
+      }
+
+      .small {
+        min-height: 34px;
+        padding: 0 10px;
+      }
+
+      .topbar {
+        align-items: center;
+        background: #fff;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 16px;
+        justify-content: space-between;
+        min-height: 78px;
+        padding: 14px clamp(14px, 4vw, 38px);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+
+      .session {
+        align-items: center;
+        display: flex;
+        gap: 10px;
+        min-width: 360px;
+      }
+
+      .shell {
+        margin: 0 auto;
+        max-width: 1280px;
+        padding: 22px clamp(12px, 4vw, 38px) 42px;
+      }
+
+      .dashboard {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: 1.25fr 1.7fr repeat(4, minmax(120px, 1fr));
+        margin-bottom: 16px;
+      }
+
+      .date-card,
+      .metric {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        justify-content: center;
+        min-height: 92px;
+        padding: 16px;
+      }
+
+      .date-card strong,
+      .metric strong {
+        font-size: 27px;
+      }
+
+      .meter {
+        background: #e9eef6;
+        border-radius: 999px;
+        height: 8px;
+        overflow: hidden;
+      }
+
+      .meter span {
+        background: var(--green);
+        display: block;
+        height: 100%;
+        transition: width 180ms ease;
+        width: 0;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+        overflow-x: auto;
+      }
+
+      .tab {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--ink);
+        min-height: 42px;
+        padding: 0 16px;
+        white-space: nowrap;
+      }
+
+      .tab.active {
+        background: var(--blue);
+        border-color: var(--blue);
+        color: #fff;
+      }
+
+      .view {
+        display: none;
+      }
+
+      .view.active {
+        display: block;
+      }
+
+      .list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .item {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        display: grid;
+        gap: 10px;
+        padding: 14px;
+      }
+
+      .task-item {
+        grid-template-columns: minmax(0, 1fr) auto;
+      }
+
+      .week-toolbar {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: space-between;
+      }
+
+      .week-grid {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(7, minmax(150px, 1fr));
+      }
+
+      .day-column {
+        background: #f8fbff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        min-height: 260px;
+        padding: 10px;
+      }
+
+      .day-column.today {
+        border-color: var(--blue);
+        box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.18);
+      }
+
+      .day-head {
+        display: grid;
+        gap: 4px;
+        margin-bottom: 10px;
+      }
+
+      .day-head strong {
+        font-size: 14px;
+      }
+
+      .day-hours {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        margin: 8px 0;
+      }
+
+      .day-tasks {
+        display: grid;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .timeline-entry {
+        align-items: start;
+        display: grid;
+        gap: 8px;
+        grid-template-columns: 48px minmax(0, 1fr);
+      }
+
+      .timeline-time {
+        color: var(--blue);
+        display: grid;
+        font-size: 11px;
+        font-weight: 900;
+        line-height: 1.25;
+        padding-top: 10px;
+        text-align: right;
+      }
+
+      .day-stats {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .mini-task {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        display: grid;
+        gap: 8px;
+        padding: 10px;
+      }
+
+      .mini-task h3 {
+        font-size: 14px;
+        line-height: 1.25;
+      }
+
+      .mini-task .meta {
+        display: grid;
+        gap: 4px;
+      }
+
+      .reassign-box {
+        align-items: center;
+        display: grid;
+        gap: 8px;
+        grid-template-columns: minmax(145px, 1fr) auto;
+        width: min(100%, 380px);
+      }
+
+      .cloud-path {
+        background: #f8fbff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--muted);
+        font-family: Consolas, "Courier New", monospace;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+        padding: 10px;
+      }
+
+      .title-row,
+      .meta,
+      .actions {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+      }
+
+      .meta {
+        font-size: 13px;
+      }
+
+      .pill {
+        align-items: center;
+        background: var(--soft);
+        border-radius: 999px;
+        color: var(--blue-dark);
+        display: inline-flex;
+        font-size: 12px;
+        font-weight: 900;
+        line-height: 1;
+        padding: 7px 10px;
+        white-space: nowrap;
+      }
+
+      .pill.pending,
+      .pill.process,
+      .pill.review,
+      .pill.medium {
+        background: var(--yellow-soft);
+        color: var(--yellow);
+      }
+
+      .pill.done,
+      .pill.approved {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .pill.high,
+      .pill.observed {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .empty {
+        background: #fff;
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        color: var(--muted);
+        padding: 22px;
+        text-align: center;
+      }
+
+      .empty strong {
+        color: var(--ink);
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      .note {
+        background: #f6f9fd;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 13px;
+      }
+
+      .divider {
+        border-top: 1px solid var(--line);
+        margin: 16px 0;
+      }
+
+      .message {
+        color: var(--muted);
+        min-height: 20px;
+      }
+
+      .message.ok {
+        color: var(--green);
+        font-weight: 900;
+      }
+
+      .message.err {
+        color: var(--red);
+        font-weight: 900;
+      }
+
+      .evidence-photo {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        max-height: 220px;
+        max-width: 100%;
+        object-fit: cover;
+      }
+
+      .product-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 16px 0;
+      }
+
+      .product-tabs button {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        min-height: 38px;
+        padding: 0 12px;
+      }
+
+      .product-tabs button.active {
+        background: var(--green);
+        border-color: var(--green);
+        color: #fff;
+      }
+
+      .feature-grid {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .feature-box {
+        background: #f8fbff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+      }
+
+      @media (max-width: 1060px) {
+        .dashboard,
+        .two-col,
+        .week-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar,
+        .session {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .session {
+          min-width: 0;
+          width: 100%;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .login-grid,
+        .form-grid,
+        .feature-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .task-item {
+          grid-template-columns: 1fr;
+        }
+
+        .panel-header {
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <section id="loginScreen" class="login-screen">
+      <div class="login-card">
+        <div class="brand login-brand">
+          <span class="brand-mark">LG</span>
+          <div>
+            <h1>Task Hub</h1>
+            <p class="muted">Gestion diaria de tareas y sustentos LG</p>
+          </div>
+        </div>
+
+        <div class="login-grid">
+          <form id="loginForm" class="panel stack" autocomplete="off">
+            <div>
+              <h2>Ingresar</h2>
+              <p class="muted">Acceso para coordinador y trainers.</p>
+            </div>
+            <label>
+              Correo
+              <input id="loginEmail" type="email" placeholder="correo@empresa.com" autocomplete="off" required />
+            </label>
+            <label>
+              Clave
+              <input id="loginPassword" type="password" placeholder="Clave de acceso" autocomplete="new-password" required />
+            </label>
+            <button class="primary" type="submit">Entrar</button>
+            <p id="loginMessage" class="message" aria-live="polite"></p>
+            <div class="divider"></div>
+            <button id="toggleRecovery" class="ghost" type="button">Olvide mi clave</button>
+            <div id="recoveryBox" class="stack hidden">
+              <label>
+                Correo registrado
+                <input id="recoveryEmail" type="email" placeholder="correo@empresa.com" autocomplete="off" />
+              </label>
+              <button id="recoverySubmit" class="small" type="button">Solicitar recuperacion</button>
+              <p id="recoveryMessage" class="message" aria-live="polite"></p>
+            </div>
+          </form>
+
+          <form id="registrationForm" class="panel stack" autocomplete="off">
+            <div>
+              <h2>Registro de usuario</h2>
+              <p class="muted">Crea tu acceso y luego ingresa con tu correo y clave.</p>
+            </div>
+            <label>
+              Nombre completo
+              <input id="regName" type="text" placeholder="Nombre completo" autocomplete="off" required />
+            </label>
+            <label>
+              Correo
+              <input id="regEmail" type="email" placeholder="correo@empresa.com" autocomplete="off" required />
+            </label>
+            <label>
+              Zona o tienda base
+              <input id="regZone" type="text" placeholder="Ej. Zona Norte / Tienda Centro" autocomplete="off" required />
+            </label>
+            <label>
+              Tipo de usuario
+              <select id="regRole">
+                <option value="Trainer">Trainer</option>
+                <option value="Coordinador">Coordinador</option>
+              </select>
+            </label>
+            <label id="coordinatorCodeWrap" class="wide hidden">
+              Codigo de coordinador
+              <input id="coordinatorCode" type="password" placeholder="Codigo interno" autocomplete="new-password" />
+            </label>
+            <label>
+              Crear clave
+              <input id="regPassword" type="password" minlength="6" placeholder="Minimo 6 caracteres" autocomplete="new-password" required />
+            </label>
+            <button class="primary" type="submit">Crear acceso</button>
+            <p id="registrationMessage" class="message" aria-live="polite"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <header id="appHeader" class="topbar hidden">
+      <div class="brand">
+        <span class="brand-mark">LG</span>
+        <div>
+          <h1>Task Hub</h1>
+          <p class="muted">Operacion diaria de cuenta LG</p>
+        </div>
+      </div>
+      <div class="session">
+        <span id="sessionName" class="muted"></span>
+        <span id="sessionRole" class="pill"></span>
+        <button id="logoutButton" class="ghost" type="button">Salir</button>
+      </div>
+    </header>
+
+    <main id="appShell" class="shell hidden">
+      <section class="dashboard">
+        <div class="date-card">
+          <span id="todayLabel" class="muted"></span>
+          <strong>Tablero diario</strong>
+        </div>
+        <div class="metric">
+          <span class="muted">Avance</span>
+          <strong id="progressPercent">0%</strong>
+          <div class="meter"><span id="progressBar"></span></div>
+        </div>
+        <div class="metric">
+          <span class="muted">Pendientes</span>
+          <strong id="pendingCount">0</strong>
+        </div>
+        <div class="metric">
+          <span class="muted">En revision</span>
+          <strong id="reviewCount">0</strong>
+        </div>
+        <div class="metric">
+          <span class="muted">Cumplidas</span>
+          <strong id="doneCount">0</strong>
+        </div>
+        <div class="metric">
+          <span class="muted">Trainers</span>
+          <strong id="trainerCount">0</strong>
+        </div>
+      </section>
+
+      <nav class="tabs" aria-label="Vistas principales">
+        <button class="tab active" data-view="tasksView">Tareas</button>
+        <button class="tab" data-view="evidenceView">Sustentos</button>
+        <button class="tab" data-view="teamView">Equipo</button>
+        <button class="tab" data-view="announcementsView">Comunicados</button>
+        <button class="tab" data-view="requestsView">Solicitudes</button>
+        <button class="tab" data-view="infoView">Info LG</button>
+      </nav>
+
+      <section id="tasksView" class="view active">
+        <section id="coordinatorWeekPanel" class="panel stack">
+          <div class="week-toolbar">
+            <div>
+              <h2>Calendario semanal del coordinador</h2>
+              <p class="muted">Agenda por hora, responsable y estado. Jornada laboral de 8:30 a. m. a 6:00 p. m.</p>
+            </div>
+            <div class="actions">
+              <button id="prevWeek" class="small" type="button">Semana anterior</button>
+              <button id="todayWeek" class="small" type="button">Hoy</button>
+              <button id="nextWeek" class="small" type="button">Semana siguiente</button>
+            </div>
+          </div>
+          <strong id="weekLabel"></strong>
+          <div id="weeklySummary" class="week-grid"></div>
+        </section>
+
+        <div class="two-col">
+          <section id="coordinatorTaskPanel" class="panel stack">
+            <div>
+              <h2>Asignar tarea</h2>
+              <p class="muted">El coordinador asigna actividades diarias a los trainers.</p>
+            </div>
+            <form id="taskForm" class="form-grid">
+              <label>
+                Titulo de tarea
+                <input id="taskTitle" type="text" placeholder="Ej. Validar exhibicion OLED" required />
+              </label>
+              <label>
+                Responsable
+                <select id="taskOwner" required></select>
+              </label>
+              <label>
+                Categoria
+                <select id="taskCategory">
+                  <option>PDV</option>
+                  <option>Entrenamiento</option>
+                  <option>Producto</option>
+                  <option>Reporte</option>
+                  <option>Coordinacion</option>
+                </select>
+              </label>
+              <label>
+                Prioridad
+                <select id="taskPriority">
+                  <option>Media</option>
+                  <option>Alta</option>
+                  <option>Baja</option>
+                </select>
+              </label>
+              <label>
+                Fecha limite
+                <input id="taskDueDate" type="date" required />
+              </label>
+              <label>
+                Hora de inicio
+                <input id="taskStartTime" type="time" min="08:30" max="17:45" step="900" required />
+              </label>
+              <label>
+                Hora de cierre
+                <input id="taskEndTime" type="time" min="08:45" max="18:00" step="900" required />
+              </label>
+              <label>
+                Producto LG
+                <input id="taskProduct" type="text" placeholder="Ej. OLED / Lavadoras / Audio" />
+              </label>
+              <label class="wide">
+                Instrucciones
+                <textarea id="taskDescription" placeholder="Detalle de lo que debe revisar o ejecutar el trainer"></textarea>
+              </label>
+              <button class="primary wide" type="submit">Asignar tarea</button>
+            </form>
+            <p id="taskMessage" class="message" aria-live="polite"></p>
+          </section>
+
+          <aside class="panel stack">
+            <div>
+              <h2>Mis tareas / Seguimiento</h2>
+              <p class="muted">El coordinador ve todas; cada trainer ve solo las suyas.</p>
+            </div>
+            <div class="form-grid">
+              <label>
+                Estado
+                <select id="taskStatusFilter">
+                  <option value="all">Todas</option>
+                  <option value="Pendiente">Pendientes</option>
+                  <option value="En proceso">En proceso</option>
+                  <option value="En revision">En revision</option>
+                  <option value="Cumplida">Cumplidas</option>
+                  <option value="Observada">Observadas</option>
+                  <option value="No disponible">No disponibles</option>
+                </select>
+              </label>
+              <label id="trainerFilterWrap">
+                Trainer
+                <select id="taskTrainerFilter"></select>
+              </label>
+            </div>
+            <div id="taskList" class="list"></div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="evidenceView" class="view">
+        <div class="two-col">
+          <section class="panel stack">
+            <div>
+              <h2>Enviar sustento</h2>
+              <p class="muted">Carga foto y formulario basico para demostrar cumplimiento.</p>
+            </div>
+            <form id="evidenceForm" class="form-grid">
+              <label class="wide">
+                Tarea
+                <select id="evidenceTask" required></select>
+              </label>
+              <label>
+                Tienda / PDV
+                <input id="evidenceStore" type="text" placeholder="Nombre de tienda o punto de venta" required />
+              </label>
+              <label>
+                Producto revisado
+                <input id="evidenceProduct" type="text" placeholder="Producto LG trabajado" />
+              </label>
+              <label>
+                Resultado
+                <select id="evidenceResult">
+                  <option>Cumplida</option>
+                  <option>Cumplida parcialmente</option>
+                  <option>No se pudo cumplir</option>
+                </select>
+              </label>
+              <label>
+                Foto de sustento
+                <input id="evidencePhoto" type="file" accept="image/*" />
+              </label>
+              <label class="wide">
+                Observaciones
+                <textarea id="evidenceNotes" placeholder="Describe que se realizo, hallazgos, incidencias o acuerdos"></textarea>
+              </label>
+              <button class="primary wide" type="submit">Enviar sustento</button>
+            </form>
+            <p id="evidenceMessage" class="message" aria-live="polite"></p>
+          </section>
+
+          <aside class="panel stack">
+            <div>
+              <h2>Sustentos recibidos</h2>
+              <p class="muted">Pablo aprueba u observa los sustentos enviados.</p>
+            </div>
+            <div id="cloudPlanPanel" class="note">
+              <strong>Orden para Microsoft 365</strong>
+              <p class="muted">Cuando conectemos la nube, cada sustento se guardara asi:</p>
+              <div class="cloud-path">LG Task Hub / Sustentos / fecha / trainer / tarea</div>
+              <p class="muted">Esto deja fotos y formularios separados por nombre de trainer y fecha.</p>
+            </div>
+            <div id="evidenceList" class="list"></div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="teamView" class="view">
+        <div class="two-col">
+          <section id="coordinatorTeamPanel" class="panel stack">
+            <div>
+              <h2>Alta de trainers</h2>
+              <p class="muted">Crear usuarios o aprobar solicitudes de registro.</p>
+            </div>
+            <form id="createTrainerForm" class="form-grid">
+              <label>
+                Nombre
+                <input id="newTrainerName" type="text" required />
+              </label>
+              <label>
+                Correo
+                <input id="newTrainerEmail" type="email" required />
+              </label>
+              <label>
+                Zona / tienda base
+                <input id="newTrainerZone" type="text" required />
+              </label>
+              <label>
+                Clave temporal
+                <input id="newTrainerPassword" type="text" value="LG2026" required />
+              </label>
+              <button class="primary wide" type="submit">Crear trainer</button>
+            </form>
+            <p id="trainerMessage" class="message" aria-live="polite"></p>
+            <div class="divider"></div>
+            <h3>Solicitudes pendientes</h3>
+            <div id="pendingRegistrations" class="list"></div>
+            <div class="divider"></div>
+            <h3>Recuperacion de claves</h3>
+            <div id="passwordRecoveryList" class="list"></div>
+          </section>
+
+          <aside class="panel stack">
+            <div>
+              <h2>Equipo activo</h2>
+              <p class="muted">Usuarios habilitados para operar la pagina.</p>
+            </div>
+            <div id="teamList" class="list"></div>
+            <div id="backupTools" class="note stack">
+              <strong>Respaldo temporal</strong>
+              <p class="muted">Mientras no haya base de datos, estos botones ayudan a mover informacion entre equipos.</p>
+              <div class="actions">
+                <button id="exportData" class="small" type="button">Exportar datos</button>
+                <label class="small" style="display:inline-flex;align-items:center;gap:8px">
+                  Importar datos
+                  <input id="importData" type="file" accept="application/json" class="hidden" />
+                </label>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="announcementsView" class="view">
+        <div class="two-col">
+          <section id="coordinatorAnnouncementPanel" class="panel stack">
+            <div>
+              <h2>Crear comunicado</h2>
+              <p class="muted">Mensaje general o individual para un trainer.</p>
+            </div>
+            <form id="announcementForm" class="form-grid">
+              <label>
+                Titulo
+                <input id="announcementTitle" type="text" required />
+              </label>
+              <label>
+                Alcance
+                <select id="announcementAudience">
+                  <option value="all">Todo el equipo</option>
+                  <option value="person">Trainer especifico</option>
+                </select>
+              </label>
+              <label id="announcementTargetWrap">
+                Trainer
+                <select id="announcementTarget"></select>
+              </label>
+              <label>
+                Prioridad
+                <select id="announcementPriority">
+                  <option>Normal</option>
+                  <option>Importante</option>
+                  <option>Urgente</option>
+                </select>
+              </label>
+              <label class="wide">
+                Mensaje
+                <textarea id="announcementBody" required></textarea>
+              </label>
+              <button class="primary wide" type="submit">Publicar comunicado</button>
+            </form>
+          </section>
+
+          <aside class="panel stack">
+            <div>
+              <h2>Bandeja de comunicados</h2>
+              <p class="muted">Cada usuario ve lo que le corresponde.</p>
+            </div>
+            <div id="announcementList" class="list"></div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="requestsView" class="view">
+        <div class="two-col">
+          <section class="panel stack">
+            <div>
+              <h2>Solicitudes internas</h2>
+              <p class="muted">Pablo y trainers pueden solicitar apoyo, revision o informacion.</p>
+            </div>
+            <form id="supportRequestForm" class="form-grid">
+              <label>
+                Para
+                <select id="supportTo" required></select>
+              </label>
+              <label>
+                Tipo
+                <select id="supportType">
+                  <option>Seguimiento</option>
+                  <option>Validacion</option>
+                  <option>Material</option>
+                  <option>Capacitacion</option>
+                </select>
+              </label>
+              <label class="wide">
+                Solicitud
+                <input id="supportTitle" type="text" required />
+              </label>
+              <label class="wide">
+                Detalle
+                <textarea id="supportDetail"></textarea>
+              </label>
+              <button class="primary wide" type="submit">Enviar solicitud</button>
+            </form>
+          </section>
+
+          <aside class="panel stack">
+            <div>
+              <h2>Listado de solicitudes</h2>
+              <p class="muted">Seguimiento de pedidos entre roles.</p>
+            </div>
+            <div id="supportList" class="list"></div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="infoView" class="view">
+        <div class="two-col">
+          <section class="panel">
+            <h2>Informacion LG</h2>
+            <p class="muted">Consulta rapida para reforzar argumentos de producto.</p>
+            <div id="productTabs" class="product-tabs"></div>
+            <div id="productInfo" class="stack"></div>
+          </section>
+          <aside class="panel stack">
+            <h2>Checklist de visita</h2>
+            <div class="item">
+              <strong>Antes de cerrar una tarea</strong>
+              <p class="muted">Verifica exhibicion, precio, disponibilidad, limpieza, material POP y evidencia fotografica.</p>
+            </div>
+            <div id="quizBox" class="stack"></div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const STORAGE_KEY = "lg-task-hub-ui-v1";
       const API_BASE = "/api";
       const WORKDAY_START = "08:30";
       const WORKDAY_END = "18:00";
