@@ -3,12 +3,13 @@ const SESSION_DAYS = 14;
 const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb9775180ea780b71";
 
 const EMPTY_DATA = {
-  version: 4,
+  version: 5,
   registrationRequests: [],
   passwordRecoveryRequests: [],
   tasks: [],
   announcements: [],
-  supportRequests: []
+  supportRequests: [],
+  dailyMotivations: []
 };
 
 export async function onRequest(context) {
@@ -34,6 +35,9 @@ export async function onRequest(context) {
     const session = await authenticate(request, env.DB);
     if (!session) return json({ ok: false, message: "Sesion no valida." }, 401);
 
+    if (route === "evidence/upload" && request.method === "POST") return uploadEvidence(request, env.DB, session.user);
+    const evidencePhotoMatch = route.match(/^evidence\/([^/]+)\/photo$/);
+    if (evidencePhotoMatch && request.method === "GET") return evidencePhoto(env.DB, session.user, evidencePhotoMatch[1]);
     if (route === "state" && request.method === "GET") return getState(env.DB, session.user);
     if (route === "state" && request.method === "PUT") return putState(request, env.DB, session.user);
     if (route === "admin/users" && request.method === "POST") return createUser(request, env.DB, session.user);
@@ -71,9 +75,21 @@ async function ensureSchema(db) {
       data TEXT NOT NULL,
       updated_at INTEGER NOT NULL
     )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS evidence_files (
+      id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
+      owner_id TEXT NOT NULL,
+      submitted_by_id TEXT NOT NULL,
+      file_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      photo_base64 TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    )`),
     db.prepare("INSERT OR IGNORE INTO app_data (id, data, updated_at) VALUES (1, ?, 0)").bind(JSON.stringify(EMPTY_DATA)),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at)")
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_evidence_task ON evidence_files(task_id)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_evidence_submitter ON evidence_files(submitted_by_id)")
   ]);
 }
 
@@ -180,14 +196,64 @@ async function getState(db, user) {
   return stateResponse(db, user);
 }
 
+async function uploadEvidence(request, db, user) {
+  const body = await readJson(request, 2_000_000);
+  const taskId = clean(body.taskId);
+  const data = await loadData(db);
+  const task = data.tasks.find((item) => item.id === taskId);
+  if (!task) return json({ ok: false, message: "La tarea ya no existe." }, 404);
+  if (user.role !== "Coordinador" && task.ownerId !== user.id) {
+    return json({ ok: false, message: "No puedes subir sustentos para esa tarea." }, 403);
+  }
+
+  const photoMatch = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(body.photoData || ""));
+  if (!photoMatch) return json({ ok: false, message: "La foto no tiene un formato valido." }, 400);
+  if (photoMatch[2].length > 1_800_000) {
+    return json({ ok: false, message: "La foto es demasiado grande. Intenta tomarla nuevamente." }, 413);
+  }
+
+  const fileId = crypto.randomUUID();
+  const fileName = clean(body.fileName).replace(/[\\/:*?"<>|]/g, "-").slice(0, 120) || "sustento.jpg";
+  const createdAt = Date.now();
+  await db
+    .prepare(
+      "INSERT INTO evidence_files (id, task_id, owner_id, submitted_by_id, file_name, mime_type, photo_base64, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    )
+    .bind(fileId, task.id, task.ownerId, user.id, fileName, photoMatch[1], photoMatch[2], createdAt)
+    .run();
+
+  return json({
+    ok: true,
+    file: { id: fileId, name: fileName, createdAt, url: `/cloud/evidence/${fileId}/photo` }
+  }, 201);
+}
+
+async function evidencePhoto(db, user, fileId) {
+  const row = await db.prepare("SELECT * FROM evidence_files WHERE id = ?").bind(clean(fileId)).first();
+  if (!row) return json({ ok: false, message: "Archivo no encontrado." }, 404);
+  const allowed = user.role === "Coordinador" || row.submitted_by_id === user.id || row.owner_id === user.id;
+  if (!allowed) return json({ ok: false, message: "No tienes acceso a este archivo." }, 403);
+
+  const binary = atob(row.photo_base64);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  const safeName = String(row.file_name || "sustento.jpg").replace(/["\r\n]/g, "-");
+  return new Response(bytes, {
+    headers: {
+      "Content-Type": row.mime_type,
+      "Content-Disposition": `inline; filename="${safeName}"`,
+      "Cache-Control": "private, max-age=300",
+      "X-Content-Type-Options": "nosniff"
+    }
+  });
+}
+
 async function stateResponse(db, user) {
   const data = await loadData(db);
   const coordinator = user.role === "Coordinador";
   const userRows = coordinator
     ? await db.prepare("SELECT id, name, email, zone, role, status, created_at FROM users ORDER BY created_at ASC").all()
     : await db
-        .prepare("SELECT id, name, email, zone, role, status, created_at FROM users WHERE id = ? OR role = 'Coordinador' ORDER BY created_at ASC")
-        .bind(user.id)
+        .prepare("SELECT id, name, email, zone, role, status, created_at FROM users WHERE status = 'Activo' ORDER BY role ASC, name ASC")
         .all();
   const users = (userRows.results || []).map(publicUser);
   const state = {
@@ -214,22 +280,36 @@ async function putState(request, db, user) {
   const current = await loadData(db);
 
   if (user.role === "Coordinador") {
-    for (const key of ["registrationRequests", "passwordRecoveryRequests", "tasks", "announcements", "supportRequests"]) {
+    for (const key of ["registrationRequests", "passwordRecoveryRequests", "tasks", "announcements", "supportRequests", "dailyMotivations"]) {
       if (Array.isArray(submitted[key])) current[key] = submitted[key];
     }
   } else {
     const submittedTasks = new Map((submitted.tasks || []).map((task) => [task.id, task]));
+    const activeTrainerRows = await db.prepare("SELECT id FROM users WHERE role = 'Trainer' AND status = 'Activo'").all();
+    const activeTrainerIds = new Set((activeTrainerRows.results || []).map((row) => row.id));
     current.tasks = current.tasks.map((task) => {
       if (task.ownerId !== user.id) return task;
       const next = submittedTasks.get(task.id);
       if (!next) return task;
+      const requestedOwnerId = clean(next.ownerId);
+      const ownerChanged = requestedOwnerId && requestedOwnerId !== task.ownerId && activeTrainerIds.has(requestedOwnerId);
+      const nextHistory = Array.isArray(next.history) ? next.history : task.history;
+      const lastHistory = nextHistory?.at(-1);
+      const validReassignment =
+        ownerChanged &&
+        lastHistory?.type === "Reasignacion" &&
+        lastHistory.fromId === user.id &&
+        lastHistory.toId === requestedOwnerId &&
+        lastHistory.byId === user.id &&
+        clean(lastHistory.reason);
       return {
         ...task,
-        status: clean(next.status) || task.status,
+        ownerId: validReassignment ? requestedOwnerId : task.ownerId,
+        status: validReassignment ? "Pendiente" : clean(next.status) || task.status,
         evidence: Array.isArray(next.evidence) ? next.evidence : task.evidence,
-        history: Array.isArray(next.history) ? next.history : task.history,
-        blockedReason: clean(next.blockedReason),
-        blockedAt: Number(next.blockedAt || 0)
+        history: validReassignment ? nextHistory : Array.isArray(next.history) ? next.history : task.history,
+        blockedReason: validReassignment ? "" : clean(next.blockedReason),
+        blockedAt: validReassignment ? 0 : Number(next.blockedAt || 0)
       };
     });
     const knownSupport = new Set(current.supportRequests.map((item) => item.id));
@@ -299,12 +379,13 @@ async function loadData(db) {
 
 async function saveData(db, data) {
   const payload = {
-    version: 4,
+    version: 5,
     registrationRequests: data.registrationRequests || [],
     passwordRecoveryRequests: data.passwordRecoveryRequests || [],
     tasks: data.tasks || [],
     announcements: data.announcements || [],
-    supportRequests: data.supportRequests || []
+    supportRequests: data.supportRequests || [],
+    dailyMotivations: data.dailyMotivations || []
   };
   await db.prepare("UPDATE app_data SET data = ?, updated_at = ? WHERE id = 1").bind(JSON.stringify(payload), Date.now()).run();
 }
