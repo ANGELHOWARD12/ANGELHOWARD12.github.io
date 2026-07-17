@@ -361,6 +361,36 @@
         font-size: 14px;
       }
 
+      .day-hours {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        margin: 8px 0;
+      }
+
+      .day-tasks {
+        display: grid;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .timeline-entry {
+        align-items: start;
+        display: grid;
+        gap: 8px;
+        grid-template-columns: 48px minmax(0, 1fr);
+      }
+
+      .timeline-time {
+        color: var(--blue);
+        display: grid;
+        font-size: 11px;
+        font-weight: 900;
+        line-height: 1.25;
+        padding-top: 10px;
+        text-align: right;
+      }
+
       .day-stats {
         align-items: center;
         display: flex;
@@ -374,7 +404,6 @@
         border-radius: 8px;
         display: grid;
         gap: 8px;
-        margin-top: 8px;
         padding: 10px;
       }
 
@@ -709,7 +738,7 @@
           <div class="week-toolbar">
             <div>
               <h2>Calendario semanal del coordinador</h2>
-              <p class="muted">Vista por dia, trainer y estado para mover la operacion de la semana.</p>
+              <p class="muted">Agenda por hora, responsable y estado. Jornada laboral de 8:30 a. m. a 6:00 p. m.</p>
             </div>
             <div class="actions">
               <button id="prevWeek" class="small" type="button">Semana anterior</button>
@@ -757,6 +786,14 @@
               <label>
                 Fecha limite
                 <input id="taskDueDate" type="date" required />
+              </label>
+              <label>
+                Hora de inicio
+                <input id="taskStartTime" type="time" min="08:30" max="17:45" step="900" required />
+              </label>
+              <label>
+                Hora de cierre
+                <input id="taskEndTime" type="time" min="08:45" max="18:00" step="900" required />
               </label>
               <label>
                 Producto LG
@@ -1027,6 +1064,8 @@
     <script>
       const STORAGE_KEY = "lg-task-hub-ui-v1";
       const API_BASE = "/api";
+      const WORKDAY_START = "08:30";
+      const WORKDAY_END = "18:00";
       const todayIso = new Date().toISOString().slice(0, 10);
 
       const initialState = {
@@ -1158,6 +1197,8 @@
         taskCategory: document.querySelector("#taskCategory"),
         taskPriority: document.querySelector("#taskPriority"),
         taskDueDate: document.querySelector("#taskDueDate"),
+        taskStartTime: document.querySelector("#taskStartTime"),
+        taskEndTime: document.querySelector("#taskEndTime"),
         taskProduct: document.querySelector("#taskProduct"),
         taskDescription: document.querySelector("#taskDescription"),
         taskMessage: document.querySelector("#taskMessage"),
@@ -1225,7 +1266,11 @@
         nextState.users = nextState.users?.length ? nextState.users : structuredClone(initialState.users);
         nextState.registrationRequests = nextState.registrationRequests || [];
         nextState.passwordRecoveryRequests = nextState.passwordRecoveryRequests || [];
-        nextState.tasks = nextState.tasks || [];
+        nextState.tasks = (nextState.tasks || []).map((task) => ({
+          ...task,
+          startTime: task.startTime || "08:30",
+          endTime: task.endTime || "09:30"
+        }));
         nextState.announcements = nextState.announcements || [];
         nextState.supportRequests = nextState.supportRequests || [];
         nextState.selectedWeekStart = nextState.selectedWeekStart || weekStartIso(todayIso);
@@ -1382,6 +1427,26 @@
         return new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "short" }).format(new Date(`${dateValue}T12:00:00`));
       }
 
+      function timeToMinutes(value) {
+        const [hours, minutes] = String(value || "00:00").split(":").map(Number);
+        return hours * 60 + minutes;
+      }
+
+      function taskTimeLabel(task) {
+        return `${task.startTime || WORKDAY_START} - ${task.endTime || "09:30"}`;
+      }
+
+      function hasScheduleConflict(ownerId, dateValue, startTime, endTime, excludeTaskId = "") {
+        const start = timeToMinutes(startTime);
+        const end = timeToMinutes(endTime);
+        return state.tasks.some((task) => {
+          if (task.id === excludeTaskId || task.ownerId !== ownerId || task.dueDate !== dateValue || task.status === "No disponible") return false;
+          const taskStart = timeToMinutes(task.startTime || WORKDAY_START);
+          const taskEnd = timeToMinutes(task.endTime || "09:30");
+          return start < taskEnd && end > taskStart;
+        });
+      }
+
       function formatShortDate(dateValue) {
         return new Intl.DateTimeFormat("es-PE", { weekday: "short", day: "2-digit", month: "short" }).format(new Date(`${dateValue}T12:00:00`));
       }
@@ -1489,9 +1554,11 @@
 
         const availableTasks = state.tasks
           .filter((task) => !isCoordinator() && task.ownerId === state.activeUserId && task.status !== "Cumplida" && task.status !== "No disponible")
-          .map((task) => ({ value: task.id, label: `${task.title} (${formatDate(task.dueDate)})` }));
+          .map((task) => ({ value: task.id, label: `${task.title} (${formatDate(task.dueDate)} | ${taskTimeLabel(task)})` }));
         fillSelect(els.evidenceTask, availableTasks, els.evidenceTask.value);
         els.taskDueDate.value = els.taskDueDate.value || todayIso;
+        els.taskStartTime.value = els.taskStartTime.value || WORKDAY_START;
+        els.taskEndTime.value = els.taskEndTime.value || "09:30";
       }
 
       function relevantTasks() {
@@ -1504,7 +1571,7 @@
         return relevantTasks()
           .filter((task) => status === "all" || task.status === status)
           .filter((task) => !isCoordinator() || trainer === "all" || task.ownerId === trainer)
-          .sort((a, b) => b.createdAt - a.createdAt);
+          .sort((a, b) => b.dueDate.localeCompare(a.dueDate) || (a.startTime || WORKDAY_START).localeCompare(b.startTime || WORKDAY_START));
       }
 
       function trainerWorkloadOnDate(trainerId, dateValue, excludeTaskId = "") {
@@ -1529,6 +1596,10 @@
         const task = state.tasks.find((item) => item.id === taskId);
         const nextOwner = state.users.find((user) => user.id === newOwnerId);
         if (!task || !nextOwner || !isCoordinator()) return;
+        if (hasScheduleConflict(newOwnerId, task.dueDate, task.startTime, task.endTime, task.id)) {
+          window.alert(`${nextOwner.name} ya tiene una tarea entre ${taskTimeLabel(task)}.`);
+          return;
+        }
         const previousOwnerId = task.ownerId;
         task.history = task.history || [];
         task.history.push({
@@ -1580,8 +1651,10 @@
 
       function focusTaskFormForDate(dateValue) {
         els.taskDueDate.value = dateValue;
+        els.taskStartTime.value = els.taskStartTime.value || WORKDAY_START;
+        els.taskEndTime.value = els.taskEndTime.value || "09:30";
         els.taskTitle.focus();
-        setMessage(els.taskMessage, `Nueva tarea para ${formatDate(dateValue)}. Completa titulo y trainer.`, "ok");
+        setMessage(els.taskMessage, `Nueva tarea para ${formatDate(dateValue)}. Define responsable y horario.`, "ok");
       }
 
       function renderWeeklyCalendar() {
@@ -1593,7 +1666,7 @@
         days.forEach((day) => {
           const tasks = state.tasks
             .filter((task) => task.dueDate === day)
-            .sort((a, b) => userName(a.ownerId).localeCompare(userName(b.ownerId)) || a.createdAt - b.createdAt);
+            .sort((a, b) => (a.startTime || WORKDAY_START).localeCompare(b.startTime || WORKDAY_START) || userName(a.ownerId).localeCompare(userName(b.ownerId)));
           const done = tasks.filter((task) => task.status === "Cumplida").length;
           const blocked = tasks.filter((task) => task.status === "No disponible").length;
           const column = document.createElement("article");
@@ -1607,6 +1680,7 @@
                 ${blocked ? `<span class="pill observed">${blocked} bloqueo</span>` : ""}
               </div>
             </div>
+            <div class="day-hours">Jornada ${WORKDAY_START} - ${WORKDAY_END}</div>
             <button class="small" type="button" data-new-task="${day}">Agregar tarea</button>
             <div class="day-tasks"></div>
           `;
@@ -1617,6 +1691,8 @@
             taskWrap.innerHTML = `<div class="empty"><strong>Libre</strong><p>Sin tareas programadas.</p></div>`;
           } else {
             tasks.forEach((task) => {
+              const timeline = document.createElement("div");
+              timeline.className = "timeline-entry";
               const mini = document.createElement("div");
               mini.className = "mini-task";
               mini.innerHTML = `
@@ -1626,6 +1702,7 @@
                 </div>
                 <div class="meta">
                   <span>${escapeHtml(userName(task.ownerId))}</span>
+                  <span>Horario: ${escapeHtml(taskTimeLabel(task))}</span>
                   <span>${escapeHtml(task.category)}${task.product ? ` | ${escapeHtml(task.product)}` : ""}</span>
                   ${task.blockedReason ? `<span>Motivo: ${escapeHtml(task.blockedReason)}</span>` : ""}
                 </div>
@@ -1643,7 +1720,11 @@
                 render();
               });
               actions.appendChild(deleteButton);
-              taskWrap.appendChild(mini);
+              const time = document.createElement("div");
+              time.className = "timeline-time";
+              time.innerHTML = `<span>${escapeHtml(task.startTime || WORKDAY_START)}</span><span>${escapeHtml(task.endTime || "09:30")}</span>`;
+              timeline.append(time, mini);
+              taskWrap.appendChild(timeline);
             });
           }
           els.weeklySummary.appendChild(column);
@@ -1687,6 +1768,7 @@
               <div class="meta">
                 <span>Trainer: ${escapeHtml(userName(task.ownerId))}</span>
                 <span>Fecha limite: ${formatDate(task.dueDate)}</span>
+                <span>Horario: ${escapeHtml(taskTimeLabel(task))}</span>
                 <span>${escapeHtml(task.category)}</span>
                 ${task.product ? `<span>Producto: ${escapeHtml(task.product)}</span>` : ""}
               </div>
@@ -2298,6 +2380,20 @@
             setMessage(els.taskMessage, "Primero registra un responsable activo.", "err");
             return;
           }
+          const startTime = els.taskStartTime.value;
+          const endTime = els.taskEndTime.value;
+          if (
+            timeToMinutes(startTime) < timeToMinutes(WORKDAY_START) ||
+            timeToMinutes(endTime) > timeToMinutes(WORKDAY_END) ||
+            timeToMinutes(endTime) <= timeToMinutes(startTime)
+          ) {
+            setMessage(els.taskMessage, `El horario debe estar entre ${WORKDAY_START} y ${WORKDAY_END}, con una hora de cierre posterior al inicio.`, "err");
+            return;
+          }
+          if (hasScheduleConflict(els.taskOwner.value, els.taskDueDate.value, startTime, endTime)) {
+            setMessage(els.taskMessage, "El responsable ya tiene otra tarea asignada en ese horario.", "err");
+            return;
+          }
           state.tasks.unshift({
             id: id(),
             title: clean(els.taskTitle.value),
@@ -2306,6 +2402,8 @@
             category: els.taskCategory.value,
             priority: els.taskPriority.value,
             dueDate: els.taskDueDate.value,
+            startTime,
+            endTime,
             product: clean(els.taskProduct.value),
             description: clean(els.taskDescription.value),
             status: "Pendiente",
@@ -2316,6 +2414,8 @@
           saveState();
           els.taskForm.reset();
           els.taskDueDate.value = todayIso;
+          els.taskStartTime.value = WORKDAY_START;
+          els.taskEndTime.value = "09:30";
           setMessage(els.taskMessage, "Tarea asignada correctamente.", "ok");
           render();
         });
@@ -2461,6 +2561,8 @@
 
       els.announcementTargetWrap.classList.add("hidden");
       els.taskDueDate.value = todayIso;
+      els.taskStartTime.value = WORKDAY_START;
+      els.taskEndTime.value = "09:30";
       async function bootstrap() {
         addEventListeners();
         render();
