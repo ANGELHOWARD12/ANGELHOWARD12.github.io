@@ -1025,12 +1025,12 @@
     </main>
 
     <script>
-      const STORAGE_KEY = "lg-task-hub-operativo-v3";
-      const COORDINATOR_REGISTRATION_CODE = "LG-COORD-2026";
+      const STORAGE_KEY = "lg-task-hub-ui-v1";
+      const API_BASE = "/api";
       const todayIso = new Date().toISOString().slice(0, 10);
 
       const initialState = {
-        version: 3,
+        version: 4,
         activeUserId: "",
         selectedProduct: "oled",
         selectedWeekStart: "",
@@ -1110,6 +1110,8 @@
       ];
 
       let state = loadState();
+      let syncTimer = 0;
+      let syncInFlight = null;
 
       const els = {
         loginScreen: document.querySelector("#loginScreen"),
@@ -1208,9 +1210,12 @@
 
       function loadState() {
         try {
-          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-          if (!saved) return structuredClone(initialState);
-          return normalizeState({ ...structuredClone(initialState), ...saved });
+          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+          return normalizeState({
+            ...structuredClone(initialState),
+            selectedProduct: saved.selectedProduct || initialState.selectedProduct,
+            selectedWeekStart: saved.selectedWeekStart || ""
+          });
         } catch {
           return structuredClone(initialState);
         }
@@ -1228,7 +1233,75 @@
       }
 
       function saveState() {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({ selectedProduct: state.selectedProduct, selectedWeekStart: state.selectedWeekStart })
+        );
+        if (!state.activeUserId) return;
+        window.clearTimeout(syncTimer);
+        syncTimer = window.setTimeout(() => {
+          syncState().catch((error) => console.error("No se pudo sincronizar", error));
+        }, 150);
+      }
+
+      async function apiRequest(path, options = {}) {
+        const response = await fetch(`${API_BASE}${path}`, {
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+          ...options
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const error = new Error(data.message || "No se pudo conectar con la nube.");
+          error.status = response.status;
+          throw error;
+        }
+        return data;
+      }
+
+      function applyCloudState(nextState) {
+        const selectedProduct = state.selectedProduct;
+        const selectedWeekStart = state.selectedWeekStart;
+        state = normalizeState({
+          ...structuredClone(initialState),
+          ...nextState,
+          selectedProduct,
+          selectedWeekStart: selectedWeekStart || nextState.selectedWeekStart
+        });
+      }
+
+      async function refreshStateFromServer({ quiet = false } = {}) {
+        try {
+          const data = await apiRequest("/state");
+          applyCloudState(data.state);
+          if (!quiet) render();
+          return true;
+        } catch (error) {
+          if (error.status === 401) {
+            state.activeUserId = "";
+            state.users = [];
+            state.tasks = [];
+            if (!quiet) render();
+            return false;
+          }
+          if (!quiet) setMessage(els.loginMessage, error.message, "err");
+          return false;
+        }
+      }
+
+      async function syncState() {
+        if (!state.activeUserId) return;
+        if (syncInFlight) return syncInFlight;
+        const snapshot = JSON.parse(JSON.stringify(state));
+        syncInFlight = apiRequest("/state", { method: "PUT", body: JSON.stringify({ state: snapshot }) })
+          .then((data) => {
+            applyCloudState(data.state);
+            render();
+          })
+          .finally(() => {
+            syncInFlight = null;
+          });
+        return syncInFlight;
       }
 
       function id() {
@@ -1271,10 +1344,6 @@
 
       function userName(userId) {
         return state.users.find((user) => user.id === userId)?.name || "Sin usuario";
-      }
-
-      function userByEmail(email) {
-        return state.users.find((user) => user.email.toLowerCase() === clean(email).toLowerCase());
       }
 
       function setMessage(element, text, type = "") {
@@ -1358,14 +1427,10 @@
         return `LG Task Hub / Sustentos / ${date} / ${folderSafe(userName(evidence.submittedById))} / ${folderSafe(task.title)}`;
       }
 
-      function generateTempPassword() {
-        return `LG-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-      }
-
       function recoveryMailLink(user, tempPassword) {
         const subject = encodeURIComponent("Recuperacion de clave - LG Task Hub");
         const body = encodeURIComponent(
-          `Hola ${user.name},\n\nSe genero una clave temporal para ingresar a LG Task Hub.\n\nCorreo: ${user.email}\nClave temporal: ${tempPassword}\n\nIngresa a https://angelhoward12.github.io/ y cambia esta clave cuando el sistema ya este conectado a base de datos.\n\nMensaje enviado por coordinacion LG.`
+          `Hola ${user.name},\n\nSe genero una clave temporal para ingresar a LGTASK.\n\nCorreo: ${user.email}\nClave temporal: ${tempPassword}\n\nIngresa a https://lgtask.pages.dev/ con estos datos.\n\nMensaje enviado por coordinacion LG.`
         );
         return `mailto:${encodeURIComponent(user.email)}?subject=${subject}&body=${body}`;
       }
@@ -2062,63 +2127,25 @@
         });
       }
 
-      function createTrainer(name, email, zone, password) {
-        if (userByEmail(email)) {
-          return { ok: false, message: "Ese correo ya existe." };
-        }
-        state.users.push({
-          id: id(),
-          name: clean(name),
-          email: clean(email).toLowerCase(),
-          password,
-          role: "Trainer",
-          zone: clean(zone),
-          status: "Activo",
-          createdAt: Date.now()
-        });
-        return { ok: true };
-      }
-
-      function createRegisteredUser(name, email, zone, password, role) {
-        if (userByEmail(email)) {
-          return { ok: false, message: "Ese correo ya esta registrado." };
-        }
-        state.users.push({
-          id: id(),
-          name: clean(name),
-          email: clean(email).toLowerCase(),
-          password,
-          role,
-          zone: clean(zone),
-          status: "Activo",
-          createdAt: Date.now()
-        });
-        return { ok: true };
-      }
-
-      function resetUserPassword(userId, requestId = "") {
+      async function resetUserPassword(userId, requestId = "") {
         if (!isCoordinator()) return;
         const user = state.users.find((item) => item.id === userId);
         if (!user) return;
-        const tempPassword = generateTempPassword();
-        user.password = tempPassword;
-        user.passwordResetTemp = tempPassword;
-        user.mustChangePassword = true;
-        user.passwordResetAt = Date.now();
-
-        if (requestId) {
-          const request = state.passwordRecoveryRequests.find((item) => item.id === requestId);
-          if (request) {
-            request.status = "Clave temporal generada";
-            request.tempPassword = tempPassword;
-            request.resolvedAt = Date.now();
-            request.resolvedById = state.activeUserId;
+        try {
+          const data = await apiRequest("/admin/reset-password", {
+            method: "POST",
+            body: JSON.stringify({ userId, requestId })
+          });
+          user.passwordResetTemp = data.tempPassword;
+          if (requestId) {
+            const request = state.passwordRecoveryRequests.find((item) => item.id === requestId);
+            if (request) request.status = "Clave temporal generada";
           }
+          setMessage(els.trainerMessage, `Clave temporal para ${user.name}: ${data.tempPassword}. Envia esta clave solo al correo registrado.`, "ok");
+          await refreshStateFromServer();
+        } catch (error) {
+          setMessage(els.trainerMessage, error.message, "err");
         }
-
-        saveState();
-        setMessage(els.trainerMessage, `Clave temporal para ${user.name}: ${tempPassword}. Envia esta clave solo al correo registrado.`, "ok");
-        render();
       }
 
       async function compressImage(file) {
@@ -2170,64 +2197,72 @@
           }
         });
 
-        els.recoverySubmit.addEventListener("click", () => {
+        els.recoverySubmit.addEventListener("click", async () => {
           const email = clean(els.recoveryEmail.value).toLowerCase();
           if (!email) {
             setMessage(els.recoveryMessage, "Escribe el correo registrado.", "err");
             return;
           }
-          const user = userByEmail(email);
-          if (user) {
-            const alreadyPending = state.passwordRecoveryRequests.some((request) => request.userId === user.id && request.status === "Pendiente");
-            if (!alreadyPending) {
-              state.passwordRecoveryRequests.unshift({
-                id: id(),
-                userId: user.id,
-                email: user.email,
-                status: "Pendiente",
-                createdAt: Date.now()
-              });
-              saveState();
-            }
+          try {
+            const data = await apiRequest("/auth/recovery", { method: "POST", body: JSON.stringify({ email }) });
+            setMessage(els.recoveryMessage, data.message, "ok");
+            els.recoveryEmail.value = "";
+          } catch (error) {
+            setMessage(els.recoveryMessage, error.message, "err");
           }
-          setMessage(els.recoveryMessage, "Si el correo esta registrado, Pablo vera la solicitud y podra enviarte una clave temporal.", "ok");
-          els.recoveryEmail.value = "";
         });
 
-        els.loginForm.addEventListener("submit", (event) => {
+        els.loginForm.addEventListener("submit", async (event) => {
           event.preventDefault();
-          const user = userByEmail(els.loginEmail.value);
-          if (!user || user.password !== els.loginPassword.value || user.status !== "Activo") {
-            setMessage(els.loginMessage, "Correo o clave incorrectos, o usuario no aprobado.", "err");
-            return;
+          setMessage(els.loginMessage, "Conectando con LGTASK...", "");
+          try {
+            const data = await apiRequest("/auth/login", {
+              method: "POST",
+              body: JSON.stringify({ email: els.loginEmail.value, password: els.loginPassword.value })
+            });
+            applyCloudState(data.state);
+            els.loginPassword.value = "";
+            setMessage(els.loginMessage, "", "");
+            render();
+          } catch (error) {
+            setMessage(els.loginMessage, error.message, "err");
           }
-          state.activeUserId = user.id;
-          saveState();
-          render();
         });
 
-        els.registrationForm.addEventListener("submit", (event) => {
+        els.registrationForm.addEventListener("submit", async (event) => {
           event.preventDefault();
           const email = clean(els.regEmail.value).toLowerCase();
           const role = els.regRole.value;
-          if (role === "Coordinador" && clean(els.coordinatorCode.value) !== COORDINATOR_REGISTRATION_CODE) {
-            setMessage(els.registrationMessage, "Codigo de coordinador incorrecto.", "err");
-            return;
+          setMessage(els.registrationMessage, "Creando cuenta en la nube...", "");
+          try {
+            await apiRequest("/auth/register", {
+              method: "POST",
+              body: JSON.stringify({
+                name: els.regName.value,
+                email,
+                zone: els.regZone.value,
+                role,
+                password: els.regPassword.value,
+                coordinatorCode: els.coordinatorCode.value
+              })
+            });
+            els.registrationForm.reset();
+            els.coordinatorCodeWrap.classList.add("hidden");
+            setMessage(els.registrationMessage, "Registro creado en la nube. Ya puedes ingresar desde cualquier dispositivo.", "ok");
+          } catch (error) {
+            setMessage(els.registrationMessage, error.message, "err");
           }
-          const result = createRegisteredUser(els.regName.value, email, els.regZone.value, els.regPassword.value, role);
-          if (!result.ok) {
-            setMessage(els.registrationMessage, result.message, "err");
-            return;
-          }
-          saveState();
-          els.registrationForm.reset();
-          els.coordinatorCodeWrap.classList.add("hidden");
-          setMessage(els.registrationMessage, "Registro creado. Ya puedes ingresar con tu correo y clave.", "ok");
         });
 
-        els.logoutButton.addEventListener("click", () => {
+        els.logoutButton.addEventListener("click", async () => {
+          try {
+            await apiRequest("/auth/logout", { method: "POST", body: "{}" });
+          } catch {
+            // The local session is still cleared when the network is unavailable.
+          }
           state.activeUserId = "";
-          saveState();
+          state.users = [];
+          state.tasks = [];
           render();
         });
 
@@ -2340,18 +2375,25 @@
           render();
         });
 
-        els.createTrainerForm.addEventListener("submit", (event) => {
+        els.createTrainerForm.addEventListener("submit", async (event) => {
           event.preventDefault();
-          const result = createTrainer(els.newTrainerName.value, els.newTrainerEmail.value, els.newTrainerZone.value, els.newTrainerPassword.value);
-          if (!result.ok) {
-            setMessage(els.trainerMessage, result.message, "err");
-            return;
+          try {
+            await apiRequest("/admin/users", {
+              method: "POST",
+              body: JSON.stringify({
+                name: els.newTrainerName.value,
+                email: els.newTrainerEmail.value,
+                zone: els.newTrainerZone.value,
+                password: els.newTrainerPassword.value
+              })
+            });
+            els.createTrainerForm.reset();
+            els.newTrainerPassword.value = "LG2026";
+            setMessage(els.trainerMessage, "Trainer creado correctamente en la nube.", "ok");
+            await refreshStateFromServer();
+          } catch (error) {
+            setMessage(els.trainerMessage, error.message, "err");
           }
-          saveState();
-          els.createTrainerForm.reset();
-          els.newTrainerPassword.value = "LG2026";
-          setMessage(els.trainerMessage, "Trainer creado correctamente.", "ok");
-          render();
         });
 
         els.announcementAudience.addEventListener("change", () => {
@@ -2419,8 +2461,18 @@
 
       els.announcementTargetWrap.classList.add("hidden");
       els.taskDueDate.value = todayIso;
-      addEventListeners();
-      render();
+      async function bootstrap() {
+        addEventListeners();
+        render();
+        await refreshStateFromServer();
+        window.setInterval(() => {
+          if (state.activeUserId && !document.hidden && !syncInFlight) {
+            refreshStateFromServer().catch(() => {});
+          }
+        }, 10000);
+      }
+
+      bootstrap();
     </script>
   </body>
 </html>
