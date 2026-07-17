@@ -19,6 +19,8 @@
         --red-soft: #ffe7ea;
         --yellow: #9a6a00;
         --yellow-soft: #fff4d7;
+        --cyan: #087e8b;
+        --cyan-soft: #e1f7f8;
         --soft: #eef4ff;
         --shadow: 0 12px 28px rgba(23, 32, 51, 0.08);
       }
@@ -44,6 +46,15 @@
 
       button {
         cursor: pointer;
+        transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, color 160ms ease, transform 160ms ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+      }
+
+      button:active {
+        transform: translateY(0) scale(0.98);
       }
 
       h1,
@@ -197,6 +208,7 @@
 
       .primary:hover {
         background: var(--blue-dark);
+        box-shadow: 0 8px 16px rgba(37, 99, 235, 0.2);
       }
 
       .ghost,
@@ -211,11 +223,25 @@
         padding: 0 10px;
       }
 
+      a.small {
+        align-items: center;
+        display: inline-flex;
+        text-decoration: none;
+        width: max-content;
+      }
+
+      .small:hover,
+      .ghost:hover {
+        background: var(--soft);
+        border-color: #9ab7f8;
+      }
+
       .topbar {
         align-items: center;
         background: #fff;
         border-bottom: 1px solid var(--line);
         display: flex;
+        flex-wrap: wrap;
         gap: 16px;
         justify-content: space-between;
         min-height: 78px;
@@ -234,8 +260,51 @@
 
       .shell {
         margin: 0 auto;
-        max-width: 1280px;
+        max-width: 1440px;
         padding: 22px clamp(12px, 4vw, 38px) 42px;
+      }
+
+      .motivation-strip {
+        align-items: center;
+        background: var(--cyan-soft);
+        border: 1px solid #98dadd;
+        border-left: 6px solid var(--cyan);
+        border-radius: 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        justify-content: space-between;
+        margin-bottom: 16px;
+        padding: 14px 16px;
+      }
+
+      .motivation-copy {
+        display: grid;
+        flex: 1;
+        gap: 4px;
+        min-width: 0;
+      }
+
+      .motivation-kicker {
+        color: var(--cyan);
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      .motivation-copy strong {
+        font-size: 17px;
+        line-height: 1.35;
+      }
+
+      .motivation-editor {
+        align-items: end;
+        display: grid;
+        flex-basis: 100%;
+        gap: 8px;
+        grid-template-columns: minmax(220px, 1fr) auto auto;
+        margin-top: 10px;
       }
 
       .dashboard {
@@ -335,7 +404,254 @@
       .week-grid {
         display: grid;
         gap: 10px;
-        grid-template-columns: repeat(7, minmax(150px, 1fr));
+        grid-template-columns: repeat(6, minmax(180px, 1fr));
+      }
+
+      .trainer-week-scroll,
+      .daily-roster-scroll {
+        overflow-x: auto;
+        padding-bottom: 4px;
+      }
+
+      .trainer-week-grid {
+        min-width: 1120px;
+      }
+
+      .daily-roster {
+        display: grid;
+        gap: 8px;
+        min-width: 1080px;
+      }
+
+      .roster-head,
+      .roster-row {
+        align-items: stretch;
+        display: grid;
+        gap: 8px;
+        grid-template-columns: 190px minmax(760px, 1fr) 88px;
+      }
+
+      .roster-head {
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 900;
+      }
+
+      .roster-person,
+      .roster-progress {
+        align-content: center;
+        background: #f8fbff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        display: grid;
+        gap: 3px;
+        min-height: 72px;
+        padding: 10px;
+      }
+
+      .roster-person span,
+      .roster-progress span {
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .roster-progress {
+        justify-items: center;
+        text-align: center;
+      }
+
+      .roster-progress strong {
+        color: var(--green);
+        font-size: 20px;
+      }
+
+      .schedule-axis,
+      .schedule-track {
+        display: grid;
+        grid-template-columns: repeat(19, minmax(38px, 1fr));
+      }
+
+      .schedule-axis {
+        align-items: end;
+        min-height: 32px;
+      }
+
+      .schedule-axis span {
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .schedule-track {
+        background-color: #fbfdff;
+        background-image: linear-gradient(to right, transparent calc(100% - 1px), #e3e9f2 calc(100% - 1px));
+        background-size: calc(100% / 19) 100%;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        min-height: 72px;
+        overflow: hidden;
+        padding: 6px 0;
+        position: relative;
+      }
+
+      .schedule-task {
+        align-content: center;
+        background: var(--soft);
+        border: 1px solid #9ab7f8;
+        border-left: 4px solid var(--blue);
+        border-radius: 6px;
+        color: var(--ink);
+        display: grid;
+        gap: 2px;
+        margin: 1px 2px;
+        min-height: 56px;
+        overflow: hidden;
+        padding: 6px 7px;
+        text-align: left;
+      }
+
+      .schedule-task.approved {
+        background: var(--green-soft);
+        border-color: #78c5a7;
+        border-left-color: var(--green);
+      }
+
+      .schedule-task.review {
+        background: var(--yellow-soft);
+        border-color: #e5c875;
+        border-left-color: var(--yellow);
+      }
+
+      .schedule-task.observed {
+        background: var(--red-soft);
+        border-color: #eea2aa;
+        border-left-color: var(--red);
+      }
+
+      .schedule-task strong,
+      .schedule-task span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .schedule-task strong {
+        font-size: 11px;
+      }
+
+      .schedule-task span {
+        font-size: 10px;
+      }
+
+      .schedule-empty {
+        align-self: center;
+        color: var(--muted);
+        font-size: 12px;
+        grid-column: 1 / -1;
+        padding: 0 12px;
+      }
+
+      .trainer-day-card {
+        border-top: 4px solid var(--cyan);
+      }
+
+      .trainer-day-card.today {
+        border-top-color: var(--red);
+      }
+
+      .trainer-task-card {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-left: 4px solid var(--blue);
+        border-radius: 7px;
+        display: grid;
+        gap: 7px;
+        padding: 10px;
+      }
+
+      .trainer-task-card.approved {
+        border-left-color: var(--green);
+      }
+
+      .trainer-task-time {
+        color: var(--blue);
+        font-size: 11px;
+        font-weight: 900;
+      }
+
+      .approval-check {
+        align-items: center;
+        background: var(--green);
+        border-radius: 50%;
+        color: #fff;
+        display: inline-flex;
+        font-size: 18px;
+        font-weight: 900;
+        height: 34px;
+        justify-content: center;
+        width: 34px;
+      }
+
+      .review-note {
+        color: var(--yellow);
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .task-item {
+        border-left: 5px solid var(--blue);
+      }
+
+      .task-item.is-approved {
+        border-left-color: var(--green);
+      }
+
+      .task-history summary {
+        color: var(--blue-dark);
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .history-list {
+        display: grid;
+        gap: 6px;
+        margin: 8px 0 0;
+        padding-left: 20px;
+      }
+
+      .history-list li {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      dialog {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: 0 24px 60px rgba(23, 32, 51, 0.24);
+        color: var(--ink);
+        max-width: 520px;
+        padding: 20px;
+        width: calc(100% - 28px);
+      }
+
+      dialog::backdrop {
+        background: rgba(23, 32, 51, 0.48);
+      }
+
+      .evidence-cloud-badge {
+        align-items: center;
+        background: var(--green-soft);
+        border: 1px solid #9dd8c2;
+        border-radius: 8px;
+        color: var(--green);
+        display: flex;
+        font-size: 12px;
+        font-weight: 900;
+        gap: 8px;
+        padding: 10px;
       }
 
       .day-column {
@@ -568,8 +884,7 @@
 
       @media (max-width: 1060px) {
         .dashboard,
-        .two-col,
-        .week-grid {
+        .two-col {
           grid-template-columns: 1fr;
         }
 
@@ -598,6 +913,15 @@
 
         .panel-header {
           flex-direction: column;
+        }
+
+        .motivation-strip {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .motivation-editor {
+          grid-template-columns: 1fr;
         }
       }
     </style>
@@ -696,6 +1020,22 @@
     </header>
 
     <main id="appShell" class="shell hidden">
+      <section id="motivationStrip" class="motivation-strip">
+        <div class="motivation-copy">
+          <span class="motivation-kicker">Impulso del dia</span>
+          <strong id="dailyMotivation"></strong>
+        </div>
+        <button id="editMotivation" class="small" type="button">Editar frase</button>
+        <form id="motivationForm" class="motivation-editor wide hidden">
+          <label>
+            Frase para hoy
+            <input id="motivationInput" type="text" maxlength="180" required />
+          </label>
+          <button class="primary" type="submit">Publicar</button>
+          <button id="cancelMotivation" class="ghost" type="button">Cancelar</button>
+        </form>
+      </section>
+
       <section class="dashboard">
         <div class="date-card">
           <span id="todayLabel" class="muted"></span>
@@ -734,20 +1074,41 @@
       </nav>
 
       <section id="tasksView" class="view active">
-        <section id="coordinatorWeekPanel" class="panel stack">
+        <section id="coordinatorDayPanel" class="panel stack">
           <div class="week-toolbar">
             <div>
-              <h2>Calendario semanal del coordinador</h2>
-              <p class="muted">Agenda por hora, responsable y estado. Jornada laboral de 8:30 a. m. a 6:00 p. m.</p>
+              <h2>Agenda diaria del coordinador</h2>
+              <p class="muted">Una fila por trainer, con sus tareas ubicadas por hora.</p>
             </div>
             <div class="actions">
-              <button id="prevWeek" class="small" type="button">Semana anterior</button>
-              <button id="todayWeek" class="small" type="button">Hoy</button>
-              <button id="nextWeek" class="small" type="button">Semana siguiente</button>
+              <button id="prevDay" class="small" type="button">Dia anterior</button>
+              <button id="todayDay" class="small" type="button">Hoy</button>
+              <button id="nextDay" class="small" type="button">Dia siguiente</button>
+              <input id="coordinatorDate" type="date" aria-label="Fecha de agenda" />
+            </div>
+          </div>
+          <strong id="coordinatorDayLabel"></strong>
+          <div class="daily-roster-scroll">
+            <div id="coordinatorDayRoster" class="daily-roster"></div>
+          </div>
+        </section>
+
+        <section id="trainerWeekPanel" class="panel stack">
+          <div class="week-toolbar">
+            <div>
+              <h2>Mi calendario semanal</h2>
+              <p class="muted">Tareas de lunes a sabado. Los domingos no forman parte de la jornada.</p>
+            </div>
+            <div class="actions">
+              <button id="prevWeek" class="small" type="button">Week anterior</button>
+              <button id="todayWeek" class="small" type="button">Week actual</button>
+              <button id="nextWeek" class="small" type="button">Week siguiente</button>
             </div>
           </div>
           <strong id="weekLabel"></strong>
-          <div id="weeklySummary" class="week-grid"></div>
+          <div class="trainer-week-scroll">
+            <div id="weeklySummary" class="week-grid trainer-week-grid"></div>
+          </div>
         </section>
 
         <div class="two-col">
@@ -883,10 +1244,10 @@
               <p class="muted">Pablo aprueba u observa los sustentos enviados.</p>
             </div>
             <div id="cloudPlanPanel" class="note">
-              <strong>Orden para Microsoft 365</strong>
-              <p class="muted">Cuando conectemos la nube, cada sustento se guardara asi:</p>
+              <strong>Nube LGTASK conectada</strong>
+              <p class="muted">Las fotos quedan protegidas en Cloudflare D1 y Pablo puede abrirlas desde esta pantalla.</p>
               <div class="cloud-path">LG Task Hub / Sustentos / fecha / trainer / tarea</div>
-              <p class="muted">Esto deja fotos y formularios separados por nombre de trainer y fecha.</p>
+              <p class="muted">Cada archivo se registra por nombre de trainer, fecha y tarea.</p>
             </div>
             <div id="evidenceList" class="list"></div>
           </aside>
@@ -1061,24 +1422,71 @@
       </section>
     </main>
 
+    <dialog id="reassignDialog">
+      <form id="reassignForm" class="stack">
+        <div>
+          <h2>Reasignar tarea</h2>
+          <p id="reassignTaskLabel" class="muted"></p>
+        </div>
+        <label>
+          Nuevo trainer
+          <select id="reassignOwner" required></select>
+        </label>
+        <label>
+          Motivo de la reasignacion
+          <textarea id="reassignReason" placeholder="Explica por que otro trainer realizara esta tarea" required></textarea>
+        </label>
+        <div class="actions">
+          <button class="primary" type="submit">Confirmar reasignacion</button>
+          <button id="cancelReassign" class="ghost" type="button">Cancelar</button>
+        </div>
+        <p id="reassignMessage" class="message" aria-live="polite"></p>
+      </form>
+    </dialog>
+
     <script>
       const STORAGE_KEY = "lg-task-hub-ui-v1";
       const API_BASE = "/cloud";
       const WORKDAY_START = "08:30";
       const WORKDAY_END = "18:00";
-      const todayIso = new Date().toISOString().slice(0, 10);
+      const todayParts = Object.fromEntries(
+        new Intl.DateTimeFormat("en", {
+          timeZone: "America/Lima",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit"
+        })
+          .formatToParts(new Date())
+          .filter((part) => part.type !== "literal")
+          .map((part) => [part.type, part.value])
+      );
+      const todayIso = `${todayParts.year}-${todayParts.month}-${todayParts.day}`;
+      const dailyQuotes = [
+        "Cada tarea bien hecha construye la confianza del equipo.",
+        "Hoy es una nueva oportunidad para enseñar, ayudar y avanzar.",
+        "La constancia convierte el conocimiento en resultados.",
+        "Un gran entrenamiento empieza escuchando y termina inspirando.",
+        "Lo que medimos hoy nos ayuda a mejorar mañana.",
+        "Avancemos con orden, claridad y buena energia.",
+        "Cada visita es una oportunidad para demostrar nuestra experiencia LG.",
+        "El trabajo en equipo hace visible lo que solos no alcanzamos.",
+        "Cumplir a tiempo tambien es una forma de cuidar al equipo.",
+        "Compartir lo aprendido multiplica el impacto."
+      ];
 
       const initialState = {
-        version: 4,
+        version: 5,
         activeUserId: "",
         selectedProduct: "oled",
         selectedWeekStart: "",
+        selectedCoordinatorDate: "",
         users: [],
         registrationRequests: [],
         passwordRecoveryRequests: [],
         tasks: [],
         announcements: [],
-        supportRequests: []
+        supportRequests: [],
+        dailyMotivations: []
       };
 
       const products = [
@@ -1184,7 +1592,19 @@
         reviewCount: document.querySelector("#reviewCount"),
         doneCount: document.querySelector("#doneCount"),
         trainerCount: document.querySelector("#trainerCount"),
-        coordinatorWeekPanel: document.querySelector("#coordinatorWeekPanel"),
+        dailyMotivation: document.querySelector("#dailyMotivation"),
+        editMotivation: document.querySelector("#editMotivation"),
+        motivationForm: document.querySelector("#motivationForm"),
+        motivationInput: document.querySelector("#motivationInput"),
+        cancelMotivation: document.querySelector("#cancelMotivation"),
+        coordinatorDayPanel: document.querySelector("#coordinatorDayPanel"),
+        trainerWeekPanel: document.querySelector("#trainerWeekPanel"),
+        prevDay: document.querySelector("#prevDay"),
+        todayDay: document.querySelector("#todayDay"),
+        nextDay: document.querySelector("#nextDay"),
+        coordinatorDate: document.querySelector("#coordinatorDate"),
+        coordinatorDayLabel: document.querySelector("#coordinatorDayLabel"),
+        coordinatorDayRoster: document.querySelector("#coordinatorDayRoster"),
         prevWeek: document.querySelector("#prevWeek"),
         todayWeek: document.querySelector("#todayWeek"),
         nextWeek: document.querySelector("#nextWeek"),
@@ -1244,6 +1664,13 @@
         supportTitle: document.querySelector("#supportTitle"),
         supportDetail: document.querySelector("#supportDetail"),
         supportList: document.querySelector("#supportList"),
+        reassignDialog: document.querySelector("#reassignDialog"),
+        reassignForm: document.querySelector("#reassignForm"),
+        reassignTaskLabel: document.querySelector("#reassignTaskLabel"),
+        reassignOwner: document.querySelector("#reassignOwner"),
+        reassignReason: document.querySelector("#reassignReason"),
+        reassignMessage: document.querySelector("#reassignMessage"),
+        cancelReassign: document.querySelector("#cancelReassign"),
         productTabs: document.querySelector("#productTabs"),
         productInfo: document.querySelector("#productInfo"),
         quizBox: document.querySelector("#quizBox")
@@ -1255,7 +1682,8 @@
           return normalizeState({
             ...structuredClone(initialState),
             selectedProduct: saved.selectedProduct || initialState.selectedProduct,
-            selectedWeekStart: saved.selectedWeekStart || ""
+            selectedWeekStart: saved.selectedWeekStart || "",
+            selectedCoordinatorDate: saved.selectedCoordinatorDate || ""
           });
         } catch {
           return structuredClone(initialState);
@@ -1273,14 +1701,20 @@
         }));
         nextState.announcements = nextState.announcements || [];
         nextState.supportRequests = nextState.supportRequests || [];
+        nextState.dailyMotivations = nextState.dailyMotivations || [];
         nextState.selectedWeekStart = nextState.selectedWeekStart || weekStartIso(todayIso);
+        nextState.selectedCoordinatorDate = nextState.selectedCoordinatorDate || nearestWorkingDay(todayIso);
         return nextState;
       }
 
       function saveState() {
         localStorage.setItem(
           STORAGE_KEY,
-          JSON.stringify({ selectedProduct: state.selectedProduct, selectedWeekStart: state.selectedWeekStart })
+          JSON.stringify({
+            selectedProduct: state.selectedProduct,
+            selectedWeekStart: state.selectedWeekStart,
+            selectedCoordinatorDate: state.selectedCoordinatorDate
+          })
         );
         if (!state.activeUserId) return;
         window.clearTimeout(syncTimer);
@@ -1307,11 +1741,13 @@
       function applyCloudState(nextState) {
         const selectedProduct = state.selectedProduct;
         const selectedWeekStart = state.selectedWeekStart;
+        const selectedCoordinatorDate = state.selectedCoordinatorDate;
         state = normalizeState({
           ...structuredClone(initialState),
           ...nextState,
           selectedProduct,
-          selectedWeekStart: selectedWeekStart || nextState.selectedWeekStart
+          selectedWeekStart: selectedWeekStart || nextState.selectedWeekStart,
+          selectedCoordinatorDate: selectedCoordinatorDate || nextState.selectedCoordinatorDate
         });
       }
 
@@ -1466,6 +1902,20 @@
         return date.toISOString().slice(0, 10);
       }
 
+      function isSunday(dateValue) {
+        return new Date(`${dateValue}T12:00:00`).getDay() === 0;
+      }
+
+      function nearestWorkingDay(dateValue) {
+        return isSunday(dateValue) ? addDaysIso(dateValue, 1) : dateValue;
+      }
+
+      function addWorkingDays(dateValue, direction) {
+        let next = addDaysIso(dateValue, direction);
+        while (isSunday(next)) next = addDaysIso(next, direction);
+        return next;
+      }
+
       function weekStartIso(dateValue) {
         const date = new Date(`${dateValue}T12:00:00`);
         const day = date.getDay() || 7;
@@ -1475,7 +1925,47 @@
 
       function selectedWeekDates() {
         const start = state.selectedWeekStart || weekStartIso(todayIso);
-        return Array.from({ length: 7 }, (_, index) => addDaysIso(start, index));
+        return Array.from({ length: 6 }, (_, index) => addDaysIso(start, index));
+      }
+
+      function isoWeekNumber(dateValue) {
+        const date = new Date(`${dateValue}T12:00:00Z`);
+        const day = date.getUTCDay() || 7;
+        date.setUTCDate(date.getUTCDate() + 4 - day);
+        const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+        return Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
+      }
+
+      function dailyMotivationText(dateValue = todayIso) {
+        const custom = state.dailyMotivations.find((item) => item.date === dateValue);
+        if (custom?.text) return custom.text;
+        const seed = Number(dateValue.replaceAll("-", ""));
+        return dailyQuotes[seed % dailyQuotes.length];
+      }
+
+      function historyEntryText(entry) {
+        if (entry.type === "Reasignacion") {
+          return `${userName(entry.byId || entry.fromId)} reasigno de ${userName(entry.fromId)} a ${userName(entry.toId)}. Motivo: ${entry.reason || "Sin detalle"}`;
+        }
+        if (entry.type === "Bloqueo") return `${userName(entry.fromId)} reporto una dificultad: ${entry.reason || "Sin detalle"}`;
+        return `${entry.type || "Actualizacion"}${entry.reason ? `: ${entry.reason}` : ""}`;
+      }
+
+      function taskHistoryMarkup(task) {
+        const entries = task.history || [];
+        if (!entries.length) return "";
+        return `
+          <details class="task-history note">
+            <summary>Historial (${entries.length})</summary>
+            <ol class="history-list">
+              ${entries
+                .slice()
+                .reverse()
+                .map((entry) => `<li>${escapeHtml(historyEntryText(entry))} | ${formatDateTime(entry.at)}</li>`)
+                .join("")}
+            </ol>
+          </details>
+        `;
       }
 
       function folderSafe(value) {
@@ -1522,22 +2012,31 @@
         }).format(new Date());
 
         els.coordinatorTaskPanel.classList.toggle("hidden", !isCoordinator());
-        els.coordinatorWeekPanel.classList.toggle("hidden", !isCoordinator());
+        els.coordinatorDayPanel.classList.toggle("hidden", !isCoordinator());
+        els.trainerWeekPanel.classList.toggle("hidden", isCoordinator());
         els.trainerFilterWrap.classList.toggle("hidden", !isCoordinator());
         els.coordinatorTeamPanel.classList.toggle("hidden", !isCoordinator());
         els.backupTools.classList.toggle("hidden", !isCoordinator());
         els.coordinatorAnnouncementPanel.classList.toggle("hidden", !isCoordinator());
         els.cloudPlanPanel.classList.toggle("hidden", !isCoordinator());
+        els.editMotivation.classList.toggle("hidden", !isCoordinator());
+        if (!isCoordinator()) els.motivationForm.classList.add("hidden");
 
         refreshSelects();
+        renderMotivation();
         renderDashboard();
-        renderWeeklyCalendar();
+        renderCoordinatorDay();
+        renderTrainerWeek();
         renderTasks();
         renderEvidence();
         renderTeam();
         renderAnnouncements();
         renderSupportRequests();
         renderProducts();
+      }
+
+      function renderMotivation() {
+        els.dailyMotivation.textContent = dailyMotivationText();
       }
 
       function refreshSelects() {
@@ -1553,10 +2052,15 @@
         fillSelect(els.supportTo, otherUsers, els.supportTo.value);
 
         const availableTasks = state.tasks
-          .filter((task) => !isCoordinator() && task.ownerId === state.activeUserId && task.status !== "Cumplida" && task.status !== "No disponible")
+          .filter(
+            (task) =>
+              !isCoordinator() &&
+              task.ownerId === state.activeUserId &&
+              (task.status === "En proceso" || task.status === "Observada")
+          )
           .map((task) => ({ value: task.id, label: `${task.title} (${formatDate(task.dueDate)} | ${taskTimeLabel(task)})` }));
         fillSelect(els.evidenceTask, availableTasks, els.evidenceTask.value);
-        els.taskDueDate.value = els.taskDueDate.value || todayIso;
+        els.taskDueDate.value = els.taskDueDate.value || nearestWorkingDay(todayIso);
         els.taskStartTime.value = els.taskStartTime.value || WORKDAY_START;
         els.taskEndTime.value = els.taskEndTime.value || "09:30";
       }
@@ -1592,13 +2096,36 @@
           .sort((a, b) => a.workload - b.workload || a.name.localeCompare(b.name));
       }
 
-      function reassignTask(taskId, newOwnerId) {
+      function canReassignTask(task) {
+        return Boolean(task && task.status !== "Cumplida" && (isCoordinator() || task.ownerId === state.activeUserId));
+      }
+
+      function openReassignDialog(taskId) {
         const task = state.tasks.find((item) => item.id === taskId);
-        const nextOwner = state.users.find((user) => user.id === newOwnerId);
-        if (!task || !nextOwner || !isCoordinator()) return;
-        if (hasScheduleConflict(newOwnerId, task.dueDate, task.startTime, task.endTime, task.id)) {
-          window.alert(`${nextOwner.name} ya tiene una tarea entre ${taskTimeLabel(task)}.`);
+        if (!canReassignTask(task)) return;
+        const options = availableTrainersForTask(task).map((trainer) => ({
+          value: trainer.id,
+          label: `${trainer.name} (${trainer.workload} tareas ese dia)`
+        }));
+        if (!options.length) {
+          window.alert("No hay otro trainer activo disponible para reasignar.");
           return;
+        }
+        els.reassignForm.dataset.taskId = task.id;
+        els.reassignTaskLabel.textContent = `${task.title} | ${formatDate(task.dueDate)} | ${taskTimeLabel(task)}`;
+        fillSelect(els.reassignOwner, options, options[0].value);
+        els.reassignReason.value = task.blockedReason || "";
+        setMessage(els.reassignMessage, "", "");
+        els.reassignDialog.showModal();
+      }
+
+      function reassignTask(taskId, newOwnerId, reason) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        const nextOwner = state.users.find((user) => user.id === newOwnerId && user.role === "Trainer" && user.status === "Activo");
+        if (!canReassignTask(task) || !nextOwner || !clean(reason)) return false;
+        if (hasScheduleConflict(newOwnerId, task.dueDate, task.startTime, task.endTime, task.id)) {
+          setMessage(els.reassignMessage, `${nextOwner.name} ya tiene una tarea entre ${taskTimeLabel(task)}.`, "err");
+          return false;
         }
         const previousOwnerId = task.ownerId;
         task.history = task.history || [];
@@ -1606,7 +2133,7 @@
           type: "Reasignacion",
           fromId: previousOwnerId,
           toId: newOwnerId,
-          reason: task.blockedReason || "Reasignacion operativa del coordinador",
+          reason: clean(reason),
           byId: state.activeUserId,
           at: Date.now()
         });
@@ -1616,27 +2143,17 @@
         task.blockedAt = "";
         saveState();
         render();
+        return true;
       }
 
       function renderReassignControl(container, task) {
-        const options = availableTrainersForTask(task);
-        if (!options.length) return;
-        const box = document.createElement("div");
-        box.className = "reassign-box";
-        const select = document.createElement("select");
-        options.forEach((trainer) => {
-          const option = document.createElement("option");
-          option.value = trainer.id;
-          option.textContent = `${trainer.name} (${trainer.workload} tareas ese dia)`;
-          select.appendChild(option);
-        });
+        if (!canReassignTask(task) || !availableTrainersForTask(task).length) return;
         const button = document.createElement("button");
         button.className = "small";
         button.type = "button";
         button.textContent = "Reasignar";
-        button.addEventListener("click", () => reassignTask(task.id, select.value));
-        box.append(select, button);
-        container.appendChild(box);
+        button.addEventListener("click", () => openReassignDialog(task.id));
+        container.appendChild(button);
       }
 
       function markTaskBlocked(taskId) {
@@ -1657,74 +2174,154 @@
         setMessage(els.taskMessage, `Nueva tarea para ${formatDate(dateValue)}. Define responsable y horario.`, "ok");
       }
 
-      function renderWeeklyCalendar() {
-        if (!isCoordinator()) return;
-        const days = selectedWeekDates();
-        els.weekLabel.textContent = `${formatShortDate(days[0])} - ${formatShortDate(days[6])}`;
-        els.weeklySummary.innerHTML = "";
+      function scheduleAxisMarkup() {
+        const start = timeToMinutes(WORKDAY_START);
+        return Array.from({ length: 19 }, (_, index) => {
+          const total = start + index * 30;
+          const label = `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+          return `<span>${index % 2 === 0 ? label : ""}</span>`;
+        }).join("");
+      }
 
+      function renderCoordinatorDay() {
+        if (!isCoordinator()) return;
+        const dateValue = nearestWorkingDay(state.selectedCoordinatorDate || todayIso);
+        state.selectedCoordinatorDate = dateValue;
+        els.coordinatorDate.value = dateValue;
+        els.coordinatorDayLabel.textContent = `${formatShortDate(dateValue)} | Week ${isoWeekNumber(dateValue)} | ${WORKDAY_START} - ${WORKDAY_END}`;
+        els.coordinatorDayRoster.innerHTML = `
+          <div class="roster-head">
+            <span>TRAINER / ZONA</span>
+            <div class="schedule-axis">${scheduleAxisMarkup()}</div>
+            <span>AVANCE</span>
+          </div>
+        `;
+
+        assignableUsers().forEach((person) => {
+          const tasks = state.tasks
+            .filter((task) => task.ownerId === person.id && task.dueDate === dateValue)
+            .sort((a, b) => (a.startTime || WORKDAY_START).localeCompare(b.startTime || WORKDAY_START));
+          const done = tasks.filter((task) => task.status === "Cumplida").length;
+          const percent = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+          const row = document.createElement("div");
+          row.className = "roster-row";
+          row.innerHTML = `
+            <div class="roster-person">
+              <strong>${escapeHtml(person.name)}</strong>
+              <span>${escapeHtml(person.role === "Coordinador" ? "Coordinador" : person.zone || "Sin zona")}</span>
+              <button class="small" type="button">+ Tarea</button>
+            </div>
+            <div class="schedule-track"></div>
+            <div class="roster-progress"><strong>${percent}%</strong><span>${done}/${tasks.length} aprobadas</span></div>
+          `;
+          row.querySelector(".roster-person button").addEventListener("click", () => {
+            focusTaskFormForDate(dateValue);
+            els.taskOwner.value = person.id;
+          });
+          const track = row.querySelector(".schedule-track");
+          if (!tasks.length) {
+            track.innerHTML = `<span class="schedule-empty">Sin tareas programadas</span>`;
+          } else {
+            tasks.forEach((task) => {
+              const start = Math.max(timeToMinutes(WORKDAY_START), timeToMinutes(task.startTime || WORKDAY_START));
+              const end = Math.min(timeToMinutes(WORKDAY_END), timeToMinutes(task.endTime || "09:30"));
+              const startColumn = Math.max(1, Math.floor((start - timeToMinutes(WORKDAY_START)) / 30) + 1);
+              const span = Math.max(1, Math.ceil((end - start) / 30));
+              const block = document.createElement("button");
+              block.className = `schedule-task ${taskStatusClass(task.status)}`;
+              block.type = "button";
+              block.style.gridColumn = `${startColumn} / span ${Math.min(span, 20 - startColumn)}`;
+              block.innerHTML = `<strong>${escapeHtml(task.title)}</strong><span>${escapeHtml(taskTimeLabel(task))} | ${escapeHtml(task.status)}</span>`;
+              block.addEventListener("click", () => {
+                els.taskStatusFilter.value = "all";
+                els.taskTrainerFilter.value = task.ownerId;
+                renderTasks();
+                els.taskList.scrollIntoView({ behavior: "smooth", block: "start" });
+              });
+              track.appendChild(block);
+            });
+          }
+          els.coordinatorDayRoster.appendChild(row);
+        });
+      }
+
+      function openEvidenceForTask(task) {
+        document.querySelector('[data-view="evidenceView"]').click();
+        els.evidenceTask.value = task.id;
+        els.evidenceStore.focus();
+      }
+
+      function renderTrainerTaskActions(container, task) {
+        if (task.status === "Cumplida") {
+          const check = document.createElement("span");
+          check.className = "approval-check";
+          check.setAttribute("aria-label", "Tarea aprobada");
+          check.innerHTML = "&#10003;";
+          container.appendChild(check);
+          return;
+        }
+        if (task.status === "En revision") {
+          const note = document.createElement("span");
+          note.className = "review-note";
+          note.textContent = "Pendiente de revision de Pablo";
+          container.appendChild(note);
+          return;
+        }
+        if (task.status === "Pendiente") {
+          const startButton = document.createElement("button");
+          startButton.className = "primary";
+          startButton.type = "button";
+          startButton.textContent = "Iniciar";
+          startButton.addEventListener("click", () => {
+            task.status = "En proceso";
+            saveState();
+            render();
+          });
+          container.appendChild(startButton);
+        } else if (task.status === "En proceso" || task.status === "Observada") {
+          const evidenceButton = document.createElement("button");
+          evidenceButton.className = "primary";
+          evidenceButton.type = "button";
+          evidenceButton.textContent = "Enviar sustento";
+          evidenceButton.addEventListener("click", () => openEvidenceForTask(task));
+          container.appendChild(evidenceButton);
+        }
+        renderReassignControl(container, task);
+      }
+
+      function renderTrainerWeek() {
+        if (isCoordinator()) return;
+        const days = selectedWeekDates();
+        els.weekLabel.textContent = `Week ${isoWeekNumber(days[0])} | ${formatShortDate(days[0])} - ${formatShortDate(days[5])}`;
+        els.weeklySummary.innerHTML = "";
         days.forEach((day) => {
           const tasks = state.tasks
-            .filter((task) => task.dueDate === day)
-            .sort((a, b) => (a.startTime || WORKDAY_START).localeCompare(b.startTime || WORKDAY_START) || userName(a.ownerId).localeCompare(userName(b.ownerId)));
-          const done = tasks.filter((task) => task.status === "Cumplida").length;
-          const blocked = tasks.filter((task) => task.status === "No disponible").length;
+            .filter((task) => task.ownerId === state.activeUserId && task.dueDate === day)
+            .sort((a, b) => (a.startTime || WORKDAY_START).localeCompare(b.startTime || WORKDAY_START));
           const column = document.createElement("article");
-          column.className = `day-column ${day === todayIso ? "today" : ""}`;
+          column.className = `day-column trainer-day-card ${day === todayIso ? "today" : ""}`;
           column.innerHTML = `
             <div class="day-head">
               <strong>${formatShortDate(day)}</strong>
-              <div class="day-stats">
-                <span class="pill">${tasks.length} tareas</span>
-                <span class="pill approved">${done} ok</span>
-                ${blocked ? `<span class="pill observed">${blocked} bloqueo</span>` : ""}
-              </div>
+              <div class="day-stats"><span class="pill">${tasks.length} tareas</span></div>
             </div>
-            <div class="day-hours">Jornada ${WORKDAY_START} - ${WORKDAY_END}</div>
-            <button class="small" type="button" data-new-task="${day}">Agregar tarea</button>
             <div class="day-tasks"></div>
           `;
-          column.querySelector("[data-new-task]").addEventListener("click", () => focusTaskFormForDate(day));
-          const taskWrap = column.querySelector(".day-tasks");
-
+          const wrap = column.querySelector(".day-tasks");
           if (!tasks.length) {
-            taskWrap.innerHTML = `<div class="empty"><strong>Libre</strong><p>Sin tareas programadas.</p></div>`;
+            wrap.innerHTML = `<div class="empty"><strong>Dia libre</strong><p>Sin tareas asignadas.</p></div>`;
           } else {
             tasks.forEach((task) => {
-              const timeline = document.createElement("div");
-              timeline.className = "timeline-entry";
-              const mini = document.createElement("div");
-              mini.className = "mini-task";
-              mini.innerHTML = `
-                <div class="title-row">
-                  <h3>${escapeHtml(task.title)}</h3>
-                  <span class="pill ${taskStatusClass(task.status)}">${escapeHtml(task.status)}</span>
-                </div>
-                <div class="meta">
-                  <span>${escapeHtml(userName(task.ownerId))}</span>
-                  <span>Horario: ${escapeHtml(taskTimeLabel(task))}</span>
-                  <span>${escapeHtml(task.category)}${task.product ? ` | ${escapeHtml(task.product)}` : ""}</span>
-                  ${task.blockedReason ? `<span>Motivo: ${escapeHtml(task.blockedReason)}</span>` : ""}
-                </div>
+              const card = document.createElement("div");
+              card.className = `trainer-task-card ${task.status === "Cumplida" ? "approved" : ""}`;
+              card.innerHTML = `
+                <span class="trainer-task-time">${escapeHtml(taskTimeLabel(task))}</span>
+                <strong>${escapeHtml(task.title)}</strong>
+                <span class="muted">${escapeHtml(task.category)}${task.product ? ` | ${escapeHtml(task.product)}` : ""}</span>
                 <div class="actions"></div>
               `;
-              const actions = mini.querySelector(".actions");
-              renderReassignControl(actions, task);
-              const deleteButton = document.createElement("button");
-              deleteButton.className = "small";
-              deleteButton.type = "button";
-              deleteButton.textContent = "Eliminar";
-              deleteButton.addEventListener("click", () => {
-                state.tasks = state.tasks.filter((item) => item.id !== task.id);
-                saveState();
-                render();
-              });
-              actions.appendChild(deleteButton);
-              const time = document.createElement("div");
-              time.className = "timeline-time";
-              time.innerHTML = `<span>${escapeHtml(task.startTime || WORKDAY_START)}</span><span>${escapeHtml(task.endTime || "09:30")}</span>`;
-              timeline.append(time, mini);
-              taskWrap.appendChild(timeline);
+              renderTrainerTaskActions(card.querySelector(".actions"), task);
+              wrap.appendChild(card);
             });
           }
           els.weeklySummary.appendChild(column);
@@ -1756,13 +2353,13 @@
 
         tasks.forEach((task) => {
           const card = document.createElement("article");
-          card.className = "item task-item";
+          card.className = `item task-item ${task.status === "Cumplida" ? "is-approved" : ""}`;
           const latestEvidence = task.evidence?.at(-1);
           card.innerHTML = `
             <div class="stack">
               <div class="title-row">
                 <h3>${escapeHtml(task.title)}</h3>
-                <span class="pill ${taskStatusClass(task.status)}">${escapeHtml(task.status)}</span>
+                ${!isCoordinator() && task.status === "Cumplida" ? "" : `<span class="pill ${taskStatusClass(task.status)}">${escapeHtml(task.status)}</span>`}
                 <span class="pill ${priorityClass(task.priority)}">${escapeHtml(task.priority)}</span>
               </div>
               <div class="meta">
@@ -1774,11 +2371,7 @@
               </div>
               ${task.description ? `<p>${escapeHtml(task.description)}</p>` : ""}
               ${task.blockedReason ? `<div class="note"><strong>No puede cumplir:</strong><p class="muted">${escapeHtml(task.blockedReason)}${task.blockedAt ? ` | ${formatDateTime(task.blockedAt)}` : ""}</p></div>` : ""}
-              ${
-                task.history?.length
-                  ? `<div class="note"><strong>Ultimo movimiento:</strong><p class="muted">${escapeHtml(task.history.at(-1).type)}${task.history.at(-1).toId ? ` a ${escapeHtml(userName(task.history.at(-1).toId))}` : ""} | ${formatDateTime(task.history.at(-1).at)}</p></div>`
-                  : ""
-              }
+              ${taskHistoryMarkup(task)}
               ${
                 latestEvidence
                   ? `<div class="note"><strong>Ultimo sustento:</strong><p class="muted">${escapeHtml(latestEvidence.result)} | ${escapeHtml(latestEvidence.store)} | ${formatDateTime(latestEvidence.submittedAt)}</p></div>`
@@ -1789,40 +2382,7 @@
           `;
 
           const actions = card.querySelector(".actions");
-          if (!isCoordinator() && task.status === "Pendiente") {
-            const startButton = document.createElement("button");
-            startButton.className = "small";
-            startButton.type = "button";
-            startButton.textContent = "Iniciar";
-            startButton.addEventListener("click", () => {
-              task.status = "En proceso";
-              saveState();
-              render();
-            });
-            actions.appendChild(startButton);
-          }
-
-          if (!isCoordinator() && task.status !== "Cumplida" && task.status !== "No disponible") {
-            const evidenceButton = document.createElement("button");
-            evidenceButton.className = "small";
-            evidenceButton.type = "button";
-            evidenceButton.textContent = "Enviar sustento";
-            evidenceButton.addEventListener("click", () => {
-              document.querySelector('[data-view="evidenceView"]').click();
-              els.evidenceTask.value = task.id;
-              els.evidenceStore.focus();
-            });
-            actions.appendChild(evidenceButton);
-          }
-
-          if (!isCoordinator() && task.status !== "Cumplida" && task.status !== "En revision" && task.status !== "No disponible") {
-            const blockedButton = document.createElement("button");
-            blockedButton.className = "small";
-            blockedButton.type = "button";
-            blockedButton.textContent = "No puedo cumplir";
-            blockedButton.addEventListener("click", () => markTaskBlocked(task.id));
-            actions.appendChild(blockedButton);
-          }
+          if (!isCoordinator()) renderTrainerTaskActions(actions, task);
 
           if (isCoordinator() && task.status === "En revision") {
             const approveButton = document.createElement("button");
@@ -1840,6 +2400,13 @@
           }
 
           if (isCoordinator()) {
+            if (task.status === "Cumplida") {
+              const check = document.createElement("span");
+              check.className = "approval-check";
+              check.setAttribute("aria-label", "Tarea aprobada");
+              check.innerHTML = "&#10003;";
+              actions.appendChild(check);
+            }
             renderReassignControl(actions, task);
             const deleteButton = document.createElement("button");
             deleteButton.className = "small";
@@ -1899,7 +2466,9 @@
             ${entry.product ? `<p><strong>Producto:</strong> ${escapeHtml(entry.product)}</p>` : ""}
             ${entry.notes ? `<p>${escapeHtml(entry.notes)}</p>` : ""}
             <div class="cloud-path">${escapeHtml(entry.cloudPath || cloudFolderForEvidence(entry, entry.task))}</div>
-            ${entry.photoData ? `<img class="evidence-photo" src="${entry.photoData}" alt="Foto de sustento" />` : ""}
+            ${entry.photoId ? `<div class="evidence-cloud-badge">Archivo protegido en la nube LGTASK</div>` : ""}
+            ${entry.photoId || entry.photoData ? `<img class="evidence-photo" loading="lazy" src="${entry.photoId ? `${API_BASE}/evidence/${encodeURIComponent(entry.photoId)}/photo` : entry.photoData}" alt="Foto de sustento" />` : ""}
+            ${isCoordinator() && entry.photoId ? `<a class="small" href="${API_BASE}/evidence/${encodeURIComponent(entry.photoId)}/photo" target="_blank" rel="noopener">Abrir archivo original</a>` : ""}
           `;
 
           if (isCoordinator() && entry.review !== "Aprobado") {
@@ -2244,14 +2813,14 @@
           image.onerror = reject;
           image.src = dataUrl;
         });
-        const maxSize = 900;
+        const maxSize = 800;
         const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
         const canvas = document.createElement("canvas");
         canvas.width = Math.round(img.width * scale);
         canvas.height = Math.round(img.height * scale);
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        return canvas.toDataURL("image/jpeg", 0.72);
+        return canvas.toDataURL("image/jpeg", 0.68);
       }
 
       function addEventListeners() {
@@ -2356,6 +2925,65 @@
           });
         });
 
+        els.editMotivation.addEventListener("click", () => {
+          els.motivationInput.value = dailyMotivationText();
+          els.motivationForm.classList.remove("hidden");
+          els.motivationInput.focus();
+        });
+
+        els.cancelMotivation.addEventListener("click", () => {
+          els.motivationForm.classList.add("hidden");
+        });
+
+        els.motivationForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          if (!isCoordinator() || !clean(els.motivationInput.value)) return;
+          const existing = state.dailyMotivations.find((item) => item.date === todayIso);
+          if (existing) {
+            existing.text = clean(els.motivationInput.value);
+            existing.updatedAt = Date.now();
+            existing.updatedById = state.activeUserId;
+          } else {
+            state.dailyMotivations.unshift({
+              date: todayIso,
+              text: clean(els.motivationInput.value),
+              updatedAt: Date.now(),
+              updatedById: state.activeUserId
+            });
+          }
+          els.motivationForm.classList.add("hidden");
+          saveState();
+          renderMotivation();
+        });
+
+        els.prevDay.addEventListener("click", () => {
+          state.selectedCoordinatorDate = addWorkingDays(state.selectedCoordinatorDate || todayIso, -1);
+          saveState();
+          renderCoordinatorDay();
+        });
+
+        els.todayDay.addEventListener("click", () => {
+          state.selectedCoordinatorDate = nearestWorkingDay(todayIso);
+          saveState();
+          renderCoordinatorDay();
+        });
+
+        els.nextDay.addEventListener("click", () => {
+          state.selectedCoordinatorDate = addWorkingDays(state.selectedCoordinatorDate || todayIso, 1);
+          saveState();
+          renderCoordinatorDay();
+        });
+
+        els.coordinatorDate.addEventListener("change", () => {
+          if (!els.coordinatorDate.value) return;
+          if (isSunday(els.coordinatorDate.value)) {
+            window.alert("Los domingos no forman parte de la jornada laboral.");
+          }
+          state.selectedCoordinatorDate = nearestWorkingDay(els.coordinatorDate.value);
+          saveState();
+          renderCoordinatorDay();
+        });
+
         els.prevWeek.addEventListener("click", () => {
           state.selectedWeekStart = addDaysIso(state.selectedWeekStart || weekStartIso(todayIso), -7);
           saveState();
@@ -2374,6 +3002,14 @@
           render();
         });
 
+        els.cancelReassign.addEventListener("click", () => els.reassignDialog.close());
+
+        els.reassignForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const success = reassignTask(els.reassignForm.dataset.taskId, els.reassignOwner.value, els.reassignReason.value);
+          if (success) els.reassignDialog.close();
+        });
+
         els.taskForm.addEventListener("submit", (event) => {
           event.preventDefault();
           if (!els.taskOwner.value) {
@@ -2382,6 +3018,10 @@
           }
           const startTime = els.taskStartTime.value;
           const endTime = els.taskEndTime.value;
+          if (isSunday(els.taskDueDate.value)) {
+            setMessage(els.taskMessage, "No se asignan tareas los domingos.", "err");
+            return;
+          }
           if (
             timeToMinutes(startTime) < timeToMinutes(WORKDAY_START) ||
             timeToMinutes(endTime) > timeToMinutes(WORKDAY_END) ||
@@ -2408,12 +3048,20 @@
             description: clean(els.taskDescription.value),
             status: "Pendiente",
             createdAt: Date.now(),
-            history: [],
+            history: [
+              {
+                type: "Asignacion",
+                toId: els.taskOwner.value,
+                byId: state.activeUserId,
+                reason: "Tarea creada",
+                at: Date.now()
+              }
+            ],
             evidence: []
           });
           saveState();
           els.taskForm.reset();
-          els.taskDueDate.value = todayIso;
+          els.taskDueDate.value = nearestWorkingDay(todayIso);
           els.taskStartTime.value = WORKDAY_START;
           els.taskEndTime.value = "09:30";
           setMessage(els.taskMessage, "Tarea asignada correctamente.", "ok");
@@ -2437,6 +3085,25 @@
           }
           setMessage(els.evidenceMessage, "Procesando sustento...", "");
           const photoData = await compressImage(els.evidencePhoto.files[0]);
+          let photoId = "";
+          let photoName = "";
+          if (photoData) {
+            try {
+              const upload = await apiRequest("/evidence/upload", {
+                method: "POST",
+                body: JSON.stringify({
+                  taskId: task.id,
+                  photoData,
+                  fileName: els.evidencePhoto.files[0]?.name || "sustento.jpg"
+                })
+              });
+              photoId = upload.file.id;
+              photoName = upload.file.name;
+            } catch (error) {
+              setMessage(els.evidenceMessage, error.message, "err");
+              return;
+            }
+          }
           const evidence = {
             id: id(),
             submittedById: state.activeUserId,
@@ -2445,7 +3112,8 @@
             product: clean(els.evidenceProduct.value),
             result: els.evidenceResult.value,
             notes,
-            photoData,
+            photoId,
+            photoName,
             review: "Pendiente"
           };
           evidence.cloudPath = cloudFolderForEvidence(evidence, task);
@@ -2466,10 +3134,18 @@
             task.status = "En revision";
           }
           saveState();
+          try {
+            await syncState();
+          } catch (error) {
+            setMessage(els.evidenceMessage, `El archivo se guardo, pero falta sincronizar el formulario: ${error.message}`, "err");
+            return;
+          }
           els.evidenceForm.reset();
           setMessage(
             els.evidenceMessage,
-            evidence.result === "No se pudo cumplir" ? "Feedback enviado. La tarea queda disponible para reasignacion del coordinador." : "Sustento enviado. Queda pendiente de revision del coordinador.",
+            evidence.result === "No se pudo cumplir"
+              ? "Feedback guardado en la nube. Reasigna la tarea indicando quien puede atenderla."
+              : "Sustento guardado en la nube. Queda pendiente de revision del coordinador.",
             "ok"
           );
           render();
@@ -2560,7 +3236,7 @@
       }
 
       els.announcementTargetWrap.classList.add("hidden");
-      els.taskDueDate.value = todayIso;
+      els.taskDueDate.value = nearestWorkingDay(todayIso);
       els.taskStartTime.value = WORKDAY_START;
       els.taskEndTime.value = "09:30";
       async function bootstrap() {
