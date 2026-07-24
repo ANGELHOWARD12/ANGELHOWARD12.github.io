@@ -879,6 +879,21 @@
         object-fit: cover;
       }
 
+      .evidence-file-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .evidence-file-row {
+        align-items: flex-start;
+        background: #f8fbff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        display: grid;
+        gap: 8px;
+        padding: 10px;
+      }
+
       .product-tabs {
         display: flex;
         flex-wrap: wrap;
@@ -1260,9 +1275,15 @@
                 </select>
               </label>
               <label>
-                Foto de sustento
-                <input id="evidencePhoto" type="file" accept="image/*" />
+                Fotos o archivos
+                <input
+                  id="evidenceFiles"
+                  type="file"
+                  multiple
+                  accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt"
+                />
               </label>
+              <p class="muted wide">Puedes adjuntar hasta 8 archivos. Maximo 1.35 MB por archivo; las imagenes se optimizan automaticamente.</p>
               <label class="wide">
                 Observaciones
                 <textarea id="evidenceNotes" placeholder="Describe que se realizo, hallazgos, incidencias o acuerdos"></textarea>
@@ -1290,10 +1311,15 @@
                 <select id="evidenceTrainerFilter"></select>
               </label>
               <label>
-                Fecha del sustento
-                <input id="evidenceDateFilter" type="date" />
+                Desde
+                <input id="evidenceDateFrom" type="date" />
               </label>
-              <button id="clearEvidenceFilters" class="small wide" type="button">Ver todo el historial</button>
+              <label>
+                Hasta
+                <input id="evidenceDateTo" type="date" />
+              </label>
+              <button id="useCurrentWeekEvidence" class="small" type="button">Week actual (lun-sab)</button>
+              <button id="clearEvidenceFilters" class="small" type="button">Ver todo el historial</button>
               <button id="exportEvidenceExcel" class="primary wide" type="button">Descargar Excel de tareas y sustentos</button>
             </div>
             <p id="evidenceExportMessage" class="message" aria-live="polite"></p>
@@ -1481,6 +1507,7 @@
       </form>
     </dialog>
 
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
     <script>
       const STORAGE_KEY = "lg-task-hub-ui-v1";
       const API_BASE = "/cloud";
@@ -1489,6 +1516,23 @@
       const SATURDAY_END = "14:00";
       const BREAK_START = "12:30";
       const BREAK_END = "14:00";
+      const MAX_EVIDENCE_FILES = 8;
+      const MAX_EVIDENCE_FILE_BYTES = 1_350_000;
+      const EVIDENCE_FILE_EXTENSIONS = new Set([
+        "jpg",
+        "jpeg",
+        "png",
+        "webp",
+        "pdf",
+        "doc",
+        "docx",
+        "xls",
+        "xlsx",
+        "ppt",
+        "pptx",
+        "csv",
+        "txt"
+      ]);
       const todayParts = Object.fromEntries(
         new Intl.DateTimeFormat("en", {
           timeZone: "America/Lima",
@@ -1515,7 +1559,7 @@
       ];
 
       const initialState = {
-        version: 6,
+        version: 7,
         activeUserId: "",
         selectedProduct: "oled",
         selectedWeekStart: "",
@@ -1674,13 +1718,15 @@
         evidenceStore: document.querySelector("#evidenceStore"),
         evidenceProduct: document.querySelector("#evidenceProduct"),
         evidenceResult: document.querySelector("#evidenceResult"),
-        evidencePhoto: document.querySelector("#evidencePhoto"),
+        evidenceFiles: document.querySelector("#evidenceFiles"),
         evidenceNotes: document.querySelector("#evidenceNotes"),
         evidenceMessage: document.querySelector("#evidenceMessage"),
         cloudPlanPanel: document.querySelector("#cloudPlanPanel"),
         evidenceFilters: document.querySelector("#evidenceFilters"),
         evidenceTrainerFilter: document.querySelector("#evidenceTrainerFilter"),
-        evidenceDateFilter: document.querySelector("#evidenceDateFilter"),
+        evidenceDateFrom: document.querySelector("#evidenceDateFrom"),
+        evidenceDateTo: document.querySelector("#evidenceDateTo"),
+        useCurrentWeekEvidence: document.querySelector("#useCurrentWeekEvidence"),
         clearEvidenceFilters: document.querySelector("#clearEvidenceFilters"),
         exportEvidenceExcel: document.querySelector("#exportEvidenceExcel"),
         evidenceExportMessage: document.querySelector("#evidenceExportMessage"),
@@ -2110,18 +2156,45 @@
         return `LG Task Hub / Sustentos / ${folderSafe(userName(evidence.submittedById || task.ownerId))} / ${date} / ${folderSafe(task.title)}`;
       }
 
-      function excelXml(value) {
-        return String(value ?? "")
-          .replaceAll("&", "&amp;")
-          .replaceAll("<", "&lt;")
-          .replaceAll(">", "&gt;")
-          .replaceAll('"', "&quot;")
-          .replaceAll("'", "&apos;");
+      function evidenceFilesForEntry(evidence) {
+        const files = Array.isArray(evidence?.files)
+          ? evidence.files
+              .filter((file) => file?.id || file?.dataUrl)
+              .map((file) => ({
+                id: clean(file.id),
+                name: clean(file.name) || "archivo-sustento",
+                mimeType: clean(file.mimeType) || "application/octet-stream",
+                dataUrl: file.dataUrl || ""
+              }))
+          : [];
+        if (evidence?.photoId && !files.some((file) => file.id === evidence.photoId)) {
+          files.unshift({
+            id: evidence.photoId,
+            name: evidence.photoName || "foto-sustento.jpg",
+            mimeType: "image/jpeg",
+            dataUrl: ""
+          });
+        } else if (evidence?.photoData && !files.length) {
+          files.push({
+            id: "",
+            name: evidence.photoName || "foto-sustento.jpg",
+            mimeType: "image/jpeg",
+            dataUrl: evidence.photoData
+          });
+        }
+        return files;
       }
 
-      function excelCell(value, style = "Data", href = "") {
-        const link = href ? ` ss:HRef="${excelXml(href)}"` : "";
-        return `<Cell ss:StyleID="${style}"${link}><Data ss:Type="String">${excelXml(value)}</Data></Cell>`;
+      function dateIsInEvidenceRange(dateValue) {
+        const from = els.evidenceDateFrom.value;
+        const to = els.evidenceDateTo.value;
+        return (!from || dateValue >= from) && (!to || dateValue <= to);
+      }
+
+      function evidenceRangeError() {
+        return els.evidenceDateFrom.value && els.evidenceDateTo.value && els.evidenceDateFrom.value > els.evidenceDateTo.value
+          ? "La fecha Desde no puede ser posterior a la fecha Hasta."
+          : "";
       }
 
       function excelSheetName(value, usedNames) {
@@ -2139,23 +2212,26 @@
 
       function evidenceReportRows() {
         const trainerFilter = els.evidenceTrainerFilter.value || "all";
-        const dateFilter = els.evidenceDateFilter.value;
         const rows = state.tasks.flatMap((task) => {
           const evidenceItems = task.evidence || [];
           if (evidenceItems.length) {
-            return evidenceItems.map((evidence) => ({ task, evidence }));
+            return evidenceItems.flatMap((evidence) => {
+              const files = evidenceFilesForEntry(evidence);
+              return files.length
+                ? files.map((file) => ({ task, evidence, file }))
+                : [{ task, evidence, file: null }];
+            });
           }
-          return task.status === "Cumplida" ? [{ task, evidence: null }] : [];
+          return task.status === "Cumplida" ? [{ task, evidence: null, file: null }] : [];
         });
 
         return rows
-          .map(({ task, evidence }) => {
+          .map(({ task, evidence, file }) => {
             const trainerId = evidence?.submittedById || task.ownerId;
             const activityDate = evidence?.submittedAt ? dateIsoInLima(evidence.submittedAt) : task.dueDate;
-            const photoUrl = evidence?.photoId
-              ? new URL(`/?view=evidenceView&photo=${encodeURIComponent(evidence.photoId)}`, window.location.origin).href
+            const fileUrl = file?.id
+              ? new URL(`/?view=evidenceView&file=${encodeURIComponent(file.id)}`, window.location.origin).href
               : "";
-            const historyUrl = new URL("/?view=evidenceView", window.location.origin).href;
             return {
               trainerId,
               trainer: userName(trainerId),
@@ -2183,22 +2259,24 @@
               result: evidence?.result || "",
               notes: evidence?.notes || "",
               review: evidence?.review || (task.status === "Cumplida" ? "Aprobado" : ""),
-              photoName: evidence?.photoName || "",
-              photoUrl,
-              historyUrl
+              fileName: file?.name || "",
+              fileType: file?.mimeType || "",
+              fileUrl,
+              historyUrl: new URL("/?view=evidenceView", window.location.origin).href
             };
           })
           .filter((row) => trainerFilter === "all" || row.trainerId === trainerFilter)
-          .filter((row) => !dateFilter || row.activityDate === dateFilter)
+          .filter((row) => dateIsInEvidenceRange(row.activityDate))
           .sort(
             (a, b) =>
               a.trainer.localeCompare(b.trainer, "es") ||
               b.activityDate.localeCompare(a.activityDate) ||
-              a.schedule.localeCompare(b.schedule)
+              a.schedule.localeCompare(b.schedule) ||
+              a.fileName.localeCompare(b.fileName, "es")
           );
       }
 
-      function evidenceWorksheetXml(sheetName, title, rows, filterDetail) {
+      function evidenceSheet(rows, title, filterDetail) {
         const headers = [
           "Carpeta en la nube",
           "Trainer",
@@ -2215,156 +2293,117 @@
           "Resultado",
           "Observaciones",
           "Revision de Pablo",
-          "Archivo",
-          "Foto",
+          "Archivo adjunto",
+          "Tipo de archivo",
+          "Abrir archivo",
           "Historial LGTASK"
         ];
-        const widths = [250, 135, 90, 95, 220, 60, 100, 105, 100, 90, 125, 130, 125, 270, 120, 145, 90, 110];
-        const dataRows = rows.length
-          ? rows
-              .map(
-                (row) => `
-              <Row>
-                ${excelCell(row.folder, "Wrap")}
-                ${excelCell(row.trainer)}
-                ${excelCell(row.taskDate)}
-                ${excelCell(row.schedule)}
-                ${excelCell(row.task, "Wrap")}
-                ${excelCell(row.line)}
-                ${excelCell(row.category)}
-                ${excelCell(row.taskStatus, row.taskStatus === "Cumplida" ? "Approved" : "Data")}
-                ${excelCell(row.evidenceDate)}
-                ${excelCell(row.evidenceTime)}
-                ${excelCell(row.store)}
-                ${excelCell(row.reviewedProduct)}
-                ${excelCell(row.result)}
-                ${excelCell(row.notes, "Wrap")}
-                ${excelCell(row.review, row.review === "Aprobado" ? "Approved" : "Data")}
-                ${excelCell(row.photoName || (row.photoUrl ? "Foto de sustento" : "Sin foto"))}
-                ${excelCell(row.photoUrl ? "Abrir foto" : "Sin foto", row.photoUrl ? "Link" : "Data", row.photoUrl)}
-                ${excelCell("Abrir historial", "Link", row.historyUrl)}
-              </Row>`
-              )
-              .join("")
-          : `<Row><Cell ss:StyleID="Empty" ss:MergeAcross="${headers.length - 1}"><Data ss:Type="String">No hay tareas cumplidas ni sustentos para este filtro.</Data></Cell></Row>`;
-
-        return `
-          <Worksheet ss:Name="${excelXml(sheetName)}">
-            <Table>
-              ${widths.map((width) => `<Column ss:AutoFitWidth="0" ss:Width="${width}"/>`).join("")}
-              <Row ss:Height="28">
-                <Cell ss:StyleID="Title" ss:MergeAcross="${headers.length - 1}"><Data ss:Type="String">${excelXml(title)}</Data></Cell>
-              </Row>
-              <Row>
-                <Cell ss:StyleID="Subtitle" ss:MergeAcross="${headers.length - 1}"><Data ss:Type="String">${excelXml(filterDetail)}</Data></Cell>
-              </Row>
-              <Row>${headers.map((header) => excelCell(header, "Header")).join("")}</Row>
-              ${dataRows}
-            </Table>
-            <WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">
-              <FreezePanes/>
-              <FrozenNoSplit/>
-              <SplitHorizontal>3</SplitHorizontal>
-              <TopRowBottomPane>3</TopRowBottomPane>
-              <ActivePane>2</ActivePane>
-              <ProtectObjects>False</ProtectObjects>
-              <ProtectScenarios>False</ProtectScenarios>
-            </WorksheetOptions>
-          </Worksheet>`;
+        const matrix = [
+          [title],
+          [filterDetail],
+          headers,
+          ...(rows.length
+            ? rows.map((row) => [
+                row.folder,
+                row.trainer,
+                row.taskDate,
+                row.schedule,
+                row.task,
+                row.line,
+                row.category,
+                row.taskStatus,
+                row.evidenceDate,
+                row.evidenceTime,
+                row.store,
+                row.reviewedProduct,
+                row.result,
+                row.notes,
+                row.review,
+                row.fileName || "Sin archivo",
+                row.fileType,
+                row.fileUrl ? "Abrir archivo" : "Sin archivo",
+                "Abrir historial"
+              ])
+            : [["No hay tareas cumplidas ni sustentos para este rango."]])
+        ];
+        const sheet = XLSX.utils.aoa_to_sheet(matrix);
+        sheet["!merges"] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: headers.length - 1 } },
+          { s: { r: 1, c: 0 }, e: { r: 1, c: headers.length - 1 } }
+        ];
+        sheet["!cols"] = [38, 22, 14, 15, 34, 10, 16, 18, 16, 14, 22, 22, 22, 42, 20, 28, 30, 18, 20].map((wch) => ({ wch }));
+        sheet["!autofilter"] = { ref: `A3:S${Math.max(3, rows.length + 3)}` };
+        rows.forEach((row, index) => {
+          const excelRow = index + 4;
+          if (row.fileUrl && sheet[`R${excelRow}`]) {
+            sheet[`R${excelRow}`].l = {
+              Target: row.fileUrl,
+              Tooltip: `Abrir ${row.fileName || "archivo"} en LGTASK`
+            };
+          }
+          if (sheet[`S${excelRow}`]) {
+            sheet[`S${excelRow}`].l = {
+              Target: row.historyUrl,
+              Tooltip: "Abrir historial protegido en LGTASK"
+            };
+          }
+        });
+        return sheet;
       }
 
       function buildEvidenceWorkbook(rows) {
-        const usedNames = new Set(["resumen"]);
+        const workbook = XLSX.utils.book_new();
+        workbook.Props = {
+          Title: "LGTASK - Tareas cumplidas y sustentos",
+          Subject: "Reporte de actividades del equipo Training LG Peru",
+          Author: "LGTASK",
+          Company: "LG Training Peru",
+          CreatedDate: new Date()
+        };
         const trainerFilter = els.evidenceTrainerFilter.value || "all";
-        const dateFilter = els.evidenceDateFilter.value;
+        const from = els.evidenceDateFrom.value || "Inicio";
+        const to = els.evidenceDateTo.value || "Hoy";
         const filterDetail = `Generado: ${formatDateTime(Date.now())} | Trainer: ${
           trainerFilter === "all" ? "Todos" : userName(trainerFilter)
-        } | Fecha: ${dateFilter || "Todas"}`;
-        const summary = evidenceWorksheetXml("Resumen", "LGTASK - Tareas cumplidas y sustentos", rows, filterDetail);
-        const activeTrainerIds =
-          trainerFilter === "all"
-            ? trainers().map((trainer) => trainer.id)
-            : [trainerFilter];
+        } | Rango: ${from} al ${to}`;
+        XLSX.utils.book_append_sheet(
+          workbook,
+          evidenceSheet(rows, "LGTASK - Tareas cumplidas y sustentos", filterDetail),
+          "Resumen"
+        );
+
+        const usedNames = new Set(["resumen"]);
+        const trainerIds = trainerFilter === "all" ? trainers().map((trainer) => trainer.id) : [trainerFilter];
         rows.forEach((row) => {
-          if (!activeTrainerIds.includes(row.trainerId)) activeTrainerIds.push(row.trainerId);
+          if (!trainerIds.includes(row.trainerId)) trainerIds.push(row.trainerId);
         });
-        const trainerSheets = activeTrainerIds
-          .map((trainerId) => {
-            const name = userName(trainerId);
-            const sheetName = excelSheetName(name, usedNames);
-            return evidenceWorksheetXml(
-              sheetName,
-              `Trainer: ${name}`,
+        trainerIds.forEach((trainerId) => {
+          const trainerName = userName(trainerId);
+          XLSX.utils.book_append_sheet(
+            workbook,
+            evidenceSheet(
               rows.filter((row) => row.trainerId === trainerId),
+              `Trainer: ${trainerName}`,
               filterDetail
-            );
-          })
-          .join("");
-
-        return `<?xml version="1.0" encoding="UTF-8"?>
-          <?mso-application progid="Excel.Sheet"?>
-          <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
-            xmlns:o="urn:schemas-microsoft-com:office:office"
-            xmlns:x="urn:schemas-microsoft-com:office:excel"
-            xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
-            xmlns:html="http://www.w3.org/TR/REC-html40">
-            <DocumentProperties xmlns="urn:schemas-microsoft-com:office:office">
-              <Author>LGTASK</Author>
-              <Company>LG Training Peru</Company>
-              <Title>Reporte de tareas cumplidas y sustentos</Title>
-            </DocumentProperties>
-            <Styles>
-              <Style ss:ID="Default" ss:Name="Normal">
-                <Alignment ss:Vertical="Top"/>
-                <Font ss:FontName="Calibri" ss:Size="11"/>
-              </Style>
-              <Style ss:ID="Data"><Alignment ss:Vertical="Top"/></Style>
-              <Style ss:ID="Wrap"><Alignment ss:Vertical="Top" ss:WrapText="1"/></Style>
-              <Style ss:ID="Title">
-                <Alignment ss:Vertical="Center"/>
-                <Font ss:FontName="Calibri" ss:Size="16" ss:Bold="1" ss:Color="#FFFFFF"/>
-                <Interior ss:Color="#B91C35" ss:Pattern="Solid"/>
-              </Style>
-              <Style ss:ID="Subtitle">
-                <Font ss:FontName="Calibri" ss:Size="10" ss:Color="#475467"/>
-                <Interior ss:Color="#F2F4F7" ss:Pattern="Solid"/>
-              </Style>
-              <Style ss:ID="Header">
-                <Alignment ss:Vertical="Center" ss:WrapText="1"/>
-                <Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1" ss:Color="#FFFFFF"/>
-                <Interior ss:Color="#172033" ss:Pattern="Solid"/>
-              </Style>
-              <Style ss:ID="Approved">
-                <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#087443"/>
-                <Interior ss:Color="#DCF7EA" ss:Pattern="Solid"/>
-              </Style>
-              <Style ss:ID="Link">
-                <Font ss:FontName="Calibri" ss:Size="11" ss:Color="#1D4ED8" ss:Underline="Single"/>
-              </Style>
-              <Style ss:ID="Empty">
-                <Alignment ss:Vertical="Center"/>
-                <Font ss:FontName="Calibri" ss:Size="11" ss:Italic="1" ss:Color="#667085"/>
-              </Style>
-            </Styles>
-            ${summary}
-            ${trainerSheets}
-          </Workbook>`;
-      }
-
-      function downloadBlob(blob, fileName) {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+            ),
+            excelSheetName(trainerName, usedNames)
+          );
+        });
+        return workbook;
       }
 
       async function exportEvidenceWorkbook() {
         if (!isCoordinator()) {
           setMessage(els.evidenceExportMessage, "Solo el coordinador puede generar este reporte.", "err");
+          return;
+        }
+        const rangeError = evidenceRangeError();
+        if (rangeError) {
+          setMessage(els.evidenceExportMessage, rangeError, "err");
+          return;
+        }
+        if (!window.XLSX) {
+          setMessage(els.evidenceExportMessage, "El modulo de Excel no termino de cargar. Recarga la pagina e intenta nuevamente.", "err");
           return;
         }
         els.exportEvidenceExcel.disabled = true;
@@ -2374,14 +2413,12 @@
           const refreshed = await refreshStateFromServer({ quiet: true });
           if (!refreshed || !isCoordinator()) throw new Error("No se pudo actualizar la informacion de la nube.");
           const rows = evidenceReportRows();
-          const workbook = buildEvidenceWorkbook(rows);
-          downloadBlob(
-            new Blob([workbook], { type: "application/vnd.ms-excel;charset=utf-8" }),
-            `LGTASK-tareas-y-sustentos-${todayIso}.xls`
-          );
+          XLSX.writeFileXLSX(buildEvidenceWorkbook(rows), `LGTASK-tareas-y-sustentos-${todayIso}.xlsx`, {
+            compression: true
+          });
           setMessage(
             els.evidenceExportMessage,
-            `Excel generado con ${rows.length} registro${rows.length === 1 ? "" : "s"}. Incluye una hoja por trainer y enlaces protegidos a las fotos.`,
+            `Excel XLSX generado con ${rows.length} registro${rows.length === 1 ? "" : "s"}. Los enlaces abren cada archivo dentro de LGTASK.`,
             "ok"
           );
         } catch (error) {
@@ -2968,17 +3005,19 @@
         let allEvidence = relevantTasks()
           .flatMap((task) => (task.evidence || []).map((evidence) => ({ ...evidence, task })))
           .sort((a, b) => b.submittedAt - a.submittedAt);
-        const linkedPhotoId = new URLSearchParams(window.location.search).get("photo");
+        const query = new URLSearchParams(window.location.search);
+        const linkedFileId = query.get("file") || query.get("photo");
 
         if (isCoordinator()) {
           const trainerId = els.evidenceTrainerFilter.value || "all";
-          const dateValue = els.evidenceDateFilter.value;
           allEvidence = allEvidence
             .filter((entry) => trainerId === "all" || entry.submittedById === trainerId)
-            .filter((entry) => !dateValue || dateIsoInLima(entry.submittedAt) === dateValue);
+            .filter((entry) => dateIsInEvidenceRange(dateIsoInLima(entry.submittedAt)));
         }
-        if (linkedPhotoId) {
-          allEvidence = allEvidence.filter((entry) => entry.photoId === linkedPhotoId);
+        if (linkedFileId) {
+          allEvidence = allEvidence.filter((entry) =>
+            evidenceFilesForEntry(entry).some((file) => file.id === linkedFileId)
+          );
         }
 
         els.evidenceList.innerHTML = "";
@@ -2993,6 +3032,23 @@
         allEvidence.forEach((entry) => {
           const card = document.createElement("article");
           card.className = "item";
+          const files = evidenceFilesForEntry(entry);
+          const filesMarkup = files
+            .map((file) => {
+              const fileUrl = file.id
+                ? `${API_BASE}/evidence/${encodeURIComponent(file.id)}/file`
+                : file.dataUrl;
+              const image = file.mimeType.startsWith("image/");
+              return `
+                <div class="evidence-file-row">
+                  <strong>${escapeHtml(file.name)}</strong>
+                  <span class="muted">${escapeHtml(file.mimeType)}</span>
+                  ${image ? `<img class="evidence-photo" loading="lazy" src="${escapeHtml(fileUrl)}" alt="${escapeHtml(file.name)}" />` : ""}
+                  <a class="small" href="${escapeHtml(fileUrl)}" target="_blank" rel="noopener">Abrir o descargar archivo</a>
+                </div>
+              `;
+            })
+            .join("");
           card.innerHTML = `
             <div class="title-row">
               <h3>${escapeHtml(entry.task.title)}</h3>
@@ -3007,9 +3063,8 @@
             ${entry.product ? `<p><strong>Producto:</strong> ${escapeHtml(entry.product)}</p>` : ""}
             ${entry.notes ? `<p>${escapeHtml(entry.notes)}</p>` : ""}
             <div class="cloud-path">${escapeHtml(cloudFolderForEvidence(entry, entry.task))}</div>
-            ${entry.photoId ? `<div class="evidence-cloud-badge">Archivo protegido en la nube LGTASK</div>` : ""}
-            ${entry.photoId || entry.photoData ? `<img class="evidence-photo" loading="lazy" src="${entry.photoId ? `${API_BASE}/evidence/${encodeURIComponent(entry.photoId)}/photo` : entry.photoData}" alt="Foto de sustento" />` : ""}
-            ${isCoordinator() && entry.photoId ? `<a class="small" href="${API_BASE}/evidence/${encodeURIComponent(entry.photoId)}/photo" target="_blank" rel="noopener">Abrir archivo original</a>` : ""}
+            ${files.length ? `<div class="evidence-cloud-badge">${files.length} archivo${files.length === 1 ? "" : "s"} protegido${files.length === 1 ? "" : "s"} en la nube LGTASK</div>` : ""}
+            ${files.length ? `<div class="evidence-file-list">${filesMarkup}</div>` : `<p class="muted">Sustento sin archivo adjunto.</p>`}
           `;
 
           if (isCoordinator() && entry.review !== "Aprobado") {
@@ -3297,18 +3352,21 @@
         }
       }
 
-      async function compressImage(file) {
-        if (!file) return "";
-        const dataUrl = await new Promise((resolve, reject) => {
+      function readFileAsDataUrl(file) {
+        return new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
+          reader.onerror = () => reject(new Error(`No se pudo leer ${file.name}.`));
           reader.readAsDataURL(file);
         });
+      }
+
+      async function compressImage(file) {
+        const dataUrl = await readFileAsDataUrl(file);
         const img = await new Promise((resolve, reject) => {
           const image = new Image();
           image.onload = () => resolve(image);
-          image.onerror = reject;
+          image.onerror = () => reject(new Error(`No se pudo procesar la imagen ${file.name}.`));
           image.src = dataUrl;
         });
         const maxSize = 800;
@@ -3319,6 +3377,26 @@
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         return canvas.toDataURL("image/jpeg", 0.68);
+      }
+
+      async function prepareEvidenceFile(file) {
+        const extension = file.name.includes(".") ? file.name.split(".").pop().toLowerCase() : "";
+        if (!EVIDENCE_FILE_EXTENSIONS.has(extension)) {
+          throw new Error(`${file.name}: formato no permitido.`);
+        }
+        const image = ["jpg", "jpeg", "png", "webp"].includes(extension);
+        if (!image && file.size > MAX_EVIDENCE_FILE_BYTES) {
+          throw new Error(`${file.name}: supera el maximo de 1.35 MB permitido por la nube.`);
+        }
+        const fileData = image ? await compressImage(file) : await readFileAsDataUrl(file);
+        const base64 = String(fileData).split(",")[1] || "";
+        if (base64.length > 1_800_000) {
+          throw new Error(`${file.name}: sigue siendo demasiado grande despues de procesarlo.`);
+        }
+        const fileName = image
+          ? `${file.name.replace(/\.[^.]+$/, "").slice(0, 105) || "sustento"}.jpg`
+          : file.name;
+        return { fileData, fileName };
       }
 
       function addEventListeners() {
@@ -3590,13 +3668,24 @@
         els.taskStatusFilter.addEventListener("change", renderTasks);
         els.taskTrainerFilter.addEventListener("change", renderTasks);
         els.evidenceTrainerFilter.addEventListener("change", renderEvidence);
-        els.evidenceDateFilter.addEventListener("change", renderEvidence);
+        els.evidenceDateFrom.addEventListener("change", renderEvidence);
+        els.evidenceDateTo.addEventListener("change", renderEvidence);
+        els.useCurrentWeekEvidence.addEventListener("click", () => {
+          const start = weekStartIso(todayIso);
+          els.evidenceDateFrom.value = start;
+          els.evidenceDateTo.value = addDaysIso(start, 5);
+          setMessage(els.evidenceExportMessage, "", "");
+          renderEvidence();
+        });
         els.clearEvidenceFilters.addEventListener("click", () => {
           els.evidenceTrainerFilter.value = "all";
-          els.evidenceDateFilter.value = "";
+          els.evidenceDateFrom.value = "";
+          els.evidenceDateTo.value = "";
           const url = new URL(window.location.href);
           url.searchParams.delete("photo");
+          url.searchParams.delete("file");
           window.history.replaceState({}, "", url);
+          setMessage(els.evidenceExportMessage, "", "");
           renderEvidence();
         });
         els.exportEvidenceExcel.addEventListener("click", exportEvidenceWorkbook);
@@ -3613,26 +3702,41 @@
             setMessage(els.evidenceMessage, "Explica el motivo para que el coordinador pueda reasignar o dar seguimiento.", "err");
             return;
           }
-          setMessage(els.evidenceMessage, "Procesando sustento...", "");
-          const photoData = await compressImage(els.evidencePhoto.files[0]);
-          let photoId = "";
-          let photoName = "";
-          if (photoData) {
-            try {
+          const selectedFiles = Array.from(els.evidenceFiles.files || []);
+          if (selectedFiles.length > MAX_EVIDENCE_FILES) {
+            setMessage(els.evidenceMessage, `Puedes adjuntar un maximo de ${MAX_EVIDENCE_FILES} archivos por sustento.`, "err");
+            return;
+          }
+          setMessage(els.evidenceMessage, "Validando archivos...", "");
+          let preparedFiles = [];
+          try {
+            preparedFiles = await Promise.all(selectedFiles.map(prepareEvidenceFile));
+          } catch (error) {
+            setMessage(els.evidenceMessage, error.message, "err");
+            return;
+          }
+          const uploadedFiles = [];
+          try {
+            for (let index = 0; index < preparedFiles.length; index += 1) {
+              const prepared = preparedFiles[index];
+              setMessage(els.evidenceMessage, `Subiendo archivo ${index + 1} de ${preparedFiles.length}...`, "");
               const upload = await apiRequest("/evidence/upload", {
                 method: "POST",
                 body: JSON.stringify({
                   taskId: task.id,
-                  photoData,
-                  fileName: els.evidencePhoto.files[0]?.name || "sustento.jpg"
+                  fileData: prepared.fileData,
+                  fileName: prepared.fileName
                 })
               });
-              photoId = upload.file.id;
-              photoName = upload.file.name;
-            } catch (error) {
-              setMessage(els.evidenceMessage, error.message, "err");
-              return;
+              uploadedFiles.push({
+                id: upload.file.id,
+                name: upload.file.name,
+                mimeType: upload.file.mimeType
+              });
             }
+          } catch (error) {
+            setMessage(els.evidenceMessage, `No se pudieron subir todos los archivos: ${error.message}`, "err");
+            return;
           }
           const evidence = {
             id: id(),
@@ -3642,8 +3746,7 @@
             product: clean(els.evidenceProduct.value),
             result: els.evidenceResult.value,
             notes,
-            photoId,
-            photoName,
+            files: uploadedFiles,
             review: "Pendiente"
           };
           evidence.cloudPath = cloudFolderForEvidence(evidence, task);
@@ -3675,7 +3778,7 @@
             els.evidenceMessage,
             evidence.result === "No se pudo cumplir"
               ? "Feedback guardado en la nube. Reasigna la tarea indicando quien puede atenderla."
-              : "Sustento guardado en la nube. Queda pendiente de revision del coordinador.",
+              : `Sustento guardado en la nube con ${uploadedFiles.length} archivo${uploadedFiles.length === 1 ? "" : "s"}. Queda pendiente de revision del coordinador.`,
             "ok"
           );
           render();
