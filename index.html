@@ -2153,7 +2153,7 @@
             const trainerId = evidence?.submittedById || task.ownerId;
             const activityDate = evidence?.submittedAt ? dateIsoInLima(evidence.submittedAt) : task.dueDate;
             const photoUrl = evidence?.photoId
-              ? new URL(`${API_BASE}/evidence/${encodeURIComponent(evidence.photoId)}/photo`, window.location.origin).href
+              ? new URL(`/?view=evidenceView&photo=${encodeURIComponent(evidence.photoId)}`, window.location.origin).href
               : "";
             const historyUrl = new URL("/?view=evidenceView", window.location.origin).href;
             return {
@@ -2968,6 +2968,7 @@
         let allEvidence = relevantTasks()
           .flatMap((task) => (task.evidence || []).map((evidence) => ({ ...evidence, task })))
           .sort((a, b) => b.submittedAt - a.submittedAt);
+        const linkedPhotoId = new URLSearchParams(window.location.search).get("photo");
 
         if (isCoordinator()) {
           const trainerId = els.evidenceTrainerFilter.value || "all";
@@ -2975,6 +2976,9 @@
           allEvidence = allEvidence
             .filter((entry) => trainerId === "all" || entry.submittedById === trainerId)
             .filter((entry) => !dateValue || dateIsoInLima(entry.submittedAt) === dateValue);
+        }
+        if (linkedPhotoId) {
+          allEvidence = allEvidence.filter((entry) => entry.photoId === linkedPhotoId);
         }
 
         els.evidenceList.innerHTML = "";
@@ -3590,6 +3594,9 @@
         els.clearEvidenceFilters.addEventListener("click", () => {
           els.evidenceTrainerFilter.value = "all";
           els.evidenceDateFilter.value = "";
+          const url = new URL(window.location.href);
+          url.searchParams.delete("photo");
+          window.history.replaceState({}, "", url);
           renderEvidence();
         });
         els.exportEvidenceExcel.addEventListener("click", exportEvidenceWorkbook);
