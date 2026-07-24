@@ -3,7 +3,7 @@ const SESSION_DAYS = 14;
 const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb9775180ea780b71";
 
 const EMPTY_DATA = {
-  version: 5,
+  version: 6,
   registrationRequests: [],
   passwordRecoveryRequests: [],
   tasks: [],
@@ -11,6 +11,12 @@ const EMPTY_DATA = {
   supportRequests: [],
   dailyMotivations: []
 };
+
+const WORKDAY_START = "08:30";
+const WEEKDAY_END = "19:00";
+const SATURDAY_END = "14:00";
+const BREAK_START = "12:30";
+const BREAK_END = "14:00";
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -302,19 +308,92 @@ async function putState(request, db, user) {
         lastHistory.toId === requestedOwnerId &&
         lastHistory.byId === user.id &&
         clean(lastHistory.reason);
+      const requestedDate = clean(next.dueDate);
+      const requestedStart = clean(next.startTime);
+      const requestedEnd = clean(next.endTime);
+      const scheduleChanged =
+        requestedDate !== task.dueDate ||
+        requestedStart !== (task.startTime || WORKDAY_START) ||
+        requestedEnd !== (task.endTime || "09:30");
+      const validReschedule =
+        !ownerChanged &&
+        scheduleChanged &&
+        task.status !== "Cumplida" &&
+        lastHistory?.type === "Reprogramacion" &&
+        lastHistory.byId === user.id &&
+        lastHistory.fromDate === task.dueDate &&
+        lastHistory.toDate === requestedDate &&
+        lastHistory.fromStartTime === (task.startTime || WORKDAY_START) &&
+        lastHistory.fromEndTime === (task.endTime || "09:30") &&
+        lastHistory.toStartTime === requestedStart &&
+        lastHistory.toEndTime === requestedEnd &&
+        clean(lastHistory.reason) &&
+        validWorkSchedule(requestedDate, requestedStart, requestedEnd) &&
+        !hasTaskConflict(current.tasks, user.id, requestedDate, requestedStart, requestedEnd, task.id);
       return {
         ...task,
         ownerId: validReassignment ? requestedOwnerId : task.ownerId,
+        dueDate: validReschedule ? requestedDate : task.dueDate,
+        startTime: validReschedule ? requestedStart : task.startTime,
+        endTime: validReschedule ? requestedEnd : task.endTime,
         status: validReassignment ? "Pendiente" : clean(next.status) || task.status,
         evidence: Array.isArray(next.evidence) ? next.evidence : task.evidence,
-        history: validReassignment ? nextHistory : Array.isArray(next.history) ? next.history : task.history,
+        history:
+          validReassignment || validReschedule
+            ? nextHistory
+            : scheduleChanged
+              ? task.history
+              : Array.isArray(next.history)
+                ? next.history
+                : task.history,
         blockedReason: validReassignment ? "" : clean(next.blockedReason),
         blockedAt: validReassignment ? 0 : Number(next.blockedAt || 0)
       };
     });
-    const knownSupport = new Set(current.supportRequests.map((item) => item.id));
-    for (const item of submitted.supportRequests || []) {
-      if (!knownSupport.has(item.id) && item.fromId === user.id) current.supportRequests.unshift(item);
+
+    const knownTaskIds = new Set(current.tasks.map((task) => task.id));
+    for (const task of submitted.tasks || []) {
+      const taskId = clean(task.id);
+      if (!taskId || knownTaskIds.has(taskId)) continue;
+      const dueDate = clean(task.dueDate);
+      const startTime = clean(task.startTime);
+      const endTime = clean(task.endTime);
+      if (
+        task.ownerId !== user.id ||
+        task.createdById !== user.id ||
+        clean(task.title).length < 2 ||
+        !validWorkSchedule(dueDate, startTime, endTime) ||
+        hasTaskConflict(current.tasks, user.id, dueDate, startTime, endTime)
+      ) {
+        continue;
+      }
+      const createdAt = Date.now();
+      current.tasks.unshift({
+        id: taskId,
+        title: clean(task.title).slice(0, 140),
+        ownerId: user.id,
+        createdById: user.id,
+        category: ["PDV", "Entrenamiento", "Producto", "Reporte", "Coordinacion"].includes(task.category) ? task.category : "PDV",
+        priority: ["Alta", "Media", "Baja"].includes(task.priority) ? task.priority : "Media",
+        dueDate,
+        startTime,
+        endTime,
+        product: clean(task.product).slice(0, 120),
+        description: clean(task.description).slice(0, 1500),
+        status: "Pendiente",
+        createdAt,
+        history: [
+          {
+            type: "Asignacion",
+            toId: user.id,
+            byId: user.id,
+            reason: "Tarea personal creada por el trainer",
+            at: createdAt
+          }
+        ],
+        evidence: []
+      });
+      knownTaskIds.add(taskId);
     }
   }
 
@@ -368,6 +447,39 @@ async function resetPassword(request, db, actor) {
   return json({ ok: true, tempPassword, user: publicUser(user) });
 }
 
+function timeToMinutes(value) {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(value || ""));
+  return match ? Number(match[1]) * 60 + Number(match[2]) : -1;
+}
+
+function validWorkSchedule(dateValue, startTime, endTime) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateValue || ""))) return false;
+  const day = new Date(`${dateValue}T12:00:00Z`).getUTCDay();
+  if (day === 0) return false;
+  const start = timeToMinutes(startTime);
+  const end = timeToMinutes(endTime);
+  const workEnd = timeToMinutes(day === 6 ? SATURDAY_END : WEEKDAY_END);
+  if (start < timeToMinutes(WORKDAY_START) || end > workEnd || end <= start) return false;
+  if (day !== 6 && start < timeToMinutes(BREAK_END) && end > timeToMinutes(BREAK_START)) return false;
+  return true;
+}
+
+function hasTaskConflict(tasks, ownerId, dateValue, startTime, endTime, excludeTaskId = "") {
+  const start = timeToMinutes(startTime);
+  const end = timeToMinutes(endTime);
+  return tasks.some((task) => {
+    if (
+      task.id === excludeTaskId ||
+      task.ownerId !== ownerId ||
+      task.dueDate !== dateValue ||
+      task.status === "No disponible"
+    ) {
+      return false;
+    }
+    return start < timeToMinutes(task.endTime || "09:30") && end > timeToMinutes(task.startTime || WORKDAY_START);
+  });
+}
+
 async function loadData(db) {
   const row = await db.prepare("SELECT data FROM app_data WHERE id = 1").first();
   try {
@@ -379,7 +491,7 @@ async function loadData(db) {
 
 async function saveData(db, data) {
   const payload = {
-    version: 5,
+    version: 6,
     registrationRequests: data.registrationRequests || [],
     passwordRecoveryRequests: data.passwordRecoveryRequests || [],
     tasks: data.tasks || [],
