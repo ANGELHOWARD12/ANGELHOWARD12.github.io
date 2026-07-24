@@ -468,6 +468,3477 @@
       .schedule-axis,
       .schedule-track {
         display: grid;
+        grid-template-columns: repeat(var(--schedule-slots, 19), minmax(38px, 1fr));
+      }
+
+      .schedule-axis {
+        align-items: end;
+        min-height: 32px;
+      }
+
+      .schedule-axis span {
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .schedule-track {
+        background-color: #fbfdff;
+        background-image: linear-gradient(to right, transparent calc(100% - 1px), #e3e9f2 calc(100% - 1px));
+        background-size: calc(100% / var(--schedule-slots, 19)) 100%;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        min-height: 72px;
+        overflow: hidden;
+        padding: 6px 0;
+        position: relative;
+      }
+
+      .schedule-break {
+        align-items: center;
+        background: repeating-linear-gradient(135deg, #eef1f5 0 7px, #e3e7ed 7px 14px);
+        border-left: 1px dashed #9aa4b2;
+        border-right: 1px dashed #9aa4b2;
+        color: #5f6b7a;
+        display: flex;
+        font-size: 10px;
+        font-weight: 900;
+        justify-content: center;
+        margin: -6px 0;
+        pointer-events: none;
+        text-align: center;
+        z-index: 1;
+      }
+
+      .schedule-task {
+        position: relative;
+        z-index: 2;
+      }
+
+      .schedule-task {
+        align-content: center;
+        background: var(--soft);
+        border: 1px solid #9ab7f8;
+        border-left: 4px solid var(--blue);
+        border-radius: 6px;
+        color: var(--ink);
+        display: grid;
+        gap: 2px;
+        margin: 1px 2px;
+        min-height: 56px;
+        overflow: hidden;
+        padding: 6px 7px;
+        text-align: left;
+      }
+
+      .schedule-task.approved {
+        background: var(--green-soft);
+        border-color: #78c5a7;
+        border-left-color: var(--green);
+      }
+
+      .schedule-task.review {
+        background: var(--yellow-soft);
+        border-color: #e5c875;
+        border-left-color: var(--yellow);
+      }
+
+      .schedule-task.observed {
+        background: var(--red-soft);
+        border-color: #eea2aa;
+        border-left-color: var(--red);
+      }
+
+      .schedule-task strong,
+      .schedule-task span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .schedule-task strong {
+        font-size: 11px;
+      }
+
+      .schedule-task span {
+        font-size: 10px;
+      }
+
+      .schedule-empty {
+        align-self: center;
+        color: var(--muted);
+        font-size: 12px;
+        grid-column: 1 / -1;
+        padding: 0 12px;
+      }
+
+      .trainer-day-card {
+        border-top: 4px solid var(--cyan);
+      }
+
+      .trainer-day-card.today {
+        border-top-color: var(--red);
+      }
+
+      .trainer-task-card {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-left: 4px solid var(--blue);
+        border-radius: 7px;
+        display: grid;
+        gap: 7px;
+        padding: 10px;
+      }
+
+      .trainer-task-card.approved {
+        border-left-color: var(--green);
+      }
+
+      .trainer-task-time {
+        color: var(--blue);
+        font-size: 11px;
+        font-weight: 900;
+      }
+
+      .workday-note {
+        background: var(--cyan-soft);
+        border: 1px solid #a7dde2;
+        border-radius: 7px;
+        color: var(--cyan);
+        font-size: 11px;
+        font-weight: 900;
+        padding: 7px 8px;
+      }
+
+      .approval-check {
+        align-items: center;
+        background: var(--green);
+        border-radius: 50%;
+        color: #fff;
+        display: inline-flex;
+        font-size: 18px;
+        font-weight: 900;
+        height: 34px;
+        justify-content: center;
+        width: 34px;
+      }
+
+      .review-note {
+        color: var(--yellow);
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .task-item {
+        border-left: 5px solid var(--blue);
+      }
+
+      .task-item.is-approved {
+        border-left-color: var(--green);
+      }
+
+      .task-history summary {
+        color: var(--blue-dark);
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .history-list {
+        display: grid;
+        gap: 6px;
+        margin: 8px 0 0;
+        padding-left: 20px;
+      }
+
+      .history-list li {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      dialog {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: 0 24px 60px rgba(23, 32, 51, 0.24);
+        color: var(--ink);
+        max-width: 520px;
+        padding: 20px;
+        width: calc(100% - 28px);
+      }
+
+      dialog::backdrop {
+        background: rgba(23, 32, 51, 0.48);
+      }
+
+      .evidence-cloud-badge {
+        align-items: center;
+        background: var(--green-soft);
+        border: 1px solid #9dd8c2;
+        border-radius: 8px;
+        color: var(--green);
+        display: flex;
+        font-size: 12px;
+        font-weight: 900;
+        gap: 8px;
+        padding: 10px;
+      }
+
+      .day-column {
+        background: #f8fbff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        min-height: 260px;
+        padding: 10px;
+      }
+
+      .day-column.today {
+        border-color: var(--blue);
+        box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.18);
+      }
+
+      .day-head {
+        display: grid;
+        gap: 4px;
+        margin-bottom: 10px;
+      }
+
+      .day-head strong {
+        font-size: 14px;
+      }
+
+      .day-hours {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        margin: 8px 0;
+      }
+
+      .day-tasks {
+        display: grid;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .timeline-entry {
+        align-items: start;
+        display: grid;
+        gap: 8px;
+        grid-template-columns: 48px minmax(0, 1fr);
+      }
+
+      .timeline-time {
+        color: var(--blue);
+        display: grid;
+        font-size: 11px;
+        font-weight: 900;
+        line-height: 1.25;
+        padding-top: 10px;
+        text-align: right;
+      }
+
+      .day-stats {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .mini-task {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        display: grid;
+        gap: 8px;
+        padding: 10px;
+      }
+
+      .mini-task h3 {
+        font-size: 14px;
+        line-height: 1.25;
+      }
+
+      .mini-task .meta {
+        display: grid;
+        gap: 4px;
+      }
+
+      .reassign-box {
+        align-items: center;
+        display: grid;
+        gap: 8px;
+        grid-template-columns: minmax(145px, 1fr) auto;
+        width: min(100%, 380px);
+      }
+
+      .cloud-path {
+        background: #f8fbff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--muted);
+        font-family: Consolas, "Courier New", monospace;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+        padding: 10px;
+      }
+
+      .title-row,
+      .meta,
+      .actions {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+      }
+
+      .meta {
+        font-size: 13px;
+      }
+
+      .pill {
+        align-items: center;
+        background: var(--soft);
+        border-radius: 999px;
+        color: var(--blue-dark);
+        display: inline-flex;
+        font-size: 12px;
+        font-weight: 900;
+        line-height: 1;
+        padding: 7px 10px;
+        white-space: nowrap;
+      }
+
+      .pill.pending,
+      .pill.process,
+      .pill.review,
+      .pill.medium {
+        background: var(--yellow-soft);
+        color: var(--yellow);
+      }
+
+      .pill.done,
+      .pill.approved {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .pill.high,
+      .pill.observed {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .empty {
+        background: #fff;
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        color: var(--muted);
+        padding: 22px;
+        text-align: center;
+      }
+
+      .empty strong {
+        color: var(--ink);
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      .note {
+        background: #f6f9fd;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 13px;
+      }
+
+      .divider {
+        border-top: 1px solid var(--line);
+        margin: 16px 0;
+      }
+
+      .message {
+        color: var(--muted);
+        min-height: 20px;
+      }
+
+      .message.ok {
+        color: var(--green);
+        font-weight: 900;
+      }
+
+      .message.err {
+        color: var(--red);
+        font-weight: 900;
+      }
+
+      .evidence-photo {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        max-height: 220px;
+        max-width: 100%;
+        object-fit: cover;
+      }
+
+      .product-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 16px 0;
+      }
+
+      .product-tabs button {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        min-height: 38px;
+        padding: 0 12px;
+      }
+
+      .product-tabs button.active {
+        background: var(--green);
+        border-color: var(--green);
+        color: #fff;
+      }
+
+      .feature-grid {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .feature-box {
+        background: #f8fbff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+      }
+
+      @media (max-width: 1060px) {
+        .dashboard,
+        .two-col {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar,
+        .session {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .session {
+          min-width: 0;
+          width: 100%;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .login-grid,
+        .form-grid,
+        .feature-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .task-item {
+          grid-template-columns: 1fr;
+        }
+
+        .panel-header {
+          flex-direction: column;
+        }
+
+        .motivation-strip {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .motivation-editor {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <section id="loginScreen" class="login-screen">
+      <div class="login-card">
+        <div class="brand login-brand">
+          <span class="brand-mark">LG</span>
+          <div>
+            <h1>Task Hub</h1>
+            <p class="muted">Gestion diaria de tareas y sustentos LG</p>
+          </div>
+        </div>
+
+        <div class="login-grid">
+          <form id="loginForm" class="panel stack" autocomplete="off">
+            <div>
+              <h2>Ingresar</h2>
+              <p class="muted">Acceso para coordinador y trainers.</p>
+            </div>
+            <label>
+              Correo
+              <input id="loginEmail" type="email" placeholder="correo@empresa.com" autocomplete="off" required />
+            </label>
+            <label>
+              Clave
+              <input id="loginPassword" type="password" placeholder="Clave de acceso" autocomplete="new-password" required />
+            </label>
+            <button class="primary" type="submit">Entrar</button>
+            <p id="loginMessage" class="message" aria-live="polite"></p>
+            <div class="divider"></div>
+            <button id="toggleRecovery" class="ghost" type="button">Olvide mi clave</button>
+            <div id="recoveryBox" class="stack hidden">
+              <label>
+                Correo registrado
+                <input id="recoveryEmail" type="email" placeholder="correo@empresa.com" autocomplete="off" />
+              </label>
+              <button id="recoverySubmit" class="small" type="button">Solicitar recuperacion</button>
+              <p id="recoveryMessage" class="message" aria-live="polite"></p>
+            </div>
+          </form>
+
+          <form id="registrationForm" class="panel stack" autocomplete="off">
+            <div>
+              <h2>Registro de usuario</h2>
+              <p class="muted">Crea tu acceso y luego ingresa con tu correo y clave.</p>
+            </div>
+            <label>
+              Nombre completo
+              <input id="regName" type="text" placeholder="Nombre completo" autocomplete="off" required />
+            </label>
+            <label>
+              Correo
+              <input id="regEmail" type="email" placeholder="correo@empresa.com" autocomplete="off" required />
+            </label>
+            <label>
+              Zona o tienda base
+              <input id="regZone" type="text" placeholder="Ej. Zona Norte / Tienda Centro" autocomplete="off" required />
+            </label>
+            <label>
+              Tipo de usuario
+              <select id="regRole">
+                <option value="Trainer">Trainer</option>
+                <option value="Coordinador">Coordinador</option>
+              </select>
+            </label>
+            <label id="coordinatorCodeWrap" class="wide hidden">
+              Codigo de coordinador
+              <input id="coordinatorCode" type="password" placeholder="Codigo interno" autocomplete="new-password" />
+            </label>
+            <label>
+              Crear clave
+              <input id="regPassword" type="password" minlength="6" placeholder="Minimo 6 caracteres" autocomplete="new-password" required />
+            </label>
+            <button class="primary" type="submit">Crear acceso</button>
+            <p id="registrationMessage" class="message" aria-live="polite"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <header id="appHeader" class="topbar hidden">
+      <div class="brand">
+        <span class="brand-mark">LG</span>
+        <div>
+          <h1>Task Hub</h1>
+          <p class="muted">Operacion diaria de cuenta LG</p>
+        </div>
+      </div>
+      <div class="session">
+        <span id="sessionName" class="muted"></span>
+        <span id="sessionRole" class="pill"></span>
+        <button id="logoutButton" class="ghost" type="button">Salir</button>
+      </div>
+    </header>
+
+    <main id="appShell" class="shell hidden">
+      <section id="motivationStrip" class="motivation-strip">
+        <div class="motivation-copy">
+          <span class="motivation-kicker">Impulso del dia</span>
+          <strong id="dailyMotivation"></strong>
+        </div>
+        <button id="editMotivation" class="small" type="button">Editar frase</button>
+        <form id="motivationForm" class="motivation-editor wide hidden">
+          <label>
+            Frase para hoy
+            <input id="motivationInput" type="text" maxlength="180" required />
+          </label>
+          <button class="primary" type="submit">Publicar</button>
+          <button id="cancelMotivation" class="ghost" type="button">Cancelar</button>
+        </form>
+      </section>
+
+      <section class="dashboard">
+        <div class="date-card">
+          <span id="todayLabel" class="muted"></span>
+          <strong>Tablero diario</strong>
+        </div>
+        <div class="metric">
+          <span class="muted">Avance</span>
+          <strong id="progressPercent">0%</strong>
+          <div class="meter"><span id="progressBar"></span></div>
+        </div>
+        <div class="metric">
+          <span class="muted">Pendientes</span>
+          <strong id="pendingCount">0</strong>
+        </div>
+        <div class="metric">
+          <span class="muted">En revision</span>
+          <strong id="reviewCount">0</strong>
+        </div>
+        <div class="metric">
+          <span class="muted">Cumplidas</span>
+          <strong id="doneCount">0</strong>
+        </div>
+        <div class="metric">
+          <span class="muted">Trainers</span>
+          <strong id="trainerCount">0</strong>
+        </div>
+      </section>
+
+      <nav class="tabs" aria-label="Vistas principales">
+        <button class="tab active" data-view="tasksView">Tareas</button>
+        <button class="tab" data-view="evidenceView">Sustentos</button>
+        <button class="tab" data-view="teamView">Equipo</button>
+        <button class="tab" data-view="announcementsView">Comunicados</button>
+        <button class="tab" data-view="infoView">Info LG</button>
+      </nav>
+
+      <section id="tasksView" class="view active">
+        <section id="coordinatorDayPanel" class="panel stack">
+          <div class="week-toolbar">
+            <div>
+              <h2>Agenda diaria del coordinador</h2>
+              <p class="muted">Una fila por trainer, con sus tareas ubicadas por hora.</p>
+            </div>
+            <div class="actions">
+              <button id="prevDay" class="small" type="button">Dia anterior</button>
+              <button id="todayDay" class="small" type="button">Hoy</button>
+              <button id="nextDay" class="small" type="button">Dia siguiente</button>
+              <input id="coordinatorDate" type="date" aria-label="Fecha de agenda" />
+            </div>
+          </div>
+          <strong id="coordinatorDayLabel"></strong>
+          <div class="daily-roster-scroll">
+            <div id="coordinatorDayRoster" class="daily-roster"></div>
+          </div>
+        </section>
+
+        <section id="trainerWeekPanel" class="panel stack">
+          <div class="week-toolbar">
+            <div>
+              <h2>Mi calendario semanal</h2>
+              <p class="muted">Tareas de lunes a sabado. Los domingos no forman parte de la jornada.</p>
+            </div>
+            <div class="actions">
+              <button id="prevWeek" class="small" type="button">Week anterior</button>
+              <button id="todayWeek" class="small" type="button">Week actual</button>
+              <button id="nextWeek" class="small" type="button">Week siguiente</button>
+            </div>
+          </div>
+          <strong id="weekLabel"></strong>
+          <div class="trainer-week-scroll">
+            <div id="weeklySummary" class="week-grid trainer-week-grid"></div>
+          </div>
+        </section>
+
+        <div class="two-col">
+          <section id="coordinatorTaskPanel" class="panel stack">
+            <div>
+              <h2 id="taskFormTitle">Asignar tarea</h2>
+              <p id="taskFormHelp" class="muted">Pablo asigna actividades a todo el equipo. Cada trainer organiza sus propias tareas.</p>
+            </div>
+            <form id="taskForm" class="form-grid">
+              <label>
+                Titulo de tarea
+                <input id="taskTitle" type="text" placeholder="Ej. Validar exhibicion OLED" required />
+              </label>
+              <label>
+                Responsable
+                <select id="taskOwner" required></select>
+              </label>
+              <label>
+                Categoria
+                <select id="taskCategory">
+                  <option>PDV</option>
+                  <option>Entrenamiento</option>
+                  <option>Producto</option>
+                  <option>Reporte</option>
+                  <option>Coordinacion</option>
+                </select>
+              </label>
+              <label>
+                Prioridad
+                <select id="taskPriority">
+                  <option>Media</option>
+                  <option>Alta</option>
+                  <option>Baja</option>
+                </select>
+              </label>
+              <label>
+                Fecha limite
+                <input id="taskDueDate" type="date" required />
+              </label>
+              <label>
+                Hora de inicio (24 h)
+                <input id="taskStartTime" type="time" lang="en-GB" min="08:30" max="18:45" step="900" required />
+              </label>
+              <label>
+                Hora de cierre (24 h)
+                <input id="taskEndTime" type="time" lang="en-GB" min="08:45" max="19:00" step="900" required />
+              </label>
+              <label>
+                Producto LG
+                <input id="taskProduct" type="text" placeholder="Ej. OLED / Lavadoras / Audio" />
+              </label>
+              <label class="wide">
+                Instrucciones
+                <textarea id="taskDescription" placeholder="Detalle de lo que debe revisar o ejecutar el trainer"></textarea>
+              </label>
+              <button id="taskSubmitButton" class="primary wide" type="submit">Asignar tarea</button>
+            </form>
+            <p id="taskMessage" class="message" aria-live="polite"></p>
+          </section>
+
+          <aside class="panel stack">
+            <div>
+              <h2>Mis tareas / Seguimiento</h2>
+              <p class="muted">El coordinador ve todas; cada trainer ve solo las suyas.</p>
+            </div>
+            <div class="form-grid">
+              <label>
+                Estado
+                <select id="taskStatusFilter">
+                  <option value="all">Todas</option>
+                  <option value="Pendiente">Pendientes</option>
+                  <option value="En proceso">En proceso</option>
+                  <option value="En revision">En revision</option>
+                  <option value="Cumplida">Cumplidas</option>
+                  <option value="Observada">Observadas</option>
+                  <option value="No disponible">No disponibles</option>
+                </select>
+              </label>
+              <label id="trainerFilterWrap">
+                Trainer
+                <select id="taskTrainerFilter"></select>
+              </label>
+            </div>
+            <div id="taskList" class="list"></div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="evidenceView" class="view">
+        <div class="two-col">
+          <section class="panel stack">
+            <div>
+              <h2>Enviar sustento</h2>
+              <p class="muted">Carga foto y formulario basico para demostrar cumplimiento.</p>
+            </div>
+            <form id="evidenceForm" class="form-grid">
+              <label class="wide">
+                Tarea
+                <select id="evidenceTask" required></select>
+              </label>
+              <label>
+                Tienda / PDV
+                <input id="evidenceStore" type="text" placeholder="Nombre de tienda o punto de venta" required />
+              </label>
+              <label>
+                Producto revisado
+                <input id="evidenceProduct" type="text" placeholder="Producto LG trabajado" />
+              </label>
+              <label>
+                Resultado
+                <select id="evidenceResult">
+                  <option>Cumplida</option>
+                  <option>Cumplida parcialmente</option>
+                  <option>No se pudo cumplir</option>
+                </select>
+              </label>
+              <label>
+                Foto de sustento
+                <input id="evidencePhoto" type="file" accept="image/*" />
+              </label>
+              <label class="wide">
+                Observaciones
+                <textarea id="evidenceNotes" placeholder="Describe que se realizo, hallazgos, incidencias o acuerdos"></textarea>
+              </label>
+              <button class="primary wide" type="submit">Enviar sustento</button>
+            </form>
+            <p id="evidenceMessage" class="message" aria-live="polite"></p>
+          </section>
+
+          <aside class="panel stack">
+            <div>
+              <h2>Sustentos recibidos</h2>
+              <p class="muted">Pablo aprueba u observa los sustentos enviados.</p>
+            </div>
+            <div id="cloudPlanPanel" class="note">
+              <strong>Nube LGTASK conectada</strong>
+              <p class="muted">Las fotos quedan protegidas en Cloudflare D1 y Pablo puede abrirlas desde esta pantalla.</p>
+              <div class="cloud-path">LG Task Hub / Sustentos / fecha / trainer / tarea</div>
+              <p class="muted">Cada archivo se registra por nombre de trainer, fecha y tarea.</p>
+              <a class="small" href="https://lgtask.pages.dev/?view=evidenceView">Abrir historial en la nube</a>
+            </div>
+            <div id="evidenceFilters" class="form-grid">
+              <label>
+                Trainer
+                <select id="evidenceTrainerFilter"></select>
+              </label>
+              <label>
+                Fecha del sustento
+                <input id="evidenceDateFilter" type="date" />
+              </label>
+              <button id="clearEvidenceFilters" class="small wide" type="button">Ver todo el historial</button>
+            </div>
+            <div id="evidenceList" class="list"></div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="teamView" class="view">
+        <div class="two-col">
+          <section id="coordinatorTeamPanel" class="panel stack">
+            <div>
+              <h2>Alta de trainers</h2>
+              <p class="muted">Crear usuarios o aprobar solicitudes de registro.</p>
+            </div>
+            <form id="createTrainerForm" class="form-grid">
+              <label>
+                Nombre
+                <input id="newTrainerName" type="text" required />
+              </label>
+              <label>
+                Correo
+                <input id="newTrainerEmail" type="email" required />
+              </label>
+              <label>
+                Zona / tienda base
+                <input id="newTrainerZone" type="text" required />
+              </label>
+              <label>
+                Clave temporal
+                <input id="newTrainerPassword" type="text" value="LG2026" required />
+              </label>
+              <button class="primary wide" type="submit">Crear trainer</button>
+            </form>
+            <p id="trainerMessage" class="message" aria-live="polite"></p>
+            <div class="divider"></div>
+            <h3>Registros pendientes</h3>
+            <div id="pendingRegistrations" class="list"></div>
+            <div class="divider"></div>
+            <h3>Recuperacion de claves</h3>
+            <div id="passwordRecoveryList" class="list"></div>
+          </section>
+
+          <aside class="panel stack">
+            <div>
+              <h2>Equipo activo</h2>
+              <p class="muted">Usuarios habilitados para operar la pagina.</p>
+            </div>
+            <div id="teamList" class="list"></div>
+            <div id="backupTools" class="note stack">
+              <strong>Respaldo temporal</strong>
+              <p class="muted">Mientras no haya base de datos, estos botones ayudan a mover informacion entre equipos.</p>
+              <div class="actions">
+                <button id="exportData" class="small" type="button">Exportar datos</button>
+                <label class="small" style="display:inline-flex;align-items:center;gap:8px">
+                  Importar datos
+                  <input id="importData" type="file" accept="application/json" class="hidden" />
+                </label>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="announcementsView" class="view">
+        <div class="two-col">
+          <section id="coordinatorAnnouncementPanel" class="panel stack">
+            <div>
+              <h2>Crear comunicado</h2>
+              <p class="muted">Mensaje general o individual para un trainer.</p>
+            </div>
+            <form id="announcementForm" class="form-grid">
+              <label>
+                Titulo
+                <input id="announcementTitle" type="text" required />
+              </label>
+              <label>
+                Alcance
+                <select id="announcementAudience">
+                  <option value="all">Todo el equipo</option>
+                  <option value="person">Trainer especifico</option>
+                </select>
+              </label>
+              <label id="announcementTargetWrap">
+                Trainer
+                <select id="announcementTarget"></select>
+              </label>
+              <label>
+                Prioridad
+                <select id="announcementPriority">
+                  <option>Normal</option>
+                  <option>Importante</option>
+                  <option>Urgente</option>
+                </select>
+              </label>
+              <label class="wide">
+                Mensaje
+                <textarea id="announcementBody" required></textarea>
+              </label>
+              <button class="primary wide" type="submit">Publicar comunicado</button>
+            </form>
+          </section>
+
+          <aside class="panel stack">
+            <div>
+              <h2>Bandeja de comunicados</h2>
+              <p class="muted">Cada usuario ve lo que le corresponde.</p>
+            </div>
+            <div id="announcementList" class="list"></div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="infoView" class="view">
+        <div class="two-col">
+          <section class="panel">
+            <h2>Informacion LG</h2>
+            <p class="muted">Consulta rapida para reforzar argumentos de producto.</p>
+            <div id="productTabs" class="product-tabs"></div>
+            <div id="productInfo" class="stack"></div>
+          </section>
+          <aside class="panel stack">
+            <h2>Checklist de visita</h2>
+            <div class="item">
+              <strong>Antes de cerrar una tarea</strong>
+              <p class="muted">Verifica exhibicion, precio, disponibilidad, limpieza, material POP y evidencia fotografica.</p>
+            </div>
+            <div id="quizBox" class="stack"></div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="reassignDialog">
+      <form id="reassignForm" class="stack">
+        <div>
+          <h2>Reasignar tarea</h2>
+          <p id="reassignTaskLabel" class="muted"></p>
+        </div>
+        <label>
+          Nuevo trainer
+          <select id="reassignOwner" required></select>
+        </label>
+        <label>
+          Motivo de la reasignacion
+          <textarea id="reassignReason" placeholder="Explica por que otro trainer realizara esta tarea" required></textarea>
+        </label>
+        <div class="actions">
+          <button class="primary" type="submit">Confirmar reasignacion</button>
+          <button id="cancelReassign" class="ghost" type="button">Cancelar</button>
+        </div>
+        <p id="reassignMessage" class="message" aria-live="polite"></p>
+      </form>
+    </dialog>
+
+    <dialog id="scheduleDialog">
+      <form id="scheduleForm" class="stack">
+        <div>
+          <h2>Mover horario</h2>
+          <p id="scheduleTaskLabel" class="muted"></p>
+        </div>
+        <label>
+          Nueva fecha
+          <input id="scheduleDate" type="date" required />
+        </label>
+        <div class="form-grid">
+          <label>
+            Inicio (24 h)
+            <input id="scheduleStartTime" type="time" lang="en-GB" min="08:30" max="18:45" step="900" required />
+          </label>
+          <label>
+            Cierre (24 h)
+            <input id="scheduleEndTime" type="time" lang="en-GB" min="08:45" max="19:00" step="900" required />
+          </label>
+        </div>
+        <label>
+          Motivo del cambio
+          <textarea id="scheduleReason" placeholder="Ej. La visita se reprogramo o la tarea termino antes" required></textarea>
+        </label>
+        <div class="actions">
+          <button class="primary" type="submit">Guardar nuevo horario</button>
+          <button id="cancelSchedule" class="ghost" type="button">Cancelar</button>
+        </div>
+        <p id="scheduleMessage" class="message" aria-live="polite"></p>
+      </form>
+    </dialog>
+
+    <script>
+      const STORAGE_KEY = "lg-task-hub-ui-v1";
+      const API_BASE = "/cloud";
+      const WORKDAY_START = "08:30";
+      const WEEKDAY_END = "19:00";
+      const SATURDAY_END = "14:00";
+      const BREAK_START = "12:30";
+      const BREAK_END = "14:00";
+      const todayParts = Object.fromEntries(
+        new Intl.DateTimeFormat("en", {
+          timeZone: "America/Lima",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit"
+        })
+          .formatToParts(new Date())
+          .filter((part) => part.type !== "literal")
+          .map((part) => [part.type, part.value])
+      );
+      const todayIso = `${todayParts.year}-${todayParts.month}-${todayParts.day}`;
+      const dailyQuotes = [
+        "Cada tarea bien hecha construye la confianza del equipo.",
+        "Hoy es una nueva oportunidad para enseñar, ayudar y avanzar.",
+        "La constancia convierte el conocimiento en resultados.",
+        "Un gran entrenamiento empieza escuchando y termina inspirando.",
+        "Lo que medimos hoy nos ayuda a mejorar mañana.",
+        "Avancemos con orden, claridad y buena energia.",
+        "Cada visita es una oportunidad para demostrar nuestra experiencia LG.",
+        "El trabajo en equipo hace visible lo que solos no alcanzamos.",
+        "Cumplir a tiempo tambien es una forma de cuidar al equipo.",
+        "Compartir lo aprendido multiplica el impacto."
+      ];
+
+      const initialState = {
+        version: 6,
+        activeUserId: "",
+        selectedProduct: "oled",
+        selectedWeekStart: "",
+        selectedCoordinatorDate: "",
+        users: [],
+        registrationRequests: [],
+        passwordRecoveryRequests: [],
+        tasks: [],
+        announcements: [],
+        supportRequests: [],
+        dailyMotivations: []
+      };
+
+      const products = [
+        {
+          id: "oled",
+          name: "TV OLED",
+          promise: "Pixeles autoiluminados para contraste superior, negros profundos y experiencia premium.",
+          features: [
+            ["Argumento clave", "Cada pixel se enciende de forma independiente para mejorar contraste y detalle."],
+            ["Cliente ideal", "Cine en casa, gamers y usuarios que buscan imagen premium."],
+            ["Demo sugerida", "Mostrar una escena oscura y explicar el detalle en sombras."],
+            ["Cierre", "Vender inmersion, calidad de imagen y diferenciacion tecnologica."]
+          ],
+          quiz: {
+            question: "Que debe destacar primero el trainer en OLED?",
+            answer: "Contraste y pixeles autoiluminados",
+            options: ["Contraste y pixeles autoiluminados", "Solo el tamano", "Unicamente el control remoto"]
+          }
+        },
+        {
+          id: "linea-blanca",
+          name: "Linea blanca",
+          promise: "Ahorro, cuidado, capacidad y conveniencia para el hogar.",
+          features: [
+            ["Argumento clave", "Conectar tecnologia con beneficios diarios: ahorro, cuidado y facilidad."],
+            ["Cliente ideal", "Familias o usuarios que buscan durabilidad y practicidad."],
+            ["Demo sugerida", "Preguntar necesidad del hogar y explicar capacidad con ejemplos."],
+            ["Cierre", "Reforzar respaldo de marca y beneficio economico."]
+          ],
+          quiz: {
+            question: "Que debe guiar una venta de linea blanca?",
+            answer: "Necesidad del hogar y ahorro diario",
+            options: ["Necesidad del hogar y ahorro diario", "Solo el color", "La ubicacion del almacen"]
+          }
+        },
+        {
+          id: "audio",
+          name: "Audio",
+          promise: "Sonido envolvente para complementar TV, videojuegos, peliculas y musica.",
+          features: [
+            ["Argumento clave", "Una barra mejora claridad, potencia e inmersion frente al audio del TV."],
+            ["Cliente ideal", "Compradores de TV, gamers y usuarios de entretenimiento."],
+            ["Demo sugerida", "Usar una escena con dialogo, bajos y efectos."],
+            ["Cierre", "Proponer combo TV + audio para elevar experiencia."]
+          ],
+          quiz: {
+            question: "Cuando conviene ofrecer audio?",
+            answer: "Cuando el cliente busca mejorar entretenimiento",
+            options: ["Cuando el cliente busca mejorar entretenimiento", "Solo cuando no hay TV", "Solo en linea blanca"]
+          }
+        },
+        {
+          id: "monitores",
+          name: "Monitores",
+          promise: "Productividad, gaming y creacion con foco en fluidez, color y espacio de trabajo.",
+          features: [
+            ["Argumento clave", "Recomendar por uso: gaming, multitarea, estudio u oficina."],
+            ["Cliente ideal", "Gamers, estudiantes, oficinas y creadores de contenido."],
+            ["Demo sugerida", "Mostrar tasa de refresco, resolucion o formato UltraWide."],
+            ["Cierre", "No vender solo pulgadas; vender beneficio por actividad."]
+          ],
+          quiz: {
+            question: "Que define la recomendacion de un monitor?",
+            answer: "El uso principal del cliente",
+            options: ["El uso principal del cliente", "El color de la caja", "La distancia al almacen"]
+          }
+        }
+      ];
+
+      let state = loadState();
+      let syncTimer = 0;
+      let syncInFlight = null;
+
+      const els = {
+        loginScreen: document.querySelector("#loginScreen"),
+        appHeader: document.querySelector("#appHeader"),
+        appShell: document.querySelector("#appShell"),
+        loginForm: document.querySelector("#loginForm"),
+        loginEmail: document.querySelector("#loginEmail"),
+        loginPassword: document.querySelector("#loginPassword"),
+        loginMessage: document.querySelector("#loginMessage"),
+        toggleRecovery: document.querySelector("#toggleRecovery"),
+        recoveryBox: document.querySelector("#recoveryBox"),
+        recoveryEmail: document.querySelector("#recoveryEmail"),
+        recoverySubmit: document.querySelector("#recoverySubmit"),
+        recoveryMessage: document.querySelector("#recoveryMessage"),
+        registrationForm: document.querySelector("#registrationForm"),
+        regName: document.querySelector("#regName"),
+        regEmail: document.querySelector("#regEmail"),
+        regZone: document.querySelector("#regZone"),
+        regRole: document.querySelector("#regRole"),
+        coordinatorCodeWrap: document.querySelector("#coordinatorCodeWrap"),
+        coordinatorCode: document.querySelector("#coordinatorCode"),
+        regPassword: document.querySelector("#regPassword"),
+        registrationMessage: document.querySelector("#registrationMessage"),
+        sessionName: document.querySelector("#sessionName"),
+        sessionRole: document.querySelector("#sessionRole"),
+        logoutButton: document.querySelector("#logoutButton"),
+        todayLabel: document.querySelector("#todayLabel"),
+        progressPercent: document.querySelector("#progressPercent"),
+        progressBar: document.querySelector("#progressBar"),
+        pendingCount: document.querySelector("#pendingCount"),
+        reviewCount: document.querySelector("#reviewCount"),
+        doneCount: document.querySelector("#doneCount"),
+        trainerCount: document.querySelector("#trainerCount"),
+        dailyMotivation: document.querySelector("#dailyMotivation"),
+        editMotivation: document.querySelector("#editMotivation"),
+        motivationForm: document.querySelector("#motivationForm"),
+        motivationInput: document.querySelector("#motivationInput"),
+        cancelMotivation: document.querySelector("#cancelMotivation"),
+        coordinatorDayPanel: document.querySelector("#coordinatorDayPanel"),
+        trainerWeekPanel: document.querySelector("#trainerWeekPanel"),
+        prevDay: document.querySelector("#prevDay"),
+        todayDay: document.querySelector("#todayDay"),
+        nextDay: document.querySelector("#nextDay"),
+        coordinatorDate: document.querySelector("#coordinatorDate"),
+        coordinatorDayLabel: document.querySelector("#coordinatorDayLabel"),
+        coordinatorDayRoster: document.querySelector("#coordinatorDayRoster"),
+        prevWeek: document.querySelector("#prevWeek"),
+        todayWeek: document.querySelector("#todayWeek"),
+        nextWeek: document.querySelector("#nextWeek"),
+        weekLabel: document.querySelector("#weekLabel"),
+        weeklySummary: document.querySelector("#weeklySummary"),
+        coordinatorTaskPanel: document.querySelector("#coordinatorTaskPanel"),
+        taskFormTitle: document.querySelector("#taskFormTitle"),
+        taskFormHelp: document.querySelector("#taskFormHelp"),
+        taskForm: document.querySelector("#taskForm"),
+        taskTitle: document.querySelector("#taskTitle"),
+        taskOwner: document.querySelector("#taskOwner"),
+        taskCategory: document.querySelector("#taskCategory"),
+        taskPriority: document.querySelector("#taskPriority"),
+        taskDueDate: document.querySelector("#taskDueDate"),
+        taskStartTime: document.querySelector("#taskStartTime"),
+        taskEndTime: document.querySelector("#taskEndTime"),
+        taskProduct: document.querySelector("#taskProduct"),
+        taskDescription: document.querySelector("#taskDescription"),
+        taskSubmitButton: document.querySelector("#taskSubmitButton"),
+        taskMessage: document.querySelector("#taskMessage"),
+        taskStatusFilter: document.querySelector("#taskStatusFilter"),
+        trainerFilterWrap: document.querySelector("#trainerFilterWrap"),
+        taskTrainerFilter: document.querySelector("#taskTrainerFilter"),
+        taskList: document.querySelector("#taskList"),
+        evidenceForm: document.querySelector("#evidenceForm"),
+        evidenceTask: document.querySelector("#evidenceTask"),
+        evidenceStore: document.querySelector("#evidenceStore"),
+        evidenceProduct: document.querySelector("#evidenceProduct"),
+        evidenceResult: document.querySelector("#evidenceResult"),
+        evidencePhoto: document.querySelector("#evidencePhoto"),
+        evidenceNotes: document.querySelector("#evidenceNotes"),
+        evidenceMessage: document.querySelector("#evidenceMessage"),
+        cloudPlanPanel: document.querySelector("#cloudPlanPanel"),
+        evidenceFilters: document.querySelector("#evidenceFilters"),
+        evidenceTrainerFilter: document.querySelector("#evidenceTrainerFilter"),
+        evidenceDateFilter: document.querySelector("#evidenceDateFilter"),
+        clearEvidenceFilters: document.querySelector("#clearEvidenceFilters"),
+        evidenceList: document.querySelector("#evidenceList"),
+        coordinatorTeamPanel: document.querySelector("#coordinatorTeamPanel"),
+        createTrainerForm: document.querySelector("#createTrainerForm"),
+        newTrainerName: document.querySelector("#newTrainerName"),
+        newTrainerEmail: document.querySelector("#newTrainerEmail"),
+        newTrainerZone: document.querySelector("#newTrainerZone"),
+        newTrainerPassword: document.querySelector("#newTrainerPassword"),
+        trainerMessage: document.querySelector("#trainerMessage"),
+        pendingRegistrations: document.querySelector("#pendingRegistrations"),
+        passwordRecoveryList: document.querySelector("#passwordRecoveryList"),
+        teamList: document.querySelector("#teamList"),
+        backupTools: document.querySelector("#backupTools"),
+        exportData: document.querySelector("#exportData"),
+        importData: document.querySelector("#importData"),
+        coordinatorAnnouncementPanel: document.querySelector("#coordinatorAnnouncementPanel"),
+        announcementForm: document.querySelector("#announcementForm"),
+        announcementTitle: document.querySelector("#announcementTitle"),
+        announcementAudience: document.querySelector("#announcementAudience"),
+        announcementTargetWrap: document.querySelector("#announcementTargetWrap"),
+        announcementTarget: document.querySelector("#announcementTarget"),
+        announcementPriority: document.querySelector("#announcementPriority"),
+        announcementBody: document.querySelector("#announcementBody"),
+        announcementList: document.querySelector("#announcementList"),
+        reassignDialog: document.querySelector("#reassignDialog"),
+        reassignForm: document.querySelector("#reassignForm"),
+        reassignTaskLabel: document.querySelector("#reassignTaskLabel"),
+        reassignOwner: document.querySelector("#reassignOwner"),
+        reassignReason: document.querySelector("#reassignReason"),
+        reassignMessage: document.querySelector("#reassignMessage"),
+        cancelReassign: document.querySelector("#cancelReassign"),
+        scheduleDialog: document.querySelector("#scheduleDialog"),
+        scheduleForm: document.querySelector("#scheduleForm"),
+        scheduleTaskLabel: document.querySelector("#scheduleTaskLabel"),
+        scheduleDate: document.querySelector("#scheduleDate"),
+        scheduleStartTime: document.querySelector("#scheduleStartTime"),
+        scheduleEndTime: document.querySelector("#scheduleEndTime"),
+        scheduleReason: document.querySelector("#scheduleReason"),
+        scheduleMessage: document.querySelector("#scheduleMessage"),
+        cancelSchedule: document.querySelector("#cancelSchedule"),
+        productTabs: document.querySelector("#productTabs"),
+        productInfo: document.querySelector("#productInfo"),
+        quizBox: document.querySelector("#quizBox")
+      };
+
+      function loadState() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+          return normalizeState({
+            ...structuredClone(initialState),
+            selectedProduct: saved.selectedProduct || initialState.selectedProduct,
+            selectedWeekStart: saved.selectedWeekStart || "",
+            selectedCoordinatorDate: saved.selectedCoordinatorDate || ""
+          });
+        } catch {
+          return structuredClone(initialState);
+        }
+      }
+
+      function normalizeState(nextState) {
+        nextState.users = nextState.users?.length ? nextState.users : structuredClone(initialState.users);
+        nextState.registrationRequests = nextState.registrationRequests || [];
+        nextState.passwordRecoveryRequests = nextState.passwordRecoveryRequests || [];
+        nextState.tasks = (nextState.tasks || []).map((task) => ({
+          ...task,
+          startTime: task.startTime || "08:30",
+          endTime: task.endTime || "09:30"
+        }));
+        nextState.announcements = nextState.announcements || [];
+        nextState.supportRequests = nextState.supportRequests || [];
+        nextState.dailyMotivations = nextState.dailyMotivations || [];
+        nextState.selectedWeekStart = nextState.selectedWeekStart || weekStartIso(todayIso);
+        nextState.selectedCoordinatorDate = nextState.selectedCoordinatorDate || nearestWorkingDay(todayIso);
+        return nextState;
+      }
+
+      function saveState() {
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({
+            selectedProduct: state.selectedProduct,
+            selectedWeekStart: state.selectedWeekStart,
+            selectedCoordinatorDate: state.selectedCoordinatorDate
+          })
+        );
+        if (!state.activeUserId) return;
+        window.clearTimeout(syncTimer);
+        syncTimer = window.setTimeout(() => {
+          syncState().catch((error) => console.error("No se pudo sincronizar", error));
+        }, 150);
+      }
+
+      async function apiRequest(path, options = {}) {
+        const response = await fetch(`${API_BASE}${path}`, {
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+          ...options
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const error = new Error(data.message || `No se pudo conectar con la nube (HTTP ${response.status}).`);
+          error.status = response.status;
+          throw error;
+        }
+        return data;
+      }
+
+      function applyCloudState(nextState) {
+        const selectedProduct = state.selectedProduct;
+        const selectedWeekStart = state.selectedWeekStart;
+        const selectedCoordinatorDate = state.selectedCoordinatorDate;
+        state = normalizeState({
+          ...structuredClone(initialState),
+          ...nextState,
+          selectedProduct,
+          selectedWeekStart: selectedWeekStart || nextState.selectedWeekStart,
+          selectedCoordinatorDate: selectedCoordinatorDate || nextState.selectedCoordinatorDate
+        });
+      }
+
+      async function refreshStateFromServer({ quiet = false } = {}) {
+        try {
+          const data = await apiRequest("/state");
+          applyCloudState(data.state);
+          if (!quiet) render();
+          return true;
+        } catch (error) {
+          if (error.status === 401) {
+            state.activeUserId = "";
+            state.users = [];
+            state.tasks = [];
+            if (!quiet) render();
+            return false;
+          }
+          if (!quiet) setMessage(els.loginMessage, error.message, "err");
+          return false;
+        }
+      }
+
+      async function syncState() {
+        if (!state.activeUserId) return;
+        if (syncInFlight) return syncInFlight;
+        const snapshot = JSON.parse(JSON.stringify(state));
+        syncInFlight = apiRequest("/state", { method: "PUT", body: JSON.stringify({ state: snapshot }) })
+          .then((data) => {
+            applyCloudState(data.state);
+            render();
+          })
+          .finally(() => {
+            syncInFlight = null;
+          });
+        return syncInFlight;
+      }
+
+      function id() {
+        return crypto.randomUUID ? crypto.randomUUID() : `id-${Date.now()}-${Math.round(Math.random() * 9999)}`;
+      }
+
+      function clean(value) {
+        return String(value || "").trim();
+      }
+
+      function escapeHtml(value) {
+        return String(value || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function activeUser() {
+        return state.users.find((user) => user.id === state.activeUserId) || null;
+      }
+
+      function isCoordinator() {
+        return activeUser()?.role === "Coordinador";
+      }
+
+      function trainers() {
+        return state.users.filter((user) => user.role === "Trainer" && user.status === "Activo");
+      }
+
+      function assignableUsers() {
+        const current = activeUser();
+        const people = trainers();
+        if (isCoordinator() && current && !people.some((user) => user.id === current.id)) {
+          return [current, ...people];
+        }
+        return people;
+      }
+
+      function userName(userId) {
+        return state.users.find((user) => user.id === userId)?.name || "Sin usuario";
+      }
+
+      function setMessage(element, text, type = "") {
+        element.textContent = text;
+        element.className = `message ${type}`.trim();
+      }
+
+      function fillSelect(select, options, selected = "") {
+        select.innerHTML = "";
+        options.forEach((option) => {
+          const node = document.createElement("option");
+          node.value = option.value;
+          node.textContent = option.label;
+          if (option.value === selected) node.selected = true;
+          select.appendChild(node);
+        });
+      }
+
+      function taskStatusClass(status) {
+        if (status === "Cumplida") return "approved";
+        if (status === "Observada") return "observed";
+        if (status === "No disponible") return "observed";
+        if (status === "En revision") return "review";
+        if (status === "En proceso") return "process";
+        return "pending";
+      }
+
+      function priorityClass(priority) {
+        if (priority === "Alta") return "high";
+        if (priority === "Media") return "medium";
+        return "";
+      }
+
+      function formatDate(dateValue) {
+        if (!dateValue) return "Sin fecha";
+        return new Intl.DateTimeFormat("es-PE", { day: "2-digit", month: "short" }).format(new Date(`${dateValue}T12:00:00`));
+      }
+
+      function timeToMinutes(value) {
+        const [hours, minutes] = String(value || "00:00").split(":").map(Number);
+        return hours * 60 + minutes;
+      }
+
+      function minutesToTime(value) {
+        return `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
+      }
+
+      function isSaturday(dateValue) {
+        return new Date(`${dateValue}T12:00:00`).getDay() === 6;
+      }
+
+      function workScheduleForDate(dateValue) {
+        const saturday = isSaturday(dateValue);
+        return {
+          start: WORKDAY_START,
+          end: saturday ? SATURDAY_END : WEEKDAY_END,
+          hasBreak: !saturday,
+          breakStart: BREAK_START,
+          breakEnd: BREAK_END
+        };
+      }
+
+      function scheduleSlotsForDate(dateValue) {
+        const schedule = workScheduleForDate(dateValue);
+        return Math.ceil((timeToMinutes(schedule.end) - timeToMinutes(schedule.start)) / 30);
+      }
+
+      function overlapsBreak(dateValue, startTime, endTime) {
+        const schedule = workScheduleForDate(dateValue);
+        if (!schedule.hasBreak) return false;
+        return timeToMinutes(startTime) < timeToMinutes(schedule.breakEnd) && timeToMinutes(endTime) > timeToMinutes(schedule.breakStart);
+      }
+
+      function validateTaskSchedule(dateValue, startTime, endTime) {
+        if (!dateValue || isSunday(dateValue)) return "No se asignan tareas los domingos.";
+        const schedule = workScheduleForDate(dateValue);
+        if (
+          timeToMinutes(startTime) < timeToMinutes(schedule.start) ||
+          timeToMinutes(endTime) > timeToMinutes(schedule.end) ||
+          timeToMinutes(endTime) <= timeToMinutes(startTime)
+        ) {
+          return `El horario del dia debe estar entre ${schedule.start} y ${schedule.end}, con cierre posterior al inicio.`;
+        }
+        if (overlapsBreak(dateValue, startTime, endTime)) {
+          return `El break de lunes a viernes es de ${BREAK_START} a ${BREAK_END}. Elige un horario fuera de ese bloque.`;
+        }
+        return "";
+      }
+
+      function applyTimeInputLimits(dateValue, startInput, endInput) {
+        const schedule = workScheduleForDate(dateValue || todayIso);
+        startInput.min = schedule.start;
+        startInput.max = minutesToTime(timeToMinutes(schedule.end) - 15);
+        endInput.min = minutesToTime(timeToMinutes(schedule.start) + 15);
+        endInput.max = schedule.end;
+        if (timeToMinutes(startInput.value) > timeToMinutes(startInput.max)) startInput.value = schedule.start;
+        if (timeToMinutes(endInput.value) > timeToMinutes(schedule.end)) endInput.value = schedule.end;
+      }
+
+      function taskTimeLabel(task) {
+        return `${task.startTime || WORKDAY_START} - ${task.endTime || "09:30"}`;
+      }
+
+      function hasScheduleConflict(ownerId, dateValue, startTime, endTime, excludeTaskId = "") {
+        const start = timeToMinutes(startTime);
+        const end = timeToMinutes(endTime);
+        return state.tasks.some((task) => {
+          if (task.id === excludeTaskId || task.ownerId !== ownerId || task.dueDate !== dateValue || task.status === "No disponible") return false;
+          const taskStart = timeToMinutes(task.startTime || WORKDAY_START);
+          const taskEnd = timeToMinutes(task.endTime || "09:30");
+          return start < taskEnd && end > taskStart;
+        });
+      }
+
+      function formatShortDate(dateValue) {
+        return new Intl.DateTimeFormat("es-PE", { weekday: "short", day: "2-digit", month: "short" }).format(new Date(`${dateValue}T12:00:00`));
+      }
+
+      function formatDateTime(value) {
+        return new Intl.DateTimeFormat("es-PE", {
+          day: "2-digit",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit"
+        }).format(new Date(value));
+      }
+
+      function dateIsoInLima(value) {
+        const parts = Object.fromEntries(
+          new Intl.DateTimeFormat("en", {
+            timeZone: "America/Lima",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit"
+          })
+            .formatToParts(new Date(value))
+            .filter((part) => part.type !== "literal")
+            .map((part) => [part.type, part.value])
+        );
+        return `${parts.year}-${parts.month}-${parts.day}`;
+      }
+
+      function addDaysIso(dateValue, days) {
+        const date = new Date(`${dateValue}T12:00:00`);
+        date.setDate(date.getDate() + days);
+        return date.toISOString().slice(0, 10);
+      }
+
+      function isSunday(dateValue) {
+        return new Date(`${dateValue}T12:00:00`).getDay() === 0;
+      }
+
+      function nearestWorkingDay(dateValue) {
+        return isSunday(dateValue) ? addDaysIso(dateValue, 1) : dateValue;
+      }
+
+      function addWorkingDays(dateValue, direction) {
+        let next = addDaysIso(dateValue, direction);
+        while (isSunday(next)) next = addDaysIso(next, direction);
+        return next;
+      }
+
+      function weekStartIso(dateValue) {
+        const date = new Date(`${dateValue}T12:00:00`);
+        const day = date.getDay() || 7;
+        date.setDate(date.getDate() - day + 1);
+        return date.toISOString().slice(0, 10);
+      }
+
+      function selectedWeekDates() {
+        const start = state.selectedWeekStart || weekStartIso(todayIso);
+        return Array.from({ length: 6 }, (_, index) => addDaysIso(start, index));
+      }
+
+      function isoWeekNumber(dateValue) {
+        const date = new Date(`${dateValue}T12:00:00Z`);
+        const day = date.getUTCDay() || 7;
+        date.setUTCDate(date.getUTCDate() + 4 - day);
+        const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+        return Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
+      }
+
+      function dailyMotivationText(dateValue = todayIso) {
+        const custom = state.dailyMotivations.find((item) => item.date === dateValue);
+        if (custom?.text) return custom.text;
+        const seed = Number(dateValue.replaceAll("-", ""));
+        return dailyQuotes[seed % dailyQuotes.length];
+      }
+
+      function historyEntryText(entry) {
+        if (entry.type === "Reasignacion") {
+          return `${userName(entry.byId || entry.fromId)} reasigno de ${userName(entry.fromId)} a ${userName(entry.toId)}. Motivo: ${entry.reason || "Sin detalle"}`;
+        }
+        if (entry.type === "Reprogramacion") {
+          const before = `${formatDate(entry.fromDate)} ${entry.fromStartTime || ""}-${entry.fromEndTime || ""}`;
+          const after = `${formatDate(entry.toDate)} ${entry.toStartTime || ""}-${entry.toEndTime || ""}`;
+          return `${userName(entry.byId)} movio el horario de ${before} a ${after}. Motivo: ${entry.reason || "Sin detalle"}`;
+        }
+        if (entry.type === "Bloqueo") return `${userName(entry.fromId)} reporto una dificultad: ${entry.reason || "Sin detalle"}`;
+        return `${entry.type || "Actualizacion"}${entry.reason ? `: ${entry.reason}` : ""}`;
+      }
+
+      function taskHistoryMarkup(task) {
+        const entries = task.history || [];
+        if (!entries.length) return "";
+        return `
+          <details class="task-history note">
+            <summary>Historial (${entries.length})</summary>
+            <ol class="history-list">
+              ${entries
+                .slice()
+                .reverse()
+                .map((entry) => `<li>${escapeHtml(historyEntryText(entry))} | ${formatDateTime(entry.at)}</li>`)
+                .join("")}
+            </ol>
+          </details>
+        `;
+      }
+
+      function folderSafe(value) {
+        return clean(value)
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[\\/:*?"<>|#%{}~&]/g, "-")
+          .replace(/\s+/g, " ")
+          .slice(0, 70) || "sin-dato";
+      }
+
+      function cloudFolderForEvidence(evidence, task) {
+        const date = dateIsoInLima(evidence.submittedAt || Date.now());
+        return `LG Task Hub / Sustentos / ${date} / ${folderSafe(userName(evidence.submittedById))} / ${folderSafe(task.title)}`;
+      }
+
+      function recoveryMailLink(user, tempPassword) {
+        const subject = encodeURIComponent("Recuperacion de clave - LG Task Hub");
+        const body = encodeURIComponent(
+          `Hola ${user.name},\n\nSe genero una clave temporal para ingresar a LGTASK.\n\nCorreo: ${user.email}\nClave temporal: ${tempPassword}\n\nIngresa a https://lgtask.pages.dev/ con estos datos.\n\nMensaje enviado por coordinacion LG.`
+        );
+        return `mailto:${encodeURIComponent(user.email)}?subject=${subject}&body=${body}`;
+      }
+
+      function emptyState(title, detail) {
+        return `<div class="empty"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(detail || "")}</p></div>`;
+      }
+
+      function activateView(viewId) {
+        const allowedViews = ["tasksView", "evidenceView", "teamView", "announcementsView", "infoView"];
+        if (!allowedViews.includes(viewId)) return;
+        document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item.dataset.view === viewId));
+        document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === viewId));
+      }
+
+      function render() {
+        const user = activeUser();
+        const logged = Boolean(user);
+        els.loginScreen.classList.toggle("hidden", logged);
+        els.appHeader.classList.toggle("hidden", !logged);
+        els.appShell.classList.toggle("hidden", !logged);
+
+        if (!logged) return;
+
+        els.sessionName.textContent = user.name;
+        els.sessionRole.textContent = user.role;
+        els.todayLabel.textContent = new Intl.DateTimeFormat("es-PE", {
+          weekday: "long",
+          day: "2-digit",
+          month: "long"
+        }).format(new Date());
+
+        els.coordinatorTaskPanel.classList.remove("hidden");
+        els.coordinatorDayPanel.classList.toggle("hidden", !isCoordinator());
+        els.trainerWeekPanel.classList.toggle("hidden", isCoordinator());
+        els.trainerFilterWrap.classList.toggle("hidden", !isCoordinator());
+        els.coordinatorTeamPanel.classList.toggle("hidden", !isCoordinator());
+        els.backupTools.classList.toggle("hidden", !isCoordinator());
+        els.coordinatorAnnouncementPanel.classList.toggle("hidden", !isCoordinator());
+        els.cloudPlanPanel.classList.toggle("hidden", !isCoordinator());
+        els.evidenceFilters.classList.toggle("hidden", !isCoordinator());
+        els.editMotivation.classList.toggle("hidden", !isCoordinator());
+        if (!isCoordinator()) els.motivationForm.classList.add("hidden");
+        els.taskFormTitle.textContent = isCoordinator() ? "Asignar tarea" : "Agregar mi tarea";
+        els.taskFormHelp.textContent = isCoordinator()
+          ? "Pablo puede asignar tareas a cualquier trainer o a si mismo."
+          : "Organiza tus propias tareas de la semana. Solo puedes asignarlas a tu usuario.";
+        els.taskSubmitButton.textContent = isCoordinator() ? "Asignar tarea" : "Agregar a mi semana";
+        els.taskOwner.disabled = !isCoordinator();
+        activateView(new URLSearchParams(window.location.search).get("view") || document.querySelector(".tab.active")?.dataset.view || "tasksView");
+
+        refreshSelects();
+        renderMotivation();
+        renderDashboard();
+        renderCoordinatorDay();
+        renderTrainerWeek();
+        renderTasks();
+        renderEvidence();
+        renderTeam();
+        renderAnnouncements();
+        renderProducts();
+      }
+
+      function renderMotivation() {
+        els.dailyMotivation.textContent = dailyMotivationText();
+      }
+
+      function refreshSelects() {
+        const trainerOptions = trainers().map((trainer) => ({ value: trainer.id, label: `${trainer.name} - ${trainer.zone}` }));
+        const taskPeople = isCoordinator() ? assignableUsers() : [activeUser()].filter(Boolean);
+        const assignableOptions = taskPeople.map((user) => ({ value: user.id, label: `${user.name} - ${user.role === "Coordinador" ? "Coordinador" : user.zone}` }));
+        fillSelect(els.taskOwner, assignableOptions, els.taskOwner.value);
+        fillSelect(els.taskTrainerFilter, [{ value: "all", label: "Todo el equipo y coordinador" }, ...assignableOptions], els.taskTrainerFilter.value || "all");
+        fillSelect(els.announcementTarget, trainerOptions, els.announcementTarget.value);
+        fillSelect(
+          els.evidenceTrainerFilter,
+          [{ value: "all", label: "Todos los trainers" }, ...trainerOptions],
+          els.evidenceTrainerFilter.value || "all"
+        );
+
+        const availableTasks = state.tasks
+          .filter(
+            (task) =>
+              !isCoordinator() &&
+              task.ownerId === state.activeUserId &&
+              (task.status === "En proceso" || task.status === "Observada")
+          )
+          .map((task) => ({ value: task.id, label: `${task.title} (${formatDate(task.dueDate)} | ${taskTimeLabel(task)})` }));
+        fillSelect(els.evidenceTask, availableTasks, els.evidenceTask.value);
+        els.taskDueDate.value = els.taskDueDate.value || nearestWorkingDay(todayIso);
+        els.taskStartTime.value = els.taskStartTime.value || WORKDAY_START;
+        els.taskEndTime.value = els.taskEndTime.value || "09:30";
+        applyTimeInputLimits(els.taskDueDate.value, els.taskStartTime, els.taskEndTime);
+        if (!isCoordinator()) els.taskOwner.value = state.activeUserId;
+      }
+
+      function relevantTasks() {
+        return isCoordinator() ? state.tasks : state.tasks.filter((task) => task.ownerId === state.activeUserId);
+      }
+
+      function filteredTasks() {
+        const status = els.taskStatusFilter.value;
+        const trainer = els.taskTrainerFilter.value || "all";
+        return relevantTasks()
+          .filter((task) => status === "all" || task.status === status)
+          .filter((task) => !isCoordinator() || trainer === "all" || task.ownerId === trainer)
+          .sort((a, b) => b.dueDate.localeCompare(a.dueDate) || (a.startTime || WORKDAY_START).localeCompare(b.startTime || WORKDAY_START));
+      }
+
+      function trainerWorkloadOnDate(trainerId, dateValue, excludeTaskId = "") {
+        return state.tasks.filter((task) => {
+          if (task.id === excludeTaskId) return false;
+          if (task.ownerId !== trainerId || task.dueDate !== dateValue) return false;
+          return task.status !== "Cumplida" && task.status !== "No disponible";
+        }).length;
+      }
+
+      function availableTrainersForTask(task) {
+        return trainers()
+          .filter((trainer) => trainer.id !== task.ownerId)
+          .map((trainer) => ({
+            ...trainer,
+            workload: trainerWorkloadOnDate(trainer.id, task.dueDate, task.id)
+          }))
+          .sort((a, b) => a.workload - b.workload || a.name.localeCompare(b.name));
+      }
+
+      function canReassignTask(task) {
+        return Boolean(task && task.status !== "Cumplida" && (isCoordinator() || task.ownerId === state.activeUserId));
+      }
+
+      function openReassignDialog(taskId) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        if (!canReassignTask(task)) return;
+        const options = availableTrainersForTask(task).map((trainer) => ({
+          value: trainer.id,
+          label: `${trainer.name} (${trainer.workload} tareas ese dia)`
+        }));
+        if (!options.length) {
+          window.alert("No hay otro trainer activo disponible para reasignar.");
+          return;
+        }
+        els.reassignForm.dataset.taskId = task.id;
+        els.reassignTaskLabel.textContent = `${task.title} | ${formatDate(task.dueDate)} | ${taskTimeLabel(task)}`;
+        fillSelect(els.reassignOwner, options, options[0].value);
+        els.reassignReason.value = task.blockedReason || "";
+        setMessage(els.reassignMessage, "", "");
+        els.reassignDialog.showModal();
+      }
+
+      function reassignTask(taskId, newOwnerId, reason) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        const nextOwner = state.users.find((user) => user.id === newOwnerId && user.role === "Trainer" && user.status === "Activo");
+        if (!canReassignTask(task) || !nextOwner || !clean(reason)) return false;
+        if (hasScheduleConflict(newOwnerId, task.dueDate, task.startTime, task.endTime, task.id)) {
+          setMessage(els.reassignMessage, `${nextOwner.name} ya tiene una tarea entre ${taskTimeLabel(task)}.`, "err");
+          return false;
+        }
+        const previousOwnerId = task.ownerId;
+        task.history = task.history || [];
+        task.history.push({
+          type: "Reasignacion",
+          fromId: previousOwnerId,
+          toId: newOwnerId,
+          reason: clean(reason),
+          byId: state.activeUserId,
+          at: Date.now()
+        });
+        task.ownerId = newOwnerId;
+        task.status = "Pendiente";
+        task.blockedReason = "";
+        task.blockedAt = "";
+        saveState();
+        render();
+        return true;
+      }
+
+      function renderReassignControl(container, task) {
+        if (!canReassignTask(task) || !availableTrainersForTask(task).length) return;
+        const button = document.createElement("button");
+        button.className = "small";
+        button.type = "button";
+        button.textContent = "Reasignar";
+        button.addEventListener("click", () => openReassignDialog(task.id));
+        container.appendChild(button);
+      }
+
+      function canRescheduleTask(task) {
+        return Boolean(task && task.status !== "Cumplida" && (isCoordinator() || task.ownerId === state.activeUserId));
+      }
+
+      function openScheduleDialog(taskId) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        if (!canRescheduleTask(task)) return;
+        els.scheduleForm.dataset.taskId = task.id;
+        els.scheduleTaskLabel.textContent = `${task.title} | Horario actual: ${formatDate(task.dueDate)} ${taskTimeLabel(task)}`;
+        els.scheduleDate.value = task.dueDate;
+        els.scheduleStartTime.value = task.startTime || WORKDAY_START;
+        els.scheduleEndTime.value = task.endTime || "09:30";
+        applyTimeInputLimits(task.dueDate, els.scheduleStartTime, els.scheduleEndTime);
+        els.scheduleReason.value = "";
+        setMessage(els.scheduleMessage, "", "");
+        els.scheduleDialog.showModal();
+      }
+
+      function rescheduleTask(taskId, dateValue, startTime, endTime, reason) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        if (!canRescheduleTask(task)) return false;
+        const scheduleError = validateTaskSchedule(dateValue, startTime, endTime);
+        if (scheduleError) {
+          setMessage(els.scheduleMessage, scheduleError, "err");
+          return false;
+        }
+        if (!clean(reason)) {
+          setMessage(els.scheduleMessage, "Indica el motivo del cambio de horario.", "err");
+          return false;
+        }
+        if (hasScheduleConflict(task.ownerId, dateValue, startTime, endTime, task.id)) {
+          setMessage(els.scheduleMessage, "Ya existe otra tarea en ese horario.", "err");
+          return false;
+        }
+        if (task.dueDate === dateValue && task.startTime === startTime && task.endTime === endTime) {
+          setMessage(els.scheduleMessage, "Elige una fecha u horario diferente.", "err");
+          return false;
+        }
+        task.history = task.history || [];
+        task.history.push({
+          type: "Reprogramacion",
+          fromDate: task.dueDate,
+          toDate: dateValue,
+          fromStartTime: task.startTime || WORKDAY_START,
+          fromEndTime: task.endTime || "09:30",
+          toStartTime: startTime,
+          toEndTime: endTime,
+          reason: clean(reason),
+          byId: state.activeUserId,
+          at: Date.now()
+        });
+        task.dueDate = dateValue;
+        task.startTime = startTime;
+        task.endTime = endTime;
+        saveState();
+        render();
+        return true;
+      }
+
+      function renderScheduleControl(container, task) {
+        if (!canRescheduleTask(task)) return;
+        const button = document.createElement("button");
+        button.className = "small";
+        button.type = "button";
+        button.textContent = "Mover horario";
+        button.addEventListener("click", () => openScheduleDialog(task.id));
+        container.appendChild(button);
+      }
+
+      function markTaskBlocked(taskId) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        if (!task || isCoordinator()) return;
+        document.querySelector('[data-view="evidenceView"]').click();
+        els.evidenceTask.value = task.id;
+        els.evidenceResult.value = "No se pudo cumplir";
+        els.evidenceNotes.focus();
+        setMessage(els.evidenceMessage, "Escribe el motivo. Pablo vera este feedback para reasignar o dar seguimiento.", "err");
+      }
+
+      function focusTaskFormForDate(dateValue) {
+        els.taskDueDate.value = dateValue;
+        els.taskStartTime.value = WORKDAY_START;
+        els.taskEndTime.value = "09:30";
+        applyTimeInputLimits(dateValue, els.taskStartTime, els.taskEndTime);
+        if (!isCoordinator()) els.taskOwner.value = state.activeUserId;
+        els.taskTitle.focus();
+        setMessage(
+          els.taskMessage,
+          isCoordinator()
+            ? `Nueva tarea para ${formatDate(dateValue)}. Define responsable y horario.`
+            : `Nueva tarea personal para ${formatDate(dateValue)}.`,
+          "ok"
+        );
+        els.coordinatorTaskPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      function scheduleAxisMarkup(dateValue) {
+        const start = timeToMinutes(WORKDAY_START);
+        return Array.from({ length: scheduleSlotsForDate(dateValue) }, (_, index) => {
+          const total = start + index * 30;
+          const label = `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+          return `<span>${index % 2 === 0 ? label : ""}</span>`;
+        }).join("");
+      }
+
+      function scheduleBreakMarkup(dateValue) {
+        const schedule = workScheduleForDate(dateValue);
+        if (!schedule.hasBreak) return "";
+        const startColumn = Math.floor((timeToMinutes(schedule.breakStart) - timeToMinutes(schedule.start)) / 30) + 1;
+        const span = Math.ceil((timeToMinutes(schedule.breakEnd) - timeToMinutes(schedule.breakStart)) / 30);
+        return `<span class="schedule-break" style="grid-column: ${startColumn} / span ${span}">BREAK<br>${schedule.breakStart}-${schedule.breakEnd}</span>`;
+      }
+
+      function renderCoordinatorDay() {
+        if (!isCoordinator()) return;
+        const dateValue = nearestWorkingDay(state.selectedCoordinatorDate || todayIso);
+        const schedule = workScheduleForDate(dateValue);
+        const scheduleSlots = scheduleSlotsForDate(dateValue);
+        state.selectedCoordinatorDate = dateValue;
+        els.coordinatorDate.value = dateValue;
+        els.coordinatorDayLabel.textContent = `${formatShortDate(dateValue)} | Week ${isoWeekNumber(dateValue)} | ${schedule.start} - ${schedule.end}${schedule.hasBreak ? ` | Break ${schedule.breakStart} - ${schedule.breakEnd}` : " | Sin break"}`;
+        els.coordinatorDayRoster.innerHTML = `
+          <div class="roster-head">
+            <span>TRAINER / ZONA</span>
+            <div class="schedule-axis" style="--schedule-slots: ${scheduleSlots}">${scheduleAxisMarkup(dateValue)}</div>
+            <span>AVANCE</span>
+          </div>
+        `;
+
+        assignableUsers().forEach((person) => {
+          const tasks = state.tasks
+            .filter((task) => task.ownerId === person.id && task.dueDate === dateValue)
+            .sort((a, b) => (a.startTime || WORKDAY_START).localeCompare(b.startTime || WORKDAY_START));
+          const done = tasks.filter((task) => task.status === "Cumplida").length;
+          const percent = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+          const row = document.createElement("div");
+          row.className = "roster-row";
+          row.innerHTML = `
+            <div class="roster-person">
+              <strong>${escapeHtml(person.name)}</strong>
+              <span>${escapeHtml(person.role === "Coordinador" ? "Coordinador" : person.zone || "Sin zona")}</span>
+              <button class="small" type="button">+ Tarea</button>
+            </div>
+            <div class="schedule-track" style="--schedule-slots: ${scheduleSlots}">${scheduleBreakMarkup(dateValue)}</div>
+            <div class="roster-progress"><strong>${percent}%</strong><span>${done}/${tasks.length} aprobadas</span></div>
+          `;
+          row.querySelector(".roster-person button").addEventListener("click", () => {
+            focusTaskFormForDate(dateValue);
+            els.taskOwner.value = person.id;
+          });
+          const track = row.querySelector(".schedule-track");
+          if (!tasks.length) {
+            track.innerHTML = `<span class="schedule-empty">Sin tareas programadas</span>`;
+            if (schedule.hasBreak) track.insertAdjacentHTML("afterbegin", scheduleBreakMarkup(dateValue));
+          } else {
+            tasks.forEach((task) => {
+              const start = Math.max(timeToMinutes(WORKDAY_START), timeToMinutes(task.startTime || WORKDAY_START));
+              const end = Math.min(timeToMinutes(schedule.end), timeToMinutes(task.endTime || "09:30"));
+              const startColumn = Math.max(1, Math.floor((start - timeToMinutes(WORKDAY_START)) / 30) + 1);
+              const span = Math.max(1, Math.ceil((end - start) / 30));
+              const block = document.createElement("button");
+              block.className = `schedule-task ${taskStatusClass(task.status)}`;
+              block.type = "button";
+              block.style.gridColumn = `${startColumn} / span ${Math.min(span, scheduleSlots + 1 - startColumn)}`;
+              block.innerHTML = `<strong>${escapeHtml(task.title)}</strong><span>${escapeHtml(taskTimeLabel(task))} | ${escapeHtml(task.status)}</span>`;
+              block.addEventListener("click", () => {
+                els.taskStatusFilter.value = "all";
+                els.taskTrainerFilter.value = task.ownerId;
+                renderTasks();
+                els.taskList.scrollIntoView({ behavior: "smooth", block: "start" });
+              });
+              track.appendChild(block);
+            });
+          }
+          els.coordinatorDayRoster.appendChild(row);
+        });
+      }
+
+      function openEvidenceForTask(task) {
+        document.querySelector('[data-view="evidenceView"]').click();
+        els.evidenceTask.value = task.id;
+        els.evidenceStore.focus();
+      }
+
+      function renderTrainerTaskActions(container, task) {
+        if (task.status === "Cumplida") {
+          const check = document.createElement("span");
+          check.className = "approval-check";
+          check.setAttribute("aria-label", "Tarea aprobada");
+          check.innerHTML = "&#10003;";
+          container.appendChild(check);
+          return;
+        }
+        if (task.status === "En revision") {
+          const note = document.createElement("span");
+          note.className = "review-note";
+          note.textContent = "Pendiente de revision de Pablo";
+          container.appendChild(note);
+          return;
+        }
+        if (task.status === "Pendiente") {
+          const startButton = document.createElement("button");
+          startButton.className = "primary";
+          startButton.type = "button";
+          startButton.textContent = "Iniciar";
+          startButton.addEventListener("click", () => {
+            task.status = "En proceso";
+            saveState();
+            render();
+          });
+          container.appendChild(startButton);
+        } else if (task.status === "En proceso" || task.status === "Observada") {
+          const evidenceButton = document.createElement("button");
+          evidenceButton.className = "primary";
+          evidenceButton.type = "button";
+          evidenceButton.textContent = "Enviar sustento";
+          evidenceButton.addEventListener("click", () => openEvidenceForTask(task));
+          container.appendChild(evidenceButton);
+        }
+        renderScheduleControl(container, task);
+        renderReassignControl(container, task);
+      }
+
+      function renderTrainerWeek() {
+        if (isCoordinator()) return;
+        const days = selectedWeekDates();
+        els.weekLabel.textContent = `Week ${isoWeekNumber(days[0])} | ${formatShortDate(days[0])} - ${formatShortDate(days[5])}`;
+        els.weeklySummary.innerHTML = "";
+        days.forEach((day) => {
+          const schedule = workScheduleForDate(day);
+          const tasks = state.tasks
+            .filter((task) => task.ownerId === state.activeUserId && task.dueDate === day)
+            .sort((a, b) => (a.startTime || WORKDAY_START).localeCompare(b.startTime || WORKDAY_START));
+          const column = document.createElement("article");
+          column.className = `day-column trainer-day-card ${day === todayIso ? "today" : ""}`;
+          column.innerHTML = `
+            <div class="day-head">
+              <strong>${formatShortDate(day)}</strong>
+              <div class="day-stats">
+                <span class="pill">${tasks.length} tareas</span>
+                <button class="small add-personal-task" type="button">+ Mi tarea</button>
+              </div>
+            </div>
+            <div class="workday-note">${schedule.start}-${schedule.end}${schedule.hasBreak ? ` | Break ${schedule.breakStart}-${schedule.breakEnd}` : " | Sin break"}</div>
+            <div class="day-tasks"></div>
+          `;
+          column.querySelector(".add-personal-task").addEventListener("click", () => focusTaskFormForDate(day));
+          const wrap = column.querySelector(".day-tasks");
+          if (!tasks.length) {
+            wrap.innerHTML = `<div class="empty"><strong>Dia libre</strong><p>Sin tareas asignadas.</p></div>`;
+          } else {
+            tasks.forEach((task) => {
+              const card = document.createElement("div");
+              card.className = `trainer-task-card ${task.status === "Cumplida" ? "approved" : ""}`;
+              card.innerHTML = `
+                <span class="trainer-task-time">${escapeHtml(taskTimeLabel(task))}</span>
+                <strong>${escapeHtml(task.title)}</strong>
+                <span class="muted">${escapeHtml(task.category)}${task.product ? ` | ${escapeHtml(task.product)}` : ""}</span>
+                <div class="actions"></div>
+              `;
+              renderTrainerTaskActions(card.querySelector(".actions"), task);
+              wrap.appendChild(card);
+            });
+          }
+          els.weeklySummary.appendChild(column);
+        });
+      }
+
+      function renderDashboard() {
+        const tasks = relevantTasks();
+        const done = tasks.filter((task) => task.status === "Cumplida").length;
+        const review = tasks.filter((task) => task.status === "En revision").length;
+        const pending = tasks.filter((task) => task.status === "Pendiente" || task.status === "En proceso" || task.status === "Observada" || task.status === "No disponible").length;
+        const percent = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+        els.progressPercent.textContent = `${percent}%`;
+        els.progressBar.style.width = `${percent}%`;
+        els.pendingCount.textContent = pending;
+        els.reviewCount.textContent = review;
+        els.doneCount.textContent = done;
+        els.trainerCount.textContent = trainers().length;
+      }
+
+      function renderTasks() {
+        const tasks = filteredTasks();
+        els.taskList.innerHTML = "";
+
+        if (!tasks.length) {
+          els.taskList.innerHTML = emptyState(
+            "No hay tareas para mostrar",
+            isCoordinator() ? "Asigna una tarea nueva a un trainer." : "Agrega tus tareas desde el calendario semanal o espera una asignacion de Pablo."
+          );
+          return;
+        }
+
+        tasks.forEach((task) => {
+          const card = document.createElement("article");
+          card.className = `item task-item ${task.status === "Cumplida" ? "is-approved" : ""}`;
+          const latestEvidence = task.evidence?.at(-1);
+          card.innerHTML = `
+            <div class="stack">
+              <div class="title-row">
+                <h3>${escapeHtml(task.title)}</h3>
+                ${!isCoordinator() && task.status === "Cumplida" ? "" : `<span class="pill ${taskStatusClass(task.status)}">${escapeHtml(task.status)}</span>`}
+                <span class="pill ${priorityClass(task.priority)}">${escapeHtml(task.priority)}</span>
+              </div>
+              <div class="meta">
+                <span>Trainer: ${escapeHtml(userName(task.ownerId))}</span>
+                <span>Fecha limite: ${formatDate(task.dueDate)}</span>
+                <span>Horario: ${escapeHtml(taskTimeLabel(task))}</span>
+                <span>${escapeHtml(task.category)}</span>
+                ${task.product ? `<span>Producto: ${escapeHtml(task.product)}</span>` : ""}
+              </div>
+              ${task.description ? `<p>${escapeHtml(task.description)}</p>` : ""}
+              ${task.blockedReason ? `<div class="note"><strong>No puede cumplir:</strong><p class="muted">${escapeHtml(task.blockedReason)}${task.blockedAt ? ` | ${formatDateTime(task.blockedAt)}` : ""}</p></div>` : ""}
+              ${taskHistoryMarkup(task)}
+              ${
+                latestEvidence
+                  ? `<div class="note"><strong>Ultimo sustento:</strong><p class="muted">${escapeHtml(latestEvidence.result)} | ${escapeHtml(latestEvidence.store)} | ${formatDateTime(latestEvidence.submittedAt)}</p></div>`
+                  : ""
+              }
+            </div>
+            <div class="actions"></div>
+          `;
+
+          const actions = card.querySelector(".actions");
+          if (!isCoordinator()) renderTrainerTaskActions(actions, task);
+
+          if (isCoordinator() && task.status === "En revision") {
+            const approveButton = document.createElement("button");
+            approveButton.className = "small";
+            approveButton.type = "button";
+            approveButton.textContent = "Aprobar";
+            approveButton.addEventListener("click", () => reviewTask(task.id, "Cumplida"));
+
+            const observeButton = document.createElement("button");
+            observeButton.className = "small";
+            observeButton.type = "button";
+            observeButton.textContent = "Observar";
+            observeButton.addEventListener("click", () => reviewTask(task.id, "Observada"));
+            actions.append(approveButton, observeButton);
+          }
+
+          if (isCoordinator()) {
+            if (task.status === "Cumplida") {
+              const check = document.createElement("span");
+              check.className = "approval-check";
+              check.setAttribute("aria-label", "Tarea aprobada");
+              check.innerHTML = "&#10003;";
+              actions.appendChild(check);
+            }
+            renderScheduleControl(actions, task);
+            renderReassignControl(actions, task);
+            const deleteButton = document.createElement("button");
+            deleteButton.className = "small";
+            deleteButton.type = "button";
+            deleteButton.textContent = "Eliminar";
+            deleteButton.addEventListener("click", () => {
+              state.tasks = state.tasks.filter((item) => item.id !== task.id);
+              saveState();
+              render();
+            });
+            actions.appendChild(deleteButton);
+          }
+
+          els.taskList.appendChild(card);
+        });
+      }
+
+      function reviewTask(taskId, status) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        if (!task) return;
+        task.status = status;
+        const latestEvidence = task.evidence?.at(-1);
+        if (latestEvidence) {
+          latestEvidence.review = status === "Cumplida" ? "Aprobado" : "Observado";
+          latestEvidence.reviewedById = state.activeUserId;
+          latestEvidence.reviewedAt = Date.now();
+        }
+        saveState();
+        render();
+      }
+
+      function renderEvidence() {
+        let allEvidence = relevantTasks()
+          .flatMap((task) => (task.evidence || []).map((evidence) => ({ ...evidence, task })))
+          .sort((a, b) => b.submittedAt - a.submittedAt);
+
+        if (isCoordinator()) {
+          const trainerId = els.evidenceTrainerFilter.value || "all";
+          const dateValue = els.evidenceDateFilter.value;
+          allEvidence = allEvidence
+            .filter((entry) => trainerId === "all" || entry.submittedById === trainerId)
+            .filter((entry) => !dateValue || dateIsoInLima(entry.submittedAt) === dateValue);
+        }
+
+        els.evidenceList.innerHTML = "";
+        if (!allEvidence.length) {
+          els.evidenceList.innerHTML = emptyState(
+            "No hay sustentos para este filtro",
+            isCoordinator() ? "Cambia el trainer o la fecha para consultar otro periodo." : "Los sustentos apareceran cuando cargues evidencia."
+          );
+          return;
+        }
+
+        allEvidence.forEach((entry) => {
+          const card = document.createElement("article");
+          card.className = "item";
+          card.innerHTML = `
+            <div class="title-row">
+              <h3>${escapeHtml(entry.task.title)}</h3>
+              <span class="pill ${entry.review === "Aprobado" ? "approved" : entry.review === "Observado" ? "observed" : "review"}">${escapeHtml(entry.review || "Pendiente")}</span>
+            </div>
+            <div class="meta">
+              <span>Trainer: ${escapeHtml(userName(entry.submittedById))}</span>
+              <span>PDV: ${escapeHtml(entry.store)}</span>
+              <span>Resultado: ${escapeHtml(entry.result)}</span>
+              <span>${formatDateTime(entry.submittedAt)}</span>
+            </div>
+            ${entry.product ? `<p><strong>Producto:</strong> ${escapeHtml(entry.product)}</p>` : ""}
+            ${entry.notes ? `<p>${escapeHtml(entry.notes)}</p>` : ""}
+            <div class="cloud-path">${escapeHtml(entry.cloudPath || cloudFolderForEvidence(entry, entry.task))}</div>
+            ${entry.photoId ? `<div class="evidence-cloud-badge">Archivo protegido en la nube LGTASK</div>` : ""}
+            ${entry.photoId || entry.photoData ? `<img class="evidence-photo" loading="lazy" src="${entry.photoId ? `${API_BASE}/evidence/${encodeURIComponent(entry.photoId)}/photo` : entry.photoData}" alt="Foto de sustento" />` : ""}
+            ${isCoordinator() && entry.photoId ? `<a class="small" href="${API_BASE}/evidence/${encodeURIComponent(entry.photoId)}/photo" target="_blank" rel="noopener">Abrir archivo original</a>` : ""}
+          `;
+
+          if (isCoordinator() && entry.review !== "Aprobado") {
+            const actions = document.createElement("div");
+            actions.className = "actions";
+            const approveButton = document.createElement("button");
+            approveButton.className = "small";
+            approveButton.type = "button";
+            approveButton.textContent = "Aprobar tarea";
+            approveButton.addEventListener("click", () => reviewTask(entry.task.id, "Cumplida"));
+            const observeButton = document.createElement("button");
+            observeButton.className = "small";
+            observeButton.type = "button";
+            observeButton.textContent = "Observar";
+            observeButton.addEventListener("click", () => reviewTask(entry.task.id, "Observada"));
+            actions.append(approveButton, observeButton);
+            card.appendChild(actions);
+          }
+
+          els.evidenceList.appendChild(card);
+        });
+      }
+
+      function renderTeam() {
+        const pending = state.registrationRequests.filter((request) => request.status === "Pendiente");
+        els.pendingRegistrations.innerHTML = "";
+        if (!pending.length) {
+          els.pendingRegistrations.innerHTML = emptyState("No hay solicitudes pendientes", "Cuando un trainer solicite acceso aparecera aqui.");
+        } else {
+          pending.forEach((request) => {
+            const card = document.createElement("article");
+            card.className = "item";
+            card.innerHTML = `
+              <div class="title-row">
+                <h3>${escapeHtml(request.name)}</h3>
+                <span class="pill pending">Pendiente</span>
+              </div>
+              <div class="meta">
+                <span>${escapeHtml(request.email)}</span>
+                <span>${escapeHtml(request.zone)}</span>
+              </div>
+              <div class="actions"></div>
+            `;
+            const actions = card.querySelector(".actions");
+            const approveButton = document.createElement("button");
+            approveButton.className = "small";
+            approveButton.type = "button";
+            approveButton.textContent = "Aprobar";
+            approveButton.addEventListener("click", () => {
+              createTrainer(request.name, request.email, request.zone, request.password);
+              request.status = "Aprobada";
+              saveState();
+              render();
+            });
+            const rejectButton = document.createElement("button");
+            rejectButton.className = "small";
+            rejectButton.type = "button";
+            rejectButton.textContent = "Rechazar";
+            rejectButton.addEventListener("click", () => {
+              request.status = "Rechazada";
+              saveState();
+              render();
+            });
+            actions.append(approveButton, rejectButton);
+            els.pendingRegistrations.appendChild(card);
+          });
+        }
+
+        renderPasswordRecoveryRequests();
+
+        els.teamList.innerHTML = "";
+        const visibleUsers = isCoordinator() ? state.users.filter((user) => user.status === "Activo") : [activeUser()].filter(Boolean);
+        visibleUsers
+          .forEach((user) => {
+            const assigned = state.tasks.filter((task) => task.ownerId === user.id);
+            const completed = assigned.filter((task) => task.status === "Cumplida").length;
+            const card = document.createElement("article");
+            card.className = "item";
+            card.innerHTML = `
+              <div class="title-row">
+                <h3>${escapeHtml(user.name)}</h3>
+                <span class="pill">${escapeHtml(user.role)}</span>
+              </div>
+              <div class="meta">
+                <span>${escapeHtml(user.zone)}</span>
+                <span>${escapeHtml(user.email)}</span>
+                <span>${completed}/${assigned.length} tareas cumplidas</span>
+                <span>Clave actual: protegida</span>
+              </div>
+              ${
+                isCoordinator()
+                  ? `<div class="note">
+                      <strong>Seguridad</strong>
+                      <p class="muted">No se muestran contrasenas actuales. Si el usuario olvido su clave, genera una temporal y enviala solo al correo registrado.</p>
+                      ${user.passwordResetTemp ? `<p><strong>Clave temporal:</strong> ${escapeHtml(user.passwordResetTemp)}</p>` : ""}
+                    </div>
+                    <div class="actions"></div>`
+                  : `<div class="note"><strong>Mi acceso</strong><p class="muted">Si olvidas tu clave, usa Olvide mi clave en la pantalla de ingreso.</p></div>`
+              }
+            `;
+            const actions = card.querySelector(".actions");
+            if (isCoordinator() && actions) {
+              const resetButton = document.createElement("button");
+              resetButton.className = "small";
+              resetButton.type = "button";
+              resetButton.textContent = "Restablecer clave";
+              resetButton.addEventListener("click", () => resetUserPassword(user.id));
+              actions.appendChild(resetButton);
+              if (user.passwordResetTemp) {
+                const mailLink = document.createElement("a");
+                mailLink.className = "small";
+                mailLink.href = recoveryMailLink(user, user.passwordResetTemp);
+                mailLink.textContent = "Preparar correo";
+                actions.appendChild(mailLink);
+                const clearButton = document.createElement("button");
+                clearButton.className = "small";
+                clearButton.type = "button";
+                clearButton.textContent = "Ocultar temporal";
+                clearButton.addEventListener("click", () => {
+                  user.passwordResetTemp = "";
+                  saveState();
+                  render();
+                });
+                actions.appendChild(clearButton);
+              }
+            }
+            els.teamList.appendChild(card);
+          });
+      }
+
+      function renderPasswordRecoveryRequests() {
+        const requests = state.passwordRecoveryRequests
+          .filter((request) => request.status !== "Cerrada")
+          .sort((a, b) => b.createdAt - a.createdAt);
+        els.passwordRecoveryList.innerHTML = "";
+
+        if (!requests.length) {
+          els.passwordRecoveryList.innerHTML = emptyState("No hay solicitudes de recuperacion", "Cuando alguien use Olvide mi clave aparecera aqui.");
+          return;
+        }
+
+        requests.forEach((request) => {
+          const user = state.users.find((item) => item.id === request.userId);
+          const card = document.createElement("article");
+          card.className = "item";
+          card.innerHTML = `
+            <div class="title-row">
+              <h3>${escapeHtml(user?.name || request.email)}</h3>
+              <span class="pill ${request.status === "Clave temporal generada" ? "approved" : "pending"}">${escapeHtml(request.status)}</span>
+            </div>
+            <div class="meta">
+              <span>${escapeHtml(request.email)}</span>
+              <span>${formatDateTime(request.createdAt)}</span>
+            </div>
+            ${request.tempPassword ? `<div class="note"><strong>Clave temporal:</strong><p>${escapeHtml(request.tempPassword)}</p></div>` : ""}
+            <div class="actions"></div>
+          `;
+          const actions = card.querySelector(".actions");
+          if (user) {
+            const resetButton = document.createElement("button");
+            resetButton.className = "small";
+            resetButton.type = "button";
+            resetButton.textContent = request.tempPassword ? "Generar otra clave" : "Generar clave temporal";
+            resetButton.addEventListener("click", () => resetUserPassword(user.id, request.id));
+            actions.appendChild(resetButton);
+            if (request.tempPassword) {
+              const mailLink = document.createElement("a");
+              mailLink.className = "small";
+              mailLink.href = recoveryMailLink(user, request.tempPassword);
+              mailLink.textContent = "Preparar correo";
+              actions.appendChild(mailLink);
+            }
+          }
+          const closeButton = document.createElement("button");
+          closeButton.className = "small";
+          closeButton.type = "button";
+          closeButton.textContent = "Cerrar solicitud";
+          closeButton.addEventListener("click", () => {
+            request.status = "Cerrada";
+            saveState();
+            render();
+          });
+          actions.appendChild(closeButton);
+          els.passwordRecoveryList.appendChild(card);
+        });
+      }
+
+      function renderAnnouncements() {
+        const visible = state.announcements
+          .filter((announcement) => isCoordinator() || announcement.audience === "all" || announcement.targetId === state.activeUserId)
+          .sort((a, b) => b.createdAt - a.createdAt);
+        els.announcementList.innerHTML = "";
+
+        if (!visible.length) {
+          els.announcementList.innerHTML = emptyState("No hay comunicados", "Los comunicados del coordinador apareceran aqui.");
+          return;
+        }
+
+        visible.forEach((announcement) => {
+          const card = document.createElement("article");
+          card.className = "item";
+          card.innerHTML = `
+            <div class="title-row">
+              <h3>${escapeHtml(announcement.title)}</h3>
+              <span class="pill ${announcement.priority === "Urgente" ? "high" : announcement.priority === "Importante" ? "medium" : ""}">${escapeHtml(announcement.priority)}</span>
+            </div>
+            <p>${escapeHtml(announcement.body)}</p>
+            <div class="meta">
+              <span>${announcement.audience === "all" ? "Todo el equipo" : `Para ${escapeHtml(userName(announcement.targetId))}`}</span>
+              <span>${formatDateTime(announcement.createdAt)}</span>
+            </div>
+          `;
+          els.announcementList.appendChild(card);
+        });
+      }
+
+      function renderProducts() {
+        els.productTabs.innerHTML = "";
+        products.forEach((product) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = product.name;
+          button.className = product.id === state.selectedProduct ? "active" : "";
+          button.addEventListener("click", () => {
+            state.selectedProduct = product.id;
+            saveState();
+            renderProducts();
+          });
+          els.productTabs.appendChild(button);
+        });
+
+        const product = products.find((item) => item.id === state.selectedProduct) || products[0];
+        els.productInfo.innerHTML = `
+          <h3>${escapeHtml(product.name)}</h3>
+          <p class="muted">${escapeHtml(product.promise)}</p>
+          <div class="feature-grid">
+            ${product.features
+              .map(
+                ([title, text]) => `
+                  <div class="feature-box">
+                    <strong>${escapeHtml(title)}</strong>
+                    <p>${escapeHtml(text)}</p>
+                  </div>
+                `
+              )
+              .join("")}
+          </div>
+        `;
+
+        els.quizBox.innerHTML = `
+          <div class="item">
+            <strong>${escapeHtml(product.quiz.question)}</strong>
+            <div class="actions">
+              ${product.quiz.options.map((option) => `<button class="small" type="button" data-answer="${escapeHtml(option)}">${escapeHtml(option)}</button>`).join("")}
+            </div>
+            <p class="muted" id="quizResult">Selecciona una respuesta.</p>
+          </div>
+        `;
+        els.quizBox.querySelectorAll("button").forEach((button) => {
+          button.addEventListener("click", () => {
+            const result = els.quizBox.querySelector("#quizResult");
+            result.textContent = button.dataset.answer === product.quiz.answer ? "Correcto. Usa ese argumento en tienda." : `Respuesta correcta: ${product.quiz.answer}`;
+          });
+        });
+      }
+
+      async function resetUserPassword(userId, requestId = "") {
+        if (!isCoordinator()) return;
+        const user = state.users.find((item) => item.id === userId);
+        if (!user) return;
+        try {
+          const data = await apiRequest("/admin/reset-password", {
+            method: "POST",
+            body: JSON.stringify({ userId, requestId })
+          });
+          user.passwordResetTemp = data.tempPassword;
+          if (requestId) {
+            const request = state.passwordRecoveryRequests.find((item) => item.id === requestId);
+            if (request) request.status = "Clave temporal generada";
+          }
+          setMessage(els.trainerMessage, `Clave temporal para ${user.name}: ${data.tempPassword}. Envia esta clave solo al correo registrado.`, "ok");
+          await refreshStateFromServer();
+        } catch (error) {
+          setMessage(els.trainerMessage, error.message, "err");
+        }
+      }
+
+      async function compressImage(file) {
+        if (!file) return "";
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        const img = await new Promise((resolve, reject) => {
+          const image = new Image();
+          image.onload = () => resolve(image);
+          image.onerror = reject;
+          image.src = dataUrl;
+        });
+        const maxSize = 800;
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL("image/jpeg", 0.68);
+      }
+
+      function addEventListeners() {
+        els.loginEmail.value = "";
+        els.loginPassword.value = "";
+        window.setTimeout(() => {
+          if (!state.activeUserId) {
+            els.loginEmail.value = "";
+            els.loginPassword.value = "";
+          }
+        }, 250);
+
+        els.regRole.addEventListener("change", () => {
+          const isCoordinator = els.regRole.value === "Coordinador";
+          els.coordinatorCodeWrap.classList.toggle("hidden", !isCoordinator);
+          els.coordinatorCode.required = isCoordinator;
+          if (!isCoordinator) els.coordinatorCode.value = "";
+        });
+
+        els.toggleRecovery.addEventListener("click", () => {
+          els.recoveryBox.classList.toggle("hidden");
+          if (!els.recoveryBox.classList.contains("hidden")) {
+            els.recoveryEmail.value = els.loginEmail.value;
+            els.recoveryEmail.focus();
+          }
+        });
+
+        els.recoverySubmit.addEventListener("click", async () => {
+          const email = clean(els.recoveryEmail.value).toLowerCase();
+          if (!email) {
+            setMessage(els.recoveryMessage, "Escribe el correo registrado.", "err");
+            return;
+          }
+          try {
+            const data = await apiRequest("/auth/recovery", { method: "POST", body: JSON.stringify({ email }) });
+            setMessage(els.recoveryMessage, data.message, "ok");
+            els.recoveryEmail.value = "";
+          } catch (error) {
+            setMessage(els.recoveryMessage, error.message, "err");
+          }
+        });
+
+        els.loginForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          setMessage(els.loginMessage, "Conectando con LGTASK...", "");
+          try {
+            const data = await apiRequest("/auth/login", {
+              method: "POST",
+              body: JSON.stringify({ email: els.loginEmail.value, password: els.loginPassword.value })
+            });
+            applyCloudState(data.state);
+            els.loginPassword.value = "";
+            setMessage(els.loginMessage, "", "");
+            render();
+          } catch (error) {
+            setMessage(els.loginMessage, error.message, "err");
+          }
+        });
+
+        els.registrationForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const email = clean(els.regEmail.value).toLowerCase();
+          const role = els.regRole.value;
+          setMessage(els.registrationMessage, "Creando cuenta en la nube...", "");
+          try {
+            await apiRequest("/auth/register", {
+              method: "POST",
+              body: JSON.stringify({
+                name: els.regName.value,
+                email,
+                zone: els.regZone.value,
+                role,
+                password: els.regPassword.value,
+                coordinatorCode: els.coordinatorCode.value
+              })
+            });
+            els.registrationForm.reset();
+            els.coordinatorCodeWrap.classList.add("hidden");
+            setMessage(els.registrationMessage, "Registro creado en la nube. Ya puedes ingresar desde cualquier dispositivo.", "ok");
+          } catch (error) {
+            setMessage(els.registrationMessage, error.message, "err");
+          }
+        });
+
+        els.logoutButton.addEventListener("click", async () => {
+          try {
+            await apiRequest("/auth/logout", { method: "POST", body: "{}" });
+          } catch {
+            // The local session is still cleared when the network is unavailable.
+          }
+          state.activeUserId = "";
+          state.users = [];
+          state.tasks = [];
+          els.loginEmail.value = "";
+          els.loginPassword.value = "";
+          render();
+        });
+
+        document.querySelectorAll(".tab").forEach((tab) => {
+          tab.addEventListener("click", () => {
+            document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item === tab));
+            document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === tab.dataset.view));
+            render();
+          });
+        });
+
+        els.editMotivation.addEventListener("click", () => {
+          els.motivationInput.value = dailyMotivationText();
+          els.motivationForm.classList.remove("hidden");
+          els.motivationInput.focus();
+        });
+
+        els.cancelMotivation.addEventListener("click", () => {
+          els.motivationForm.classList.add("hidden");
+        });
+
+        els.motivationForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          if (!isCoordinator() || !clean(els.motivationInput.value)) return;
+          const existing = state.dailyMotivations.find((item) => item.date === todayIso);
+          if (existing) {
+            existing.text = clean(els.motivationInput.value);
+            existing.updatedAt = Date.now();
+            existing.updatedById = state.activeUserId;
+          } else {
+            state.dailyMotivations.unshift({
+              date: todayIso,
+              text: clean(els.motivationInput.value),
+              updatedAt: Date.now(),
+              updatedById: state.activeUserId
+            });
+          }
+          els.motivationForm.classList.add("hidden");
+          saveState();
+          renderMotivation();
+        });
+
+        els.prevDay.addEventListener("click", () => {
+          state.selectedCoordinatorDate = addWorkingDays(state.selectedCoordinatorDate || todayIso, -1);
+          saveState();
+          renderCoordinatorDay();
+        });
+
+        els.todayDay.addEventListener("click", () => {
+          state.selectedCoordinatorDate = nearestWorkingDay(todayIso);
+          saveState();
+          renderCoordinatorDay();
+        });
+
+        els.nextDay.addEventListener("click", () => {
+          state.selectedCoordinatorDate = addWorkingDays(state.selectedCoordinatorDate || todayIso, 1);
+          saveState();
+          renderCoordinatorDay();
+        });
+
+        els.coordinatorDate.addEventListener("change", () => {
+          if (!els.coordinatorDate.value) return;
+          if (isSunday(els.coordinatorDate.value)) {
+            window.alert("Los domingos no forman parte de la jornada laboral.");
+          }
+          state.selectedCoordinatorDate = nearestWorkingDay(els.coordinatorDate.value);
+          saveState();
+          renderCoordinatorDay();
+        });
+
+        els.prevWeek.addEventListener("click", () => {
+          state.selectedWeekStart = addDaysIso(state.selectedWeekStart || weekStartIso(todayIso), -7);
+          saveState();
+          render();
+        });
+
+        els.todayWeek.addEventListener("click", () => {
+          state.selectedWeekStart = weekStartIso(todayIso);
+          saveState();
+          render();
+        });
+
+        els.nextWeek.addEventListener("click", () => {
+          state.selectedWeekStart = addDaysIso(state.selectedWeekStart || weekStartIso(todayIso), 7);
+          saveState();
+          render();
+        });
+
+        els.taskDueDate.addEventListener("change", () => {
+          if (!els.taskDueDate.value) return;
+          applyTimeInputLimits(els.taskDueDate.value, els.taskStartTime, els.taskEndTime);
+          setMessage(els.taskMessage, "", "");
+        });
+
+        els.cancelReassign.addEventListener("click", () => els.reassignDialog.close());
+
+        els.reassignForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const success = reassignTask(els.reassignForm.dataset.taskId, els.reassignOwner.value, els.reassignReason.value);
+          if (success) els.reassignDialog.close();
+        });
+
+        els.cancelSchedule.addEventListener("click", () => els.scheduleDialog.close());
+        els.scheduleDate.addEventListener("change", () => {
+          if (!els.scheduleDate.value) return;
+          applyTimeInputLimits(els.scheduleDate.value, els.scheduleStartTime, els.scheduleEndTime);
+          setMessage(els.scheduleMessage, "", "");
+        });
+
+        els.scheduleForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const success = rescheduleTask(
+            els.scheduleForm.dataset.taskId,
+            els.scheduleDate.value,
+            els.scheduleStartTime.value,
+            els.scheduleEndTime.value,
+            els.scheduleReason.value
+          );
+          if (success) els.scheduleDialog.close();
+        });
+
+        els.taskForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          if (!isCoordinator()) els.taskOwner.value = state.activeUserId;
+          if (!els.taskOwner.value) {
+            setMessage(els.taskMessage, "Primero registra un responsable activo.", "err");
+            return;
+          }
+          const startTime = els.taskStartTime.value;
+          const endTime = els.taskEndTime.value;
+          const scheduleError = validateTaskSchedule(els.taskDueDate.value, startTime, endTime);
+          if (scheduleError) {
+            setMessage(els.taskMessage, scheduleError, "err");
+            return;
+          }
+          if (hasScheduleConflict(els.taskOwner.value, els.taskDueDate.value, startTime, endTime)) {
+            setMessage(els.taskMessage, "El responsable ya tiene otra tarea asignada en ese horario.", "err");
+            return;
+          }
+          state.tasks.unshift({
+            id: id(),
+            title: clean(els.taskTitle.value),
+            ownerId: els.taskOwner.value,
+            createdById: state.activeUserId,
+            category: els.taskCategory.value,
+            priority: els.taskPriority.value,
+            dueDate: els.taskDueDate.value,
+            startTime,
+            endTime,
+            product: clean(els.taskProduct.value),
+            description: clean(els.taskDescription.value),
+            status: "Pendiente",
+            createdAt: Date.now(),
+            history: [
+              {
+                type: "Asignacion",
+                toId: els.taskOwner.value,
+                byId: state.activeUserId,
+                reason: "Tarea creada",
+                at: Date.now()
+              }
+            ],
+            evidence: []
+          });
+          saveState();
+          els.taskForm.reset();
+          els.taskDueDate.value = nearestWorkingDay(todayIso);
+          els.taskStartTime.value = WORKDAY_START;
+          els.taskEndTime.value = "09:30";
+          setMessage(els.taskMessage, isCoordinator() ? "Tarea asignada correctamente." : "Tu tarea se agrego a la semana.", "ok");
+          render();
+        });
+
+        els.taskStatusFilter.addEventListener("change", renderTasks);
+        els.taskTrainerFilter.addEventListener("change", renderTasks);
+        els.evidenceTrainerFilter.addEventListener("change", renderEvidence);
+        els.evidenceDateFilter.addEventListener("change", renderEvidence);
+        els.clearEvidenceFilters.addEventListener("click", () => {
+          els.evidenceTrainerFilter.value = "all";
+          els.evidenceDateFilter.value = "";
+          renderEvidence();
+        });
+
+        els.evidenceForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const task = state.tasks.find((item) => item.id === els.evidenceTask.value);
+          if (!task) {
+            setMessage(els.evidenceMessage, "No hay tarea seleccionada.", "err");
+            return;
+          }
+          const notes = clean(els.evidenceNotes.value);
+          if (els.evidenceResult.value === "No se pudo cumplir" && !notes) {
+            setMessage(els.evidenceMessage, "Explica el motivo para que el coordinador pueda reasignar o dar seguimiento.", "err");
+            return;
+          }
+          setMessage(els.evidenceMessage, "Procesando sustento...", "");
+          const photoData = await compressImage(els.evidencePhoto.files[0]);
+          let photoId = "";
+          let photoName = "";
+          if (photoData) {
+            try {
+              const upload = await apiRequest("/evidence/upload", {
+                method: "POST",
+                body: JSON.stringify({
+                  taskId: task.id,
+                  photoData,
+                  fileName: els.evidencePhoto.files[0]?.name || "sustento.jpg"
+                })
+              });
+              photoId = upload.file.id;
+              photoName = upload.file.name;
+            } catch (error) {
+              setMessage(els.evidenceMessage, error.message, "err");
+              return;
+            }
+          }
+          const evidence = {
+            id: id(),
+            submittedById: state.activeUserId,
+            submittedAt: Date.now(),
+            store: clean(els.evidenceStore.value),
+            product: clean(els.evidenceProduct.value),
+            result: els.evidenceResult.value,
+            notes,
+            photoId,
+            photoName,
+            review: "Pendiente"
+          };
+          evidence.cloudPath = cloudFolderForEvidence(evidence, task);
+          task.evidence = task.evidence || [];
+          task.evidence.push(evidence);
+          if (els.evidenceResult.value === "No se pudo cumplir") {
+            task.status = "No disponible";
+            task.blockedReason = notes;
+            task.blockedAt = Date.now();
+            task.history = task.history || [];
+            task.history.push({
+              type: "Bloqueo",
+              fromId: state.activeUserId,
+              reason: notes,
+              at: Date.now()
+            });
+          } else {
+            task.status = "En revision";
+          }
+          saveState();
+          try {
+            await syncState();
+          } catch (error) {
+            setMessage(els.evidenceMessage, `El archivo se guardo, pero falta sincronizar el formulario: ${error.message}`, "err");
+            return;
+          }
+          els.evidenceForm.reset();
+          setMessage(
+            els.evidenceMessage,
+            evidence.result === "No se pudo cumplir"
+              ? "Feedback guardado en la nube. Reasigna la tarea indicando quien puede atenderla."
+              : "Sustento guardado en la nube. Queda pendiente de revision del coordinador.",
+            "ok"
+          );
+          render();
+        });
+
+        els.createTrainerForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          try {
+            await apiRequest("/admin/users", {
+              method: "POST",
+              body: JSON.stringify({
+                name: els.newTrainerName.value,
+                email: els.newTrainerEmail.value,
+                zone: els.newTrainerZone.value,
+                password: els.newTrainerPassword.value
+              })
+            });
+            els.createTrainerForm.reset();
+            els.newTrainerPassword.value = "LG2026";
+            setMessage(els.trainerMessage, "Trainer creado correctamente en la nube.", "ok");
+            await refreshStateFromServer();
+          } catch (error) {
+            setMessage(els.trainerMessage, error.message, "err");
+          }
+        });
+
+        els.announcementAudience.addEventListener("change", () => {
+          els.announcementTargetWrap.classList.toggle("hidden", els.announcementAudience.value !== "person");
+        });
+
+        els.announcementForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          state.announcements.unshift({
+            id: id(),
+            title: clean(els.announcementTitle.value),
+            audience: els.announcementAudience.value,
+            targetId: els.announcementAudience.value === "person" ? els.announcementTarget.value : "",
+            priority: els.announcementPriority.value,
+            body: clean(els.announcementBody.value),
+            createdById: state.activeUserId,
+            createdAt: Date.now()
+          });
+          saveState();
+          els.announcementForm.reset();
+          render();
+        });
+
+        els.exportData.addEventListener("click", () => {
+          const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `lg-task-hub-respaldo-${todayIso}.json`;
+          link.click();
+          URL.revokeObjectURL(url);
+        });
+
+        els.importData.addEventListener("change", async () => {
+          const file = els.importData.files[0];
+          if (!file) return;
+          try {
+            const text = await file.text();
+            state = normalizeState(JSON.parse(text));
+            saveState();
+            render();
+          } catch {
+            window.alert("No se pudo importar el archivo.");
+          }
+        });
+      }
+
+      els.announcementTargetWrap.classList.add("hidden");
+      els.taskDueDate.value = nearestWorkingDay(todayIso);
+      els.taskStartTime.value = WORKDAY_START;
+      els.taskEndTime.value = "09:30";
+      async function bootstrap() {
+        addEventListeners();
+        render();
+        await refreshStateFromServer();
+        window.setInterval(() => {
+          if (state.activeUserId && !document.hidden && !syncInFlight) {
+            refreshStateFromServer().catch(() => {});
+          }
+        }, 10000);
+      }
+
+      bootstrap();
+    </script>
+  </body>
+</html>
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LG Task Hub</title>
+    <style>
+      :root {
+        --bg: #f4f7fb;
+        --card: #ffffff;
+        --ink: #172033;
+        --muted: #667085;
+        --line: #d8e0ec;
+        --blue: #2563eb;
+        --blue-dark: #1d4ed8;
+        --green: #0f8a5f;
+        --green-soft: #dcf7ea;
+        --red: #c8333b;
+        --red-soft: #ffe7ea;
+        --yellow: #9a6a00;
+        --yellow-soft: #fff4d7;
+        --cyan: #087e8b;
+        --cyan-soft: #e1f7f8;
+        --soft: #eef4ff;
+        --shadow: 0 12px 28px rgba(23, 32, 51, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: Inter, "Segoe UI", Arial, sans-serif;
+        font-size: 15px;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+        transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, color 160ms ease, transform 160ms ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+      }
+
+      button:active {
+        transform: translateY(0) scale(0.98);
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      .muted,
+      label,
+      .meta {
+        color: var(--muted);
+      }
+
+      .login-screen {
+        align-items: center;
+        display: flex;
+        min-height: 100vh;
+        padding: 28px clamp(14px, 4vw, 38px);
+      }
+
+      .login-card {
+        margin: 0 auto;
+        max-width: 1040px;
+        width: 100%;
+      }
+
+      .brand {
+        align-items: center;
+        display: flex;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .brand-mark {
+        align-items: center;
+        background: #b91c35;
+        border-radius: 8px;
+        color: #fff;
+        display: inline-flex;
+        font-weight: 900;
+        height: 44px;
+        justify-content: center;
+        width: 44px;
+      }
+
+      .brand h1 {
+        font-size: 22px;
+        line-height: 1.05;
+      }
+
+      .login-brand {
+        margin-bottom: 18px;
+      }
+
+      .login-grid,
+      .two-col {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+
+      .panel,
+      .metric,
+      .date-card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+      }
+
+      .panel {
+        padding: 18px;
+      }
+
+      .panel-header {
+        align-items: flex-start;
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+
+      .stack {
+        display: grid;
+        gap: 12px;
+      }
+
+      .form-grid {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .wide {
+        grid-column: 1 / -1;
+      }
+
+      label {
+        display: flex;
+        flex-direction: column;
+        font-size: 13px;
+        font-weight: 800;
+        gap: 6px;
+      }
+
+      input,
+      select,
+      textarea {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--ink);
+        min-height: 42px;
+        padding: 9px 11px;
+        width: 100%;
+      }
+
+      textarea {
+        min-height: 96px;
+        resize: vertical;
+      }
+
+      input:focus,
+      select:focus,
+      textarea:focus,
+      button:focus-visible {
+        outline: 3px solid rgba(37, 99, 235, 0.18);
+        outline-offset: 2px;
+      }
+
+      .primary,
+      .ghost,
+      .small {
+        border-radius: 8px;
+        font-weight: 900;
+        min-height: 42px;
+        padding: 0 14px;
+      }
+
+      .primary {
+        background: var(--blue);
+        border: 1px solid var(--blue);
+        color: #fff;
+      }
+
+      .primary:hover {
+        background: var(--blue-dark);
+        box-shadow: 0 8px 16px rgba(37, 99, 235, 0.2);
+      }
+
+      .ghost,
+      .small {
+        background: #fff;
+        border: 1px solid var(--line);
+        color: var(--ink);
+      }
+
+      .small {
+        min-height: 34px;
+        padding: 0 10px;
+      }
+
+      a.small {
+        align-items: center;
+        display: inline-flex;
+        text-decoration: none;
+        width: max-content;
+      }
+
+      .small:hover,
+      .ghost:hover {
+        background: var(--soft);
+        border-color: #9ab7f8;
+      }
+
+      .topbar {
+        align-items: center;
+        background: #fff;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        justify-content: space-between;
+        min-height: 78px;
+        padding: 14px clamp(14px, 4vw, 38px);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+
+      .session {
+        align-items: center;
+        display: flex;
+        gap: 10px;
+        min-width: 360px;
+      }
+
+      .shell {
+        margin: 0 auto;
+        max-width: 1440px;
+        padding: 22px clamp(12px, 4vw, 38px) 42px;
+      }
+
+      .motivation-strip {
+        align-items: center;
+        background: var(--cyan-soft);
+        border: 1px solid #98dadd;
+        border-left: 6px solid var(--cyan);
+        border-radius: 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        justify-content: space-between;
+        margin-bottom: 16px;
+        padding: 14px 16px;
+      }
+
+      .motivation-copy {
+        display: grid;
+        flex: 1;
+        gap: 4px;
+        min-width: 0;
+      }
+
+      .motivation-kicker {
+        color: var(--cyan);
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      .motivation-copy strong {
+        font-size: 17px;
+        line-height: 1.35;
+      }
+
+      .motivation-editor {
+        align-items: end;
+        display: grid;
+        flex-basis: 100%;
+        gap: 8px;
+        grid-template-columns: minmax(220px, 1fr) auto auto;
+        margin-top: 10px;
+      }
+
+      .dashboard {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: 1.25fr 1.7fr repeat(4, minmax(120px, 1fr));
+        margin-bottom: 16px;
+      }
+
+      .date-card,
+      .metric {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        justify-content: center;
+        min-height: 92px;
+        padding: 16px;
+      }
+
+      .date-card strong,
+      .metric strong {
+        font-size: 27px;
+      }
+
+      .meter {
+        background: #e9eef6;
+        border-radius: 999px;
+        height: 8px;
+        overflow: hidden;
+      }
+
+      .meter span {
+        background: var(--green);
+        display: block;
+        height: 100%;
+        transition: width 180ms ease;
+        width: 0;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+        overflow-x: auto;
+      }
+
+      .tab {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--ink);
+        min-height: 42px;
+        padding: 0 16px;
+        white-space: nowrap;
+      }
+
+      .tab.active {
+        background: var(--blue);
+        border-color: var(--blue);
+        color: #fff;
+      }
+
+      .view {
+        display: none;
+      }
+
+      .view.active {
+        display: block;
+      }
+
+      .list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .item {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        display: grid;
+        gap: 10px;
+        padding: 14px;
+      }
+
+      .task-item {
+        grid-template-columns: minmax(0, 1fr) auto;
+      }
+
+      .week-toolbar {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: space-between;
+      }
+
+      .week-grid {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(6, minmax(180px, 1fr));
+      }
+
+      .trainer-week-scroll,
+      .daily-roster-scroll {
+        overflow-x: auto;
+        padding-bottom: 4px;
+      }
+
+      .trainer-week-grid {
+        min-width: 1120px;
+      }
+
+      .daily-roster {
+        display: grid;
+        gap: 8px;
+        min-width: 1080px;
+      }
+
+      .roster-head,
+      .roster-row {
+        align-items: stretch;
+        display: grid;
+        gap: 8px;
+        grid-template-columns: 190px minmax(760px, 1fr) 88px;
+      }
+
+      .roster-head {
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 900;
+      }
+
+      .roster-person,
+      .roster-progress {
+        align-content: center;
+        background: #f8fbff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        display: grid;
+        gap: 3px;
+        min-height: 72px;
+        padding: 10px;
+      }
+
+      .roster-person span,
+      .roster-progress span {
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .roster-progress {
+        justify-items: center;
+        text-align: center;
+      }
+
+      .roster-progress strong {
+        color: var(--green);
+        font-size: 20px;
+      }
+
+      .schedule-axis,
+      .schedule-track {
+        display: grid;
         grid-template-columns: repeat(19, minmax(38px, 1fr));
       }
 
