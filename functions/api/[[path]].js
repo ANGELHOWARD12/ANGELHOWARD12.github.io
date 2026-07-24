@@ -3,7 +3,7 @@ const SESSION_DAYS = 14;
 const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb9775180ea780b71";
 
 const EMPTY_DATA = {
-  version: 6,
+  version: 7,
   registrationRequests: [],
   passwordRecoveryRequests: [],
   tasks: [],
@@ -17,6 +17,44 @@ const WEEKDAY_END = "19:00";
 const SATURDAY_END = "14:00";
 const BREAK_START = "12:30";
 const BREAK_END = "14:00";
+const MAX_FILE_BASE64 = 1_800_000;
+const ALLOWED_FILE_EXTENSIONS = new Set([
+  "jpg",
+  "jpeg",
+  "png",
+  "webp",
+  "pdf",
+  "doc",
+  "docx",
+  "xls",
+  "xlsx",
+  "ppt",
+  "pptx",
+  "csv",
+  "txt"
+]);
+const ALLOWED_FILE_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/msexcel",
+  "application/mspowerpoint",
+  "application/vnd.ms-word",
+  "application/csv",
+  "text/csv",
+  "text/comma-separated-values",
+  "text/plain",
+  "application/octet-stream"
+]);
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -42,8 +80,8 @@ export async function onRequest(context) {
     if (!session) return json({ ok: false, message: "Sesion no valida." }, 401);
 
     if (route === "evidence/upload" && request.method === "POST") return uploadEvidence(request, env.DB, session.user);
-    const evidencePhotoMatch = route.match(/^evidence\/([^/]+)\/photo$/);
-    if (evidencePhotoMatch && request.method === "GET") return evidencePhoto(env.DB, session.user, evidencePhotoMatch[1]);
+    const evidenceFileMatch = route.match(/^evidence\/([^/]+)\/(?:file|photo)$/);
+    if (evidenceFileMatch && request.method === "GET") return evidenceFile(env.DB, session.user, evidenceFileMatch[1]);
     if (route === "state" && request.method === "GET") return getState(env.DB, session.user);
     if (route === "state" && request.method === "PUT") return putState(request, env.DB, session.user);
     if (route === "admin/users" && request.method === "POST") return createUser(request, env.DB, session.user);
@@ -212,29 +250,33 @@ async function uploadEvidence(request, db, user) {
     return json({ ok: false, message: "No puedes subir sustentos para esa tarea." }, 403);
   }
 
-  const photoMatch = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(body.photoData || ""));
-  if (!photoMatch) return json({ ok: false, message: "La foto no tiene un formato valido." }, 400);
-  if (photoMatch[2].length > 1_800_000) {
-    return json({ ok: false, message: "La foto es demasiado grande. Intenta tomarla nuevamente." }, 413);
+  const fileId = crypto.randomUUID();
+  const fileName = clean(body.fileName).replace(/[\\/:*?"<>|]/g, "-").slice(0, 120) || "archivo-sustento";
+  const extension = fileName.includes(".") ? fileName.split(".").pop().toLowerCase() : "";
+  const fileMatch = /^data:([^;,]{1,150});base64,([A-Za-z0-9+/=]+)$/.exec(String(body.fileData || body.photoData || ""));
+  const mimeType = clean(fileMatch?.[1]).toLowerCase();
+  if (!fileMatch || !ALLOWED_FILE_EXTENSIONS.has(extension) || !ALLOWED_FILE_MIME_TYPES.has(mimeType)) {
+    return json({ ok: false, message: "El archivo no tiene un formato permitido." }, 400);
+  }
+  if (fileMatch[2].length > MAX_FILE_BASE64) {
+    return json({ ok: false, message: "El archivo supera el limite de 1.35 MB permitido por la nube." }, 413);
   }
 
-  const fileId = crypto.randomUUID();
-  const fileName = clean(body.fileName).replace(/[\\/:*?"<>|]/g, "-").slice(0, 120) || "sustento.jpg";
   const createdAt = Date.now();
   await db
     .prepare(
       "INSERT INTO evidence_files (id, task_id, owner_id, submitted_by_id, file_name, mime_type, photo_base64, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     )
-    .bind(fileId, task.id, task.ownerId, user.id, fileName, photoMatch[1], photoMatch[2], createdAt)
+    .bind(fileId, task.id, task.ownerId, user.id, fileName, mimeType, fileMatch[2], createdAt)
     .run();
 
   return json({
     ok: true,
-    file: { id: fileId, name: fileName, createdAt, url: `/cloud/evidence/${fileId}/photo` }
+    file: { id: fileId, name: fileName, mimeType, createdAt, url: `/cloud/evidence/${fileId}/file` }
   }, 201);
 }
 
-async function evidencePhoto(db, user, fileId) {
+async function evidenceFile(db, user, fileId) {
   const row = await db.prepare("SELECT * FROM evidence_files WHERE id = ?").bind(clean(fileId)).first();
   if (!row) return json({ ok: false, message: "Archivo no encontrado." }, 404);
   const allowed = user.role === "Coordinador" || row.submitted_by_id === user.id || row.owner_id === user.id;
@@ -243,11 +285,13 @@ async function evidencePhoto(db, user, fileId) {
   const binary = atob(row.photo_base64);
   const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
   const safeName = String(row.file_name || "sustento.jpg").replace(/["\r\n]/g, "-");
+  const disposition = String(row.mime_type).startsWith("image/") || row.mime_type === "application/pdf" ? "inline" : "attachment";
   return new Response(bytes, {
     headers: {
       "Content-Type": row.mime_type,
-      "Content-Disposition": `inline; filename="${safeName}"`,
+      "Content-Disposition": `${disposition}; filename="${safeName}"`,
       "Cache-Control": "private, max-age=300",
+      "Content-Length": String(bytes.length),
       "X-Content-Type-Options": "nosniff"
     }
   });
@@ -286,8 +330,16 @@ async function putState(request, db, user) {
   const current = await loadData(db);
 
   if (user.role === "Coordinador") {
-    for (const key of ["registrationRequests", "passwordRecoveryRequests", "tasks", "announcements", "supportRequests", "dailyMotivations"]) {
+    for (const key of ["registrationRequests", "passwordRecoveryRequests", "announcements", "supportRequests", "dailyMotivations"]) {
       if (Array.isArray(submitted[key])) current[key] = submitted[key];
+    }
+    if (Array.isArray(submitted.tasks)) {
+      const submittedTaskIds = new Set(submitted.tasks.map((task) => clean(task.id)).filter(Boolean));
+      const removedTaskIds = current.tasks.map((task) => clean(task.id)).filter((taskId) => taskId && !submittedTaskIds.has(taskId));
+      current.tasks = submitted.tasks;
+      for (const taskId of removedTaskIds) {
+        await db.prepare("DELETE FROM evidence_files WHERE task_id = ?").bind(taskId).run();
+      }
     }
   } else {
     const submittedTasks = new Map((submitted.tasks || []).map((task) => [task.id, task]));
