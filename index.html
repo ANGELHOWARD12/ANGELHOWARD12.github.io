@@ -1187,8 +1187,12 @@
                 <input id="taskEndTime" type="time" lang="en-GB" min="08:45" max="19:00" step="900" required />
               </label>
               <label>
-                Producto LG
-                <input id="taskProduct" type="text" placeholder="Ej. OLED / Lavadoras / Audio" />
+                Linea
+                <select id="taskProduct" required>
+                  <option>HS</option>
+                  <option>TV</option>
+                  <option>AV</option>
+                </select>
               </label>
               <label class="wide">
                 Instrucciones
@@ -1276,7 +1280,7 @@
             <div id="cloudPlanPanel" class="note">
               <strong>Nube LGTASK conectada</strong>
               <p class="muted">Las fotos quedan protegidas en Cloudflare D1 y Pablo puede abrirlas desde esta pantalla.</p>
-              <div class="cloud-path">LG Task Hub / Sustentos / fecha / trainer / tarea</div>
+              <div class="cloud-path">LG Task Hub / Sustentos / trainer / fecha / tarea</div>
               <p class="muted">Cada archivo se registra por nombre de trainer, fecha y tarea.</p>
               <a class="small" href="https://lgtask.pages.dev/?view=evidenceView">Abrir historial en la nube</a>
             </div>
@@ -1290,7 +1294,9 @@
                 <input id="evidenceDateFilter" type="date" />
               </label>
               <button id="clearEvidenceFilters" class="small wide" type="button">Ver todo el historial</button>
+              <button id="exportEvidenceExcel" class="primary wide" type="button">Descargar Excel de tareas y sustentos</button>
             </div>
+            <p id="evidenceExportMessage" class="message" aria-live="polite"></p>
             <div id="evidenceList" class="list"></div>
           </aside>
         </div>
@@ -1676,6 +1682,8 @@
         evidenceTrainerFilter: document.querySelector("#evidenceTrainerFilter"),
         evidenceDateFilter: document.querySelector("#evidenceDateFilter"),
         clearEvidenceFilters: document.querySelector("#clearEvidenceFilters"),
+        exportEvidenceExcel: document.querySelector("#exportEvidenceExcel"),
+        evidenceExportMessage: document.querySelector("#evidenceExportMessage"),
         evidenceList: document.querySelector("#evidenceList"),
         coordinatorTeamPanel: document.querySelector("#coordinatorTeamPanel"),
         createTrainerForm: document.querySelector("#createTrainerForm"),
@@ -2099,7 +2107,288 @@
 
       function cloudFolderForEvidence(evidence, task) {
         const date = dateIsoInLima(evidence.submittedAt || Date.now());
-        return `LG Task Hub / Sustentos / ${date} / ${folderSafe(userName(evidence.submittedById))} / ${folderSafe(task.title)}`;
+        return `LG Task Hub / Sustentos / ${folderSafe(userName(evidence.submittedById || task.ownerId))} / ${date} / ${folderSafe(task.title)}`;
+      }
+
+      function excelXml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&apos;");
+      }
+
+      function excelCell(value, style = "Data", href = "") {
+        const link = href ? ` ss:HRef="${excelXml(href)}"` : "";
+        return `<Cell ss:StyleID="${style}"${link}><Data ss:Type="String">${excelXml(value)}</Data></Cell>`;
+      }
+
+      function excelSheetName(value, usedNames) {
+        const base = clean(value).replace(/[\\/?*[\]:]/g, "-").slice(0, 31) || "Trainer";
+        let name = base;
+        let suffix = 2;
+        while (usedNames.has(name.toLowerCase())) {
+          const marker = ` ${suffix}`;
+          name = `${base.slice(0, 31 - marker.length)}${marker}`;
+          suffix += 1;
+        }
+        usedNames.add(name.toLowerCase());
+        return name;
+      }
+
+      function evidenceReportRows() {
+        const trainerFilter = els.evidenceTrainerFilter.value || "all";
+        const dateFilter = els.evidenceDateFilter.value;
+        const rows = state.tasks.flatMap((task) => {
+          const evidenceItems = task.evidence || [];
+          if (evidenceItems.length) {
+            return evidenceItems.map((evidence) => ({ task, evidence }));
+          }
+          return task.status === "Cumplida" ? [{ task, evidence: null }] : [];
+        });
+
+        return rows
+          .map(({ task, evidence }) => {
+            const trainerId = evidence?.submittedById || task.ownerId;
+            const activityDate = evidence?.submittedAt ? dateIsoInLima(evidence.submittedAt) : task.dueDate;
+            const photoUrl = evidence?.photoId
+              ? new URL(`${API_BASE}/evidence/${encodeURIComponent(evidence.photoId)}/photo`, window.location.origin).href
+              : "";
+            const historyUrl = new URL("/?view=evidenceView", window.location.origin).href;
+            return {
+              trainerId,
+              trainer: userName(trainerId),
+              activityDate,
+              folder: evidence
+                ? cloudFolderForEvidence(evidence, task)
+                : `LG Task Hub / Sustentos / ${folderSafe(userName(trainerId))} / ${activityDate} / ${folderSafe(task.title)}`,
+              taskDate: task.dueDate,
+              schedule: taskTimeLabel(task),
+              task: task.title,
+              line: task.product || "",
+              category: task.category || "",
+              taskStatus: task.status || "",
+              evidenceDate: evidence?.submittedAt ? dateIsoInLima(evidence.submittedAt) : "",
+              evidenceTime: evidence?.submittedAt
+                ? new Intl.DateTimeFormat("es-PE", {
+                    timeZone: "America/Lima",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: false
+                  }).format(new Date(evidence.submittedAt))
+                : "",
+              store: evidence?.store || "",
+              reviewedProduct: evidence?.product || "",
+              result: evidence?.result || "",
+              notes: evidence?.notes || "",
+              review: evidence?.review || (task.status === "Cumplida" ? "Aprobado" : ""),
+              photoName: evidence?.photoName || "",
+              photoUrl,
+              historyUrl
+            };
+          })
+          .filter((row) => trainerFilter === "all" || row.trainerId === trainerFilter)
+          .filter((row) => !dateFilter || row.activityDate === dateFilter)
+          .sort(
+            (a, b) =>
+              a.trainer.localeCompare(b.trainer, "es") ||
+              b.activityDate.localeCompare(a.activityDate) ||
+              a.schedule.localeCompare(b.schedule)
+          );
+      }
+
+      function evidenceWorksheetXml(sheetName, title, rows, filterDetail) {
+        const headers = [
+          "Carpeta en la nube",
+          "Trainer",
+          "Fecha de tarea",
+          "Horario",
+          "Tarea",
+          "Linea",
+          "Categoria",
+          "Estado de tarea",
+          "Fecha de sustento",
+          "Hora de sustento",
+          "Tienda / PDV",
+          "Producto revisado",
+          "Resultado",
+          "Observaciones",
+          "Revision de Pablo",
+          "Archivo",
+          "Foto",
+          "Historial LGTASK"
+        ];
+        const widths = [250, 135, 90, 95, 220, 60, 100, 105, 100, 90, 125, 130, 125, 270, 120, 145, 90, 110];
+        const dataRows = rows.length
+          ? rows
+              .map(
+                (row) => `
+              <Row>
+                ${excelCell(row.folder, "Wrap")}
+                ${excelCell(row.trainer)}
+                ${excelCell(row.taskDate)}
+                ${excelCell(row.schedule)}
+                ${excelCell(row.task, "Wrap")}
+                ${excelCell(row.line)}
+                ${excelCell(row.category)}
+                ${excelCell(row.taskStatus, row.taskStatus === "Cumplida" ? "Approved" : "Data")}
+                ${excelCell(row.evidenceDate)}
+                ${excelCell(row.evidenceTime)}
+                ${excelCell(row.store)}
+                ${excelCell(row.reviewedProduct)}
+                ${excelCell(row.result)}
+                ${excelCell(row.notes, "Wrap")}
+                ${excelCell(row.review, row.review === "Aprobado" ? "Approved" : "Data")}
+                ${excelCell(row.photoName || (row.photoUrl ? "Foto de sustento" : "Sin foto"))}
+                ${excelCell(row.photoUrl ? "Abrir foto" : "Sin foto", row.photoUrl ? "Link" : "Data", row.photoUrl)}
+                ${excelCell("Abrir historial", "Link", row.historyUrl)}
+              </Row>`
+              )
+              .join("")
+          : `<Row><Cell ss:StyleID="Empty" ss:MergeAcross="${headers.length - 1}"><Data ss:Type="String">No hay tareas cumplidas ni sustentos para este filtro.</Data></Cell></Row>`;
+
+        return `
+          <Worksheet ss:Name="${excelXml(sheetName)}">
+            <Table>
+              ${widths.map((width) => `<Column ss:AutoFitWidth="0" ss:Width="${width}"/>`).join("")}
+              <Row ss:Height="28">
+                <Cell ss:StyleID="Title" ss:MergeAcross="${headers.length - 1}"><Data ss:Type="String">${excelXml(title)}</Data></Cell>
+              </Row>
+              <Row>
+                <Cell ss:StyleID="Subtitle" ss:MergeAcross="${headers.length - 1}"><Data ss:Type="String">${excelXml(filterDetail)}</Data></Cell>
+              </Row>
+              <Row>${headers.map((header) => excelCell(header, "Header")).join("")}</Row>
+              ${dataRows}
+            </Table>
+            <WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">
+              <FreezePanes/>
+              <FrozenNoSplit/>
+              <SplitHorizontal>3</SplitHorizontal>
+              <TopRowBottomPane>3</TopRowBottomPane>
+              <ActivePane>2</ActivePane>
+              <ProtectObjects>False</ProtectObjects>
+              <ProtectScenarios>False</ProtectScenarios>
+            </WorksheetOptions>
+          </Worksheet>`;
+      }
+
+      function buildEvidenceWorkbook(rows) {
+        const usedNames = new Set(["resumen"]);
+        const trainerFilter = els.evidenceTrainerFilter.value || "all";
+        const dateFilter = els.evidenceDateFilter.value;
+        const filterDetail = `Generado: ${formatDateTime(Date.now())} | Trainer: ${
+          trainerFilter === "all" ? "Todos" : userName(trainerFilter)
+        } | Fecha: ${dateFilter || "Todas"}`;
+        const summary = evidenceWorksheetXml("Resumen", "LGTASK - Tareas cumplidas y sustentos", rows, filterDetail);
+        const activeTrainerIds =
+          trainerFilter === "all"
+            ? trainers().map((trainer) => trainer.id)
+            : [trainerFilter];
+        rows.forEach((row) => {
+          if (!activeTrainerIds.includes(row.trainerId)) activeTrainerIds.push(row.trainerId);
+        });
+        const trainerSheets = activeTrainerIds
+          .map((trainerId) => {
+            const name = userName(trainerId);
+            const sheetName = excelSheetName(name, usedNames);
+            return evidenceWorksheetXml(
+              sheetName,
+              `Trainer: ${name}`,
+              rows.filter((row) => row.trainerId === trainerId),
+              filterDetail
+            );
+          })
+          .join("");
+
+        return `<?xml version="1.0" encoding="UTF-8"?>
+          <?mso-application progid="Excel.Sheet"?>
+          <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+            xmlns:o="urn:schemas-microsoft-com:office:office"
+            xmlns:x="urn:schemas-microsoft-com:office:excel"
+            xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+            xmlns:html="http://www.w3.org/TR/REC-html40">
+            <DocumentProperties xmlns="urn:schemas-microsoft-com:office:office">
+              <Author>LGTASK</Author>
+              <Company>LG Training Peru</Company>
+              <Title>Reporte de tareas cumplidas y sustentos</Title>
+            </DocumentProperties>
+            <Styles>
+              <Style ss:ID="Default" ss:Name="Normal">
+                <Alignment ss:Vertical="Top"/>
+                <Font ss:FontName="Calibri" ss:Size="11"/>
+              </Style>
+              <Style ss:ID="Data"><Alignment ss:Vertical="Top"/></Style>
+              <Style ss:ID="Wrap"><Alignment ss:Vertical="Top" ss:WrapText="1"/></Style>
+              <Style ss:ID="Title">
+                <Alignment ss:Vertical="Center"/>
+                <Font ss:FontName="Calibri" ss:Size="16" ss:Bold="1" ss:Color="#FFFFFF"/>
+                <Interior ss:Color="#B91C35" ss:Pattern="Solid"/>
+              </Style>
+              <Style ss:ID="Subtitle">
+                <Font ss:FontName="Calibri" ss:Size="10" ss:Color="#475467"/>
+                <Interior ss:Color="#F2F4F7" ss:Pattern="Solid"/>
+              </Style>
+              <Style ss:ID="Header">
+                <Alignment ss:Vertical="Center" ss:WrapText="1"/>
+                <Font ss:FontName="Calibri" ss:Size="10" ss:Bold="1" ss:Color="#FFFFFF"/>
+                <Interior ss:Color="#172033" ss:Pattern="Solid"/>
+              </Style>
+              <Style ss:ID="Approved">
+                <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#087443"/>
+                <Interior ss:Color="#DCF7EA" ss:Pattern="Solid"/>
+              </Style>
+              <Style ss:ID="Link">
+                <Font ss:FontName="Calibri" ss:Size="11" ss:Color="#1D4ED8" ss:Underline="Single"/>
+              </Style>
+              <Style ss:ID="Empty">
+                <Alignment ss:Vertical="Center"/>
+                <Font ss:FontName="Calibri" ss:Size="11" ss:Italic="1" ss:Color="#667085"/>
+              </Style>
+            </Styles>
+            ${summary}
+            ${trainerSheets}
+          </Workbook>`;
+      }
+
+      function downloadBlob(blob, fileName) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      async function exportEvidenceWorkbook() {
+        if (!isCoordinator()) {
+          setMessage(els.evidenceExportMessage, "Solo el coordinador puede generar este reporte.", "err");
+          return;
+        }
+        els.exportEvidenceExcel.disabled = true;
+        setMessage(els.evidenceExportMessage, "Actualizando datos y preparando el Excel...", "");
+        try {
+          if (syncInFlight) await syncInFlight;
+          const refreshed = await refreshStateFromServer({ quiet: true });
+          if (!refreshed || !isCoordinator()) throw new Error("No se pudo actualizar la informacion de la nube.");
+          const rows = evidenceReportRows();
+          const workbook = buildEvidenceWorkbook(rows);
+          downloadBlob(
+            new Blob([workbook], { type: "application/vnd.ms-excel;charset=utf-8" }),
+            `LGTASK-tareas-y-sustentos-${todayIso}.xls`
+          );
+          setMessage(
+            els.evidenceExportMessage,
+            `Excel generado con ${rows.length} registro${rows.length === 1 ? "" : "s"}. Incluye una hoja por trainer y enlaces protegidos a las fotos.`,
+            "ok"
+          );
+        } catch (error) {
+          setMessage(els.evidenceExportMessage, error.message || "No se pudo generar el Excel.", "err");
+        } finally {
+          els.exportEvidenceExcel.disabled = false;
+        }
       }
 
       function recoveryMailLink(user, tempPassword) {
@@ -2603,7 +2892,7 @@
                 <span>Fecha limite: ${formatDate(task.dueDate)}</span>
                 <span>Horario: ${escapeHtml(taskTimeLabel(task))}</span>
                 <span>${escapeHtml(task.category)}</span>
-                ${task.product ? `<span>Producto: ${escapeHtml(task.product)}</span>` : ""}
+                ${task.product ? `<span>Linea: ${escapeHtml(task.product)}</span>` : ""}
               </div>
               ${task.description ? `<p>${escapeHtml(task.description)}</p>` : ""}
               ${task.blockedReason ? `<div class="note"><strong>No puede cumplir:</strong><p class="muted">${escapeHtml(task.blockedReason)}${task.blockedAt ? ` | ${formatDateTime(task.blockedAt)}` : ""}</p></div>` : ""}
@@ -2713,7 +3002,7 @@
             </div>
             ${entry.product ? `<p><strong>Producto:</strong> ${escapeHtml(entry.product)}</p>` : ""}
             ${entry.notes ? `<p>${escapeHtml(entry.notes)}</p>` : ""}
-            <div class="cloud-path">${escapeHtml(entry.cloudPath || cloudFolderForEvidence(entry, entry.task))}</div>
+            <div class="cloud-path">${escapeHtml(cloudFolderForEvidence(entry, entry.task))}</div>
             ${entry.photoId ? `<div class="evidence-cloud-badge">Archivo protegido en la nube LGTASK</div>` : ""}
             ${entry.photoId || entry.photoData ? `<img class="evidence-photo" loading="lazy" src="${entry.photoId ? `${API_BASE}/evidence/${encodeURIComponent(entry.photoId)}/photo` : entry.photoData}" alt="Foto de sustento" />` : ""}
             ${isCoordinator() && entry.photoId ? `<a class="small" href="${API_BASE}/evidence/${encodeURIComponent(entry.photoId)}/photo" target="_blank" rel="noopener">Abrir archivo original</a>` : ""}
@@ -3303,6 +3592,7 @@
           els.evidenceDateFilter.value = "";
           renderEvidence();
         });
+        els.exportEvidenceExcel.addEventListener("click", exportEvidenceWorkbook);
 
         els.evidenceForm.addEventListener("submit", async (event) => {
           event.preventDefault();
