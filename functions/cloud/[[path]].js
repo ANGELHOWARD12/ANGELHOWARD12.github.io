@@ -97,6 +97,8 @@ export async function onRequest(context) {
     if (route === "evidence/upload/complete" && request.method === "POST") return completeEvidenceUpload(request, env.DB, session.user);
     const evidenceFileMatch = route.match(/^evidence\/([^/]+)\/(?:file|photo)$/);
     if (evidenceFileMatch && request.method === "GET") return evidenceFile(env.DB, session.user, evidenceFileMatch[1]);
+    if (route === "tasks/evidence" && request.method === "POST") return submitTaskEvidence(request, env.DB, session.user, context);
+    if (route === "tasks/review" && request.method === "POST") return reviewTaskEvidence(request, env.DB, session.user, context);
     if (route === "state" && request.method === "GET") return getState(env.DB, session.user, context);
     if (route === "state" && request.method === "PUT") return putState(request, env.DB, session.user, context);
     if (route === "admin/users" && request.method === "POST") return createUser(request, env.DB, session.user);
@@ -518,6 +520,156 @@ async function evidenceFile(db, user, fileId) {
       "X-Content-Type-Options": "nosniff"
     }
   });
+}
+
+async function submitTaskEvidence(request, db, user, context) {
+  const body = await readJson(request, 1_000_000);
+  const taskId = clean(body.taskId);
+  const submittedEvidence = body.evidence || {};
+  const data = await loadData(db);
+  const task = data.tasks.find((item) => clean(item.id) === taskId);
+  if (!task) return json({ ok: false, message: "La tarea ya no existe." }, 404);
+  if (clean(task.ownerId) !== user.id) {
+    return json({ ok: false, message: "Solo el responsable de la tarea puede enviar el sustento." }, 403);
+  }
+  if (task.status === "Cumplida") {
+    return json({ ok: false, message: "La tarea ya fue aprobada y completada." }, 409);
+  }
+
+  const result = clean(submittedEvidence.result);
+  const notes = clean(submittedEvidence.notes).slice(0, 3000);
+  const store = clean(submittedEvidence.store).slice(0, 180);
+  const product = clean(submittedEvidence.product).slice(0, 180);
+  const allowedResults = new Set(["Cumplida", "Cumplida parcialmente", "No se pudo cumplir"]);
+  if (!allowedResults.has(result) || !store) {
+    return json({ ok: false, message: "Completa la tienda y selecciona un resultado valido." }, 400);
+  }
+  if (result === "No se pudo cumplir" && !notes) {
+    return json({ ok: false, message: "Explica por que no se pudo cumplir la tarea." }, 400);
+  }
+
+  const submittedFiles = Array.isArray(submittedEvidence.files) ? submittedEvidence.files.slice(0, 8) : [];
+  const files = [];
+  for (const submittedFile of submittedFiles) {
+    const fileId = clean(submittedFile.id);
+    const file = await db
+      .prepare(
+        "SELECT id, task_id, submitted_by_id, file_name, mime_type FROM evidence_files WHERE id = ?"
+      )
+      .bind(fileId)
+      .first();
+    if (!file || clean(file.task_id) !== taskId || clean(file.submitted_by_id) !== user.id) {
+      return json({ ok: false, message: "Uno de los archivos no pertenece a esta tarea." }, 403);
+    }
+    files.push({
+      id: file.id,
+      name: file.file_name,
+      mimeType: file.mime_type
+    });
+  }
+
+  const evidenceId = clean(submittedEvidence.id) || crypto.randomUUID();
+  task.evidence = Array.isArray(task.evidence) ? task.evidence : [];
+  if (task.evidence.some((item) => clean(item.id) === evidenceId)) {
+    return stateResponse(db, user, data);
+  }
+  const submittedAt = Date.now();
+  const evidence = {
+    id: evidenceId,
+    submittedById: user.id,
+    submittedAt,
+    store,
+    product,
+    result,
+    notes,
+    files,
+    cloudPath: clean(submittedEvidence.cloudPath).slice(0, 800),
+    review: "Pendiente"
+  };
+  task.evidence.push(evidence);
+  task.history = Array.isArray(task.history) ? task.history : [];
+  if (result === "No se pudo cumplir") {
+    task.status = "No disponible";
+    task.blockedReason = notes;
+    task.blockedAt = submittedAt;
+    task.history.push({
+      type: "Bloqueo",
+      fromId: user.id,
+      reason: notes,
+      at: submittedAt
+    });
+  } else {
+    task.status = "En revision";
+    task.blockedReason = "";
+    task.blockedAt = 0;
+    task.history.push({
+      type: "Sustento enviado",
+      fromId: user.id,
+      reason: `${files.length} archivo${files.length === 1 ? "" : "s"} enviado${files.length === 1 ? "" : "s"}`,
+      at: submittedAt
+    });
+  }
+
+  await saveData(db, data);
+  const coordinators = await db
+    .prepare("SELECT id FROM users WHERE role = 'Coordinador' AND status = 'Activo'")
+    .all();
+  const notifications = (coordinators.results || [])
+    .filter((coordinator) => clean(coordinator.id) !== user.id)
+    .map((coordinator) => ({
+      userId: coordinator.id,
+      title: result === "No se pudo cumplir" ? "Tarea con incidencia" : "Nuevo sustento por revisar",
+      body: `${clean(task.title)} | ${clean(user.name)}`,
+      url: `/?view=evidenceView&task=${encodeURIComponent(taskId)}`,
+      sourceKey: `evidence:${taskId}:${evidenceId}:${clean(coordinator.id)}`
+    }));
+  const notifiedUsers = await queueNotifications(db, notifications);
+  if (notifiedUsers.length) context.waitUntil(pushNotificationsForUsers(db, notifiedUsers));
+  return stateResponse(db, user, data);
+}
+
+async function reviewTaskEvidence(request, db, user, context) {
+  if (user.role !== "Coordinador") {
+    return json({ ok: false, message: "Solo el coordinador puede aprobar o observar sustentos." }, 403);
+  }
+  const body = await readJson(request);
+  const taskId = clean(body.taskId);
+  const status = clean(body.status);
+  if (!["Cumplida", "Observada"].includes(status)) {
+    return json({ ok: false, message: "La revision indicada no es valida." }, 400);
+  }
+  const data = await loadData(db);
+  const task = data.tasks.find((item) => clean(item.id) === taskId);
+  if (!task) return json({ ok: false, message: "La tarea ya no existe." }, 404);
+  const latestEvidence = Array.isArray(task.evidence) ? task.evidence.at(-1) : null;
+  if (!latestEvidence) {
+    return json({ ok: false, message: "La tarea aun no tiene un sustento para revisar." }, 409);
+  }
+
+  const reviewedAt = Date.now();
+  task.status = status;
+  latestEvidence.review = status === "Cumplida" ? "Aprobado" : "Observado";
+  latestEvidence.reviewedById = user.id;
+  latestEvidence.reviewedAt = reviewedAt;
+  task.history = Array.isArray(task.history) ? task.history : [];
+  task.history.push({
+    type: status === "Cumplida" ? "Aprobacion" : "Observacion",
+    byId: user.id,
+    reason: status === "Cumplida" ? "Sustento aprobado y tarea completada" : "Sustento observado por el coordinador",
+    at: reviewedAt
+  });
+  await saveData(db, data);
+
+  const notification = {
+    userId: task.ownerId,
+    title: status === "Cumplida" ? "Tarea aprobada y completada" : "Sustento observado",
+    body: clean(task.title),
+    url: `/?view=tasksView&task=${encodeURIComponent(taskId)}`,
+    sourceKey: `review:${taskId}:${status}:${reviewedAt}`
+  };
+  const notifiedUsers = await queueNotifications(db, [notification]);
+  if (notifiedUsers.length) context.waitUntil(pushNotificationsForUsers(db, notifiedUsers));
+  return stateResponse(db, user, data);
 }
 
 async function stateResponse(db, user, loadedData = null) {
