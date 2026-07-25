@@ -985,6 +985,72 @@
         padding: 10px;
       }
 
+      .file-preview-dialog {
+        max-width: min(980px, calc(100vw - 24px));
+        padding: 0;
+      }
+
+      .file-preview-shell {
+        display: grid;
+        gap: 14px;
+        padding: 18px;
+      }
+
+      .file-preview-head {
+        align-items: flex-start;
+        display: flex;
+        gap: 16px;
+        justify-content: space-between;
+      }
+
+      .file-preview-head h2 {
+        overflow-wrap: anywhere;
+      }
+
+      .file-preview-stage {
+        align-items: center;
+        background: #111827;
+        border-radius: 8px;
+        display: flex;
+        justify-content: center;
+        min-height: 260px;
+        overflow: hidden;
+        padding: 12px;
+      }
+
+      .file-preview-stage .message {
+        color: #fff;
+        min-height: 0;
+        text-align: center;
+      }
+
+      .file-preview-image,
+      .file-preview-frame {
+        background: #fff;
+        border: 0;
+        max-height: 72vh;
+        max-width: 100%;
+      }
+
+      .file-preview-image {
+        height: auto;
+        object-fit: contain;
+        width: auto;
+      }
+
+      .file-preview-frame {
+        height: 68vh;
+        width: 100%;
+      }
+
+      .file-preview-actions {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: flex-end;
+      }
+
       .product-tabs {
         display: flex;
         flex-wrap: wrap;
@@ -1502,7 +1568,7 @@
               <p class="muted">Las fotos quedan protegidas en Cloudflare D1 y Pablo puede abrirlas desde esta pantalla.</p>
               <div class="cloud-path">LG Task Hub / Sustentos / trainer / fecha / tarea</div>
               <p class="muted">Cada archivo se registra por nombre de trainer, fecha y tarea.</p>
-              <a class="small" href="https://lgtask.pages.dev/?view=evidenceView">Abrir historial en la nube</a>
+              <button id="openCloudHistory" class="small" type="button">Abrir historial en la nube</button>
             </div>
             <div id="evidenceFilters" class="form-grid">
               <label>
@@ -1729,11 +1795,33 @@
       </form>
     </dialog>
 
+    <dialog id="filePreviewDialog" class="file-preview-dialog" aria-labelledby="filePreviewTitle">
+      <div class="file-preview-shell">
+        <div class="file-preview-head">
+          <div>
+            <h2 id="filePreviewTitle">Archivo de sustento</h2>
+            <p id="filePreviewMeta" class="muted"></p>
+          </div>
+          <button id="closeFilePreview" class="small" type="button" aria-label="Cerrar visor">Cerrar</button>
+        </div>
+        <div id="filePreviewStage" class="file-preview-stage">
+          <p id="filePreviewStatus" class="message" aria-live="polite">Cargando archivo original...</p>
+          <img id="filePreviewImage" class="file-preview-image hidden" alt="" />
+          <iframe id="filePreviewFrame" class="file-preview-frame hidden" title="Vista previa del archivo"></iframe>
+        </div>
+        <div class="file-preview-actions">
+          <span class="muted">El archivo se muestra sin reducir su calidad.</span>
+          <a id="downloadFilePreview" class="primary hidden" href="#" download>Descargar original</a>
+        </div>
+      </div>
+    </dialog>
+
     <script src="./vendor/exceljs-4.4.0.min.js"></script>
     <script src="./vendor/jszip-3.10.1.min.js"></script>
     <script>
       const STORAGE_KEY = "lg-task-hub-ui-v1";
       const API_BASE = "/cloud";
+      const PUBLIC_APP_ORIGIN = "https://lgtask.pages.dev";
       const WORKDAY_START = "08:30";
       const WEEKDAY_END = "19:00";
       const SATURDAY_END = "14:00";
@@ -1874,6 +1962,9 @@
       let serviceWorkerRegistration = null;
       let notificationCheckInFlight = null;
       let toastTimer = 0;
+      let activePreviewObjectUrl = "";
+      let previewRequestId = 0;
+      let lastAutoOpenedFileId = "";
       let activeViewId = ALLOWED_VIEW_IDS.includes(new URLSearchParams(window.location.search).get("view"))
         ? new URLSearchParams(window.location.search).get("view")
         : "tasksView";
@@ -1960,6 +2051,7 @@
         evidenceSubmitButton: document.querySelector("#evidenceSubmitButton"),
         evidenceMessage: document.querySelector("#evidenceMessage"),
         cloudPlanPanel: document.querySelector("#cloudPlanPanel"),
+        openCloudHistory: document.querySelector("#openCloudHistory"),
         evidenceFilters: document.querySelector("#evidenceFilters"),
         evidenceTrainerFilter: document.querySelector("#evidenceTrainerFilter"),
         evidenceDateFrom: document.querySelector("#evidenceDateFrom"),
@@ -2014,6 +2106,15 @@
         reminderDateTime: document.querySelector("#reminderDateTime"),
         reminderMessage: document.querySelector("#reminderMessage"),
         cancelReminder: document.querySelector("#cancelReminder"),
+        filePreviewDialog: document.querySelector("#filePreviewDialog"),
+        filePreviewTitle: document.querySelector("#filePreviewTitle"),
+        filePreviewMeta: document.querySelector("#filePreviewMeta"),
+        filePreviewStage: document.querySelector("#filePreviewStage"),
+        filePreviewStatus: document.querySelector("#filePreviewStatus"),
+        filePreviewImage: document.querySelector("#filePreviewImage"),
+        filePreviewFrame: document.querySelector("#filePreviewFrame"),
+        downloadFilePreview: document.querySelector("#downloadFilePreview"),
+        closeFilePreview: document.querySelector("#closeFilePreview"),
         productTabs: document.querySelector("#productTabs"),
         productInfo: document.querySelector("#productInfo"),
         quizBox: document.querySelector("#quizBox"),
@@ -2592,6 +2693,108 @@
         return files;
       }
 
+      function originalEvidenceFileUrl(file) {
+        return file?.id
+          ? `${API_BASE}/evidence/${encodeURIComponent(file.id)}/file`
+          : file?.dataUrl || "";
+      }
+
+      function publicEvidenceHistoryUrl({ fileId = "", evidenceId = "" } = {}) {
+        const url = new URL("/", PUBLIC_APP_ORIGIN);
+        url.searchParams.set("view", "evidenceView");
+        if (fileId) url.searchParams.set("file", fileId);
+        if (!fileId && evidenceId) url.searchParams.set("evidence", evidenceId);
+        return url.href;
+      }
+
+      function clearPreviewObjectUrl() {
+        if (activePreviewObjectUrl) {
+          URL.revokeObjectURL(activePreviewObjectUrl);
+          activePreviewObjectUrl = "";
+        }
+        els.filePreviewImage.removeAttribute("src");
+        els.filePreviewFrame.removeAttribute("src");
+      }
+
+      function clearEvidenceDeepLink() {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("photo");
+        url.searchParams.delete("file");
+        url.searchParams.delete("evidence");
+        window.history.replaceState({}, "", url);
+      }
+
+      async function openEvidenceFilePreview(file, { syncUrl = true } = {}) {
+        if (!file || (!file.id && !file.dataUrl)) {
+          showToast("Este sustento no tiene un archivo disponible.", "error");
+          return;
+        }
+
+        const requestId = ++previewRequestId;
+        clearPreviewObjectUrl();
+        els.filePreviewTitle.textContent = file.name || "Archivo de sustento";
+        els.filePreviewMeta.textContent = `${file.mimeType || "Archivo"} | Original protegido en la nube LGTASK`;
+        els.filePreviewStatus.textContent = "Cargando archivo original...";
+        els.filePreviewStatus.classList.remove("hidden");
+        els.filePreviewImage.classList.add("hidden");
+        els.filePreviewFrame.classList.add("hidden");
+        els.downloadFilePreview.classList.add("hidden");
+        els.downloadFilePreview.removeAttribute("href");
+        if (!els.filePreviewDialog.open) els.filePreviewDialog.showModal();
+
+        if (syncUrl && file.id) {
+          const url = new URL(window.location.href);
+          url.searchParams.set("view", "evidenceView");
+          url.searchParams.set("file", file.id);
+          url.searchParams.delete("photo");
+          url.searchParams.delete("evidence");
+          window.history.replaceState({}, "", url);
+          lastAutoOpenedFileId = file.id;
+        }
+
+        try {
+          let previewUrl = file.dataUrl || "";
+          let mimeType = file.mimeType || "application/octet-stream";
+          if (file.id) {
+            const response = await fetch(originalEvidenceFileUrl(file), {
+              credentials: "same-origin",
+              cache: "no-store"
+            });
+            if (!response.ok) {
+              throw new Error(response.status === 401 ? "Inicia sesion nuevamente para abrir este archivo." : "No se pudo obtener el archivo de la nube.");
+            }
+            const originalBlob = await response.blob();
+            if (requestId !== previewRequestId) return;
+            mimeType = originalBlob.type || mimeType;
+            activePreviewObjectUrl = URL.createObjectURL(originalBlob);
+            previewUrl = activePreviewObjectUrl;
+          }
+          if (!previewUrl || requestId !== previewRequestId) throw new Error("El archivo no esta disponible.");
+
+          els.downloadFilePreview.href = previewUrl;
+          els.downloadFilePreview.download = file.name || "sustento";
+          els.downloadFilePreview.classList.remove("hidden");
+
+          if (mimeType.startsWith("image/")) {
+            els.filePreviewImage.alt = file.name || "Imagen de sustento";
+            els.filePreviewImage.src = previewUrl;
+            els.filePreviewImage.classList.remove("hidden");
+            els.filePreviewStatus.classList.add("hidden");
+          } else if (mimeType === "application/pdf") {
+            els.filePreviewFrame.src = previewUrl;
+            els.filePreviewFrame.classList.remove("hidden");
+            els.filePreviewStatus.classList.add("hidden");
+          } else {
+            els.filePreviewStatus.textContent = "Este tipo de archivo se conserva en su formato original. Usa Descargar original para abrirlo.";
+          }
+        } catch (error) {
+          if (requestId !== previewRequestId) return;
+          clearPreviewObjectUrl();
+          els.filePreviewStatus.textContent = error.message || "No se pudo abrir el archivo.";
+          els.downloadFilePreview.classList.add("hidden");
+        }
+      }
+
       function dateIsInEvidenceRange(dateValue) {
         const from = els.evidenceDateFrom.value;
         const to = els.evidenceDateTo.value;
@@ -2637,8 +2840,12 @@
             const trainerId = evidence?.submittedById || task.ownerId;
             const activityDate = evidence?.submittedAt ? dateIsoInLima(evidence.submittedAt) : task.dueDate;
             const fileUrl = file?.id
-              ? new URL(`/?view=evidenceView&file=${encodeURIComponent(file.id)}`, window.location.origin).href
+              ? publicEvidenceHistoryUrl({ fileId: file.id })
               : "";
+            const historyUrl = publicEvidenceHistoryUrl({
+              fileId: file?.id || "",
+              evidenceId: evidence?.id || ""
+            });
             return {
               trainerId,
               trainer: userName(trainerId),
@@ -2671,7 +2878,7 @@
               fileId: file?.id || "",
               fileDataUrl: file?.dataUrl || "",
               fileUrl,
-              historyUrl: new URL("/?view=evidenceView", window.location.origin).href
+              historyUrl
             };
           })
           .filter((row) => trainerFilter === "all" || row.trainerId === trainerFilter)
@@ -2855,8 +3062,14 @@
           row.fileName || "Sin archivo",
           row.fileType,
           included,
-          row.fileUrl ? { text: "Abrir respaldo", hyperlink: row.fileUrl, tooltip: `Abrir ${row.fileName || "archivo"} en LGTASK` } : "Sin archivo",
-          { text: "Abrir historial", hyperlink: row.historyUrl, tooltip: "Abrir historial protegido en LGTASK" }
+          row.fileUrl
+            ? {
+                text: row.fileType.startsWith("image/") ? "Ver imagen original" : "Abrir archivo original",
+                hyperlink: row.fileUrl,
+                tooltip: `Abrir ${row.fileName || "archivo"} exacto en LGTASK`
+              }
+            : "Sin archivo",
+          { text: "Ver en historial", hyperlink: row.historyUrl, tooltip: "Abrir este sustento exacto en LGTASK" }
         ];
       }
 
@@ -3898,8 +4111,15 @@
           .sort((a, b) => b.submittedAt - a.submittedAt);
         const query = new URLSearchParams(window.location.search);
         const linkedFileId = query.get("file") || query.get("photo");
+        const linkedEvidenceId = query.get("evidence");
+        const linkedEntry = linkedFileId
+          ? allEvidence.find((entry) => evidenceFilesForEntry(entry).some((file) => file.id === linkedFileId))
+          : null;
+        const linkedFile = linkedEntry
+          ? evidenceFilesForEntry(linkedEntry).find((file) => file.id === linkedFileId)
+          : null;
 
-        if (isCoordinator()) {
+        if (isCoordinator() && !linkedFileId && !linkedEvidenceId) {
           const trainerId = els.evidenceTrainerFilter.value || "all";
           allEvidence = allEvidence
             .filter((entry) => trainerId === "all" || entry.submittedById === trainerId)
@@ -3909,6 +4129,8 @@
           allEvidence = allEvidence.filter((entry) =>
             evidenceFilesForEntry(entry).some((file) => file.id === linkedFileId)
           );
+        } else if (linkedEvidenceId) {
+          allEvidence = allEvidence.filter((entry) => entry.id === linkedEvidenceId);
         }
 
         els.evidenceList.innerHTML = "";
@@ -3925,17 +4147,18 @@
           card.className = "item";
           const files = evidenceFilesForEntry(entry);
           const filesMarkup = files
-            .map((file) => {
-              const fileUrl = file.id
-                ? `${API_BASE}/evidence/${encodeURIComponent(file.id)}/file`
-                : file.dataUrl;
+            .map((file, fileIndex) => {
+              const fileUrl = originalEvidenceFileUrl(file);
               const image = file.mimeType.startsWith("image/");
               return `
                 <div class="evidence-file-row">
                   <strong>${escapeHtml(file.name)}</strong>
                   <span class="muted">${escapeHtml(file.mimeType)}</span>
                   ${image ? `<img class="evidence-photo" loading="lazy" src="${escapeHtml(fileUrl)}" alt="${escapeHtml(file.name)}" />` : ""}
-                  <a class="small" href="${escapeHtml(fileUrl)}" target="_blank" rel="noopener">Abrir o descargar archivo</a>
+                  <div class="actions">
+                    <button class="small preview-evidence-file" type="button" data-file-index="${fileIndex}">Ver archivo original</button>
+                    <a class="small" href="${escapeHtml(fileUrl)}" download="${escapeHtml(file.name)}">Descargar original</a>
+                  </div>
                 </div>
               `;
             })
@@ -3981,8 +4204,21 @@
             card.appendChild(actions);
           }
 
+          card.querySelectorAll(".preview-evidence-file").forEach((button) => {
+            button.addEventListener("click", () => {
+              const file = files[Number(button.dataset.fileIndex)];
+              openEvidenceFilePreview(file).catch(() => {});
+            });
+          });
           els.evidenceList.appendChild(card);
         });
+
+        if (linkedFile && linkedFileId !== lastAutoOpenedFileId) {
+          lastAutoOpenedFileId = linkedFileId;
+          window.requestAnimationFrame(() => {
+            openEvidenceFilePreview(linkedFile, { syncUrl: false }).catch(() => {});
+          });
+        }
       }
 
       function renderTeam() {
@@ -4635,6 +4871,24 @@
 
         els.taskStatusFilter.addEventListener("change", renderTasks);
         els.taskTrainerFilter.addEventListener("change", renderTasks);
+        els.openCloudHistory.addEventListener("click", () => {
+          els.evidenceTrainerFilter.value = "all";
+          els.evidenceDateFrom.value = "";
+          els.evidenceDateTo.value = "";
+          lastAutoOpenedFileId = "";
+          clearEvidenceDeepLink();
+          activateView("evidenceView", { updateUrl: true });
+          renderEvidence();
+          window.requestAnimationFrame(() => {
+            els.evidenceList.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        });
+        els.closeFilePreview.addEventListener("click", () => els.filePreviewDialog.close());
+        els.filePreviewDialog.addEventListener("close", () => {
+          previewRequestId += 1;
+          clearPreviewObjectUrl();
+          clearEvidenceDeepLink();
+        });
         els.evidenceTrainerFilter.addEventListener("change", renderEvidence);
         els.evidenceDateFrom.addEventListener("change", renderEvidence);
         els.evidenceDateTo.addEventListener("change", renderEvidence);
@@ -4652,6 +4906,7 @@
           const url = new URL(window.location.href);
           url.searchParams.delete("photo");
           url.searchParams.delete("file");
+          url.searchParams.delete("evidence");
           window.history.replaceState({}, "", url);
           setMessage(els.evidenceExportMessage, "", "");
           renderEvidence();
