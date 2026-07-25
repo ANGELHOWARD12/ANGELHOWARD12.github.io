@@ -377,6 +377,7 @@
         gap: 8px;
         margin-bottom: 16px;
         overflow-x: auto;
+        scrollbar-width: thin;
       }
 
       .tab {
@@ -401,6 +402,54 @@
 
       .view.active {
         display: block;
+      }
+
+      .toast-region {
+        display: grid;
+        gap: 8px;
+        left: 50%;
+        max-width: min(440px, calc(100vw - 24px));
+        pointer-events: none;
+        position: fixed;
+        top: 92px;
+        transform: translateX(-50%);
+        width: 100%;
+        z-index: 50;
+      }
+
+      .toast {
+        background: #172033;
+        border: 1px solid #344054;
+        border-radius: 8px;
+        box-shadow: 0 16px 34px rgba(23, 32, 51, 0.22);
+        color: #fff;
+        font-weight: 800;
+        line-height: 1.35;
+        padding: 13px 15px;
+      }
+
+      .toast.success {
+        background: #07583e;
+        border-color: #0f8a5f;
+      }
+
+      .toast.error {
+        background: #8f1f2b;
+        border-color: #c8333b;
+      }
+
+      .workflow-status {
+        align-items: center;
+        background: var(--yellow-soft);
+        border: 1px solid #ecd28f;
+        border-radius: 8px;
+        color: #765200;
+        display: inline-flex;
+        font-size: 13px;
+        font-weight: 900;
+        gap: 7px;
+        min-height: 38px;
+        padding: 8px 11px;
       }
 
       .list {
@@ -989,6 +1038,110 @@
       }
 
       @media (max-width: 720px) {
+        body {
+          padding-bottom: calc(68px + env(safe-area-inset-bottom));
+        }
+
+        .shell {
+          padding: 14px 10px 24px;
+        }
+
+        .topbar {
+          gap: 10px;
+          padding: 11px 12px;
+          position: static;
+        }
+
+        .topbar .brand-mark {
+          height: 38px;
+          width: 38px;
+        }
+
+        .topbar .brand h1 {
+          font-size: 19px;
+        }
+
+        .session {
+          display: grid;
+          gap: 8px;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        }
+
+        #sessionName {
+          align-self: center;
+          font-weight: 800;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        #sessionRole {
+          justify-self: end;
+        }
+
+        #notificationButton,
+        #logoutButton {
+          justify-content: center;
+          width: 100%;
+        }
+
+        .dashboard {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .date-card {
+          grid-column: 1 / -1;
+        }
+
+        .date-card,
+        .metric {
+          min-height: 76px;
+          padding: 12px;
+        }
+
+        .date-card strong,
+        .metric strong {
+          font-size: 22px;
+        }
+
+        .tabs {
+          background: #fff;
+          border-top: 1px solid var(--line);
+          bottom: 0;
+          box-shadow: 0 -8px 24px rgba(23, 32, 51, 0.12);
+          display: grid;
+          gap: 3px;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          left: 0;
+          margin: 0;
+          overflow: visible;
+          padding: 6px 5px calc(6px + env(safe-area-inset-bottom));
+          position: fixed;
+          right: 0;
+          z-index: 40;
+        }
+
+        .tab {
+          border: 0;
+          font-size: 11px;
+          font-weight: 800;
+          min-height: 48px;
+          min-width: 0;
+          padding: 4px 2px;
+          white-space: normal;
+        }
+
+        .tab.active {
+          background: var(--soft);
+          color: var(--blue-dark);
+        }
+
+        .toast-region {
+          bottom: calc(76px + env(safe-area-inset-bottom));
+          top: auto;
+        }
+
         .login-grid,
         .form-grid,
         .feature-grid {
@@ -1156,12 +1309,12 @@
         </div>
       </section>
 
-      <nav class="tabs" aria-label="Vistas principales">
-        <button class="tab active" data-view="tasksView">Tareas</button>
-        <button class="tab" data-view="evidenceView">Sustentos</button>
-        <button class="tab" data-view="teamView">Equipo</button>
-        <button class="tab" data-view="announcementsView">Comunicados</button>
-        <button class="tab" data-view="infoView">Info LG</button>
+      <nav id="mainTabs" class="tabs" aria-label="Vistas principales" role="tablist">
+        <button class="tab active" data-view="tasksView" role="tab" aria-selected="true">Tareas</button>
+        <button class="tab" data-view="evidenceView" role="tab" aria-selected="false">Sustentos</button>
+        <button class="tab" data-view="teamView" role="tab" aria-selected="false">Equipo</button>
+        <button class="tab" data-view="announcementsView" role="tab" aria-selected="false">Avisos</button>
+        <button class="tab" data-view="infoView" role="tab" aria-selected="false">Info LG</button>
       </nav>
 
       <section id="tasksView" class="view active">
@@ -1334,7 +1487,7 @@
                 Observaciones
                 <textarea id="evidenceNotes" placeholder="Describe que se realizo, hallazgos, incidencias o acuerdos"></textarea>
               </label>
-              <button class="primary wide" type="submit">Enviar sustento</button>
+              <button id="evidenceSubmitButton" class="primary wide" type="submit">Enviar sustento</button>
             </form>
             <p id="evidenceMessage" class="message" aria-live="polite"></p>
           </section>
@@ -1501,6 +1654,8 @@
       </section>
     </main>
 
+    <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+
     <dialog id="reassignDialog">
       <form id="reassignForm" class="stack">
         <div>
@@ -1588,6 +1743,7 @@
       const MAX_EVIDENCE_FILE_BYTES = 15_000_000;
       const EVIDENCE_CHUNK_BASE64 = 750_000;
       const NOTIFICATION_TASKS_KEY = "lgtask-notified-tasks-v1";
+      const ALLOWED_VIEW_IDS = ["tasksView", "evidenceView", "teamView", "announcementsView", "infoView"];
       const EVIDENCE_FILE_EXTENSIONS = new Set([
         "jpg",
         "jpeg",
@@ -1713,8 +1869,14 @@
       let state = loadState();
       let syncTimer = 0;
       let syncInFlight = null;
+      let syncQueued = false;
+      let stateRevision = 0;
       let serviceWorkerRegistration = null;
       let notificationCheckInFlight = null;
+      let toastTimer = 0;
+      let activeViewId = ALLOWED_VIEW_IDS.includes(new URLSearchParams(window.location.search).get("view"))
+        ? new URLSearchParams(window.location.search).get("view")
+        : "tasksView";
 
       const els = {
         loginScreen: document.querySelector("#loginScreen"),
@@ -1743,6 +1905,7 @@
         notificationButton: document.querySelector("#notificationButton"),
         notificationButtonText: document.querySelector("#notificationButtonText"),
         logoutButton: document.querySelector("#logoutButton"),
+        mainTabs: document.querySelector("#mainTabs"),
         todayLabel: document.querySelector("#todayLabel"),
         progressPercent: document.querySelector("#progressPercent"),
         progressBar: document.querySelector("#progressBar"),
@@ -1794,6 +1957,7 @@
         evidenceResult: document.querySelector("#evidenceResult"),
         evidenceFiles: document.querySelector("#evidenceFiles"),
         evidenceNotes: document.querySelector("#evidenceNotes"),
+        evidenceSubmitButton: document.querySelector("#evidenceSubmitButton"),
         evidenceMessage: document.querySelector("#evidenceMessage"),
         cloudPlanPanel: document.querySelector("#cloudPlanPanel"),
         evidenceFilters: document.querySelector("#evidenceFilters"),
@@ -1852,7 +2016,8 @@
         cancelReminder: document.querySelector("#cancelReminder"),
         productTabs: document.querySelector("#productTabs"),
         productInfo: document.querySelector("#productInfo"),
-        quizBox: document.querySelector("#quizBox")
+        quizBox: document.querySelector("#quizBox"),
+        toastRegion: document.querySelector("#toastRegion")
       };
 
       function loadState() {
@@ -1887,7 +2052,7 @@
         return nextState;
       }
 
-      function saveState() {
+      function saveUiState() {
         localStorage.setItem(
           STORAGE_KEY,
           JSON.stringify({
@@ -1896,6 +2061,11 @@
             selectedCoordinatorDate: state.selectedCoordinatorDate
           })
         );
+      }
+
+      function saveState() {
+        stateRevision += 1;
+        saveUiState();
         if (!state.activeUserId) return;
         window.clearTimeout(syncTimer);
         syncTimer = window.setTimeout(() => {
@@ -2086,18 +2256,34 @@
         }
       }
 
-      async function syncState() {
-        if (!state.activeUserId) return;
-        if (syncInFlight) return syncInFlight;
-        const snapshot = JSON.parse(JSON.stringify(state));
-        syncInFlight = apiRequest("/state", { method: "PUT", body: JSON.stringify({ state: snapshot }) })
-          .then((data) => {
-            applyCloudState(data.state);
+      async function runSyncQueue() {
+        let finalData = null;
+        while (syncQueued && state.activeUserId) {
+          syncQueued = false;
+          const snapshotRevision = stateRevision;
+          const snapshot = JSON.parse(JSON.stringify(state));
+          finalData = await apiRequest("/state", { method: "PUT", body: JSON.stringify({ state: snapshot }) });
+          if (stateRevision === snapshotRevision) {
+            applyCloudState(finalData.state);
             render();
-          })
-          .finally(() => {
+          } else {
+            syncQueued = true;
+          }
+        }
+        return finalData;
+      }
+
+      function syncState() {
+        if (!state.activeUserId) return Promise.resolve(null);
+        syncQueued = true;
+        if (!syncInFlight) {
+          syncInFlight = runSyncQueue().finally(() => {
             syncInFlight = null;
+            if (syncQueued && state.activeUserId) {
+              syncState().catch((error) => console.error("No se pudo completar la sincronizacion pendiente", error));
+            }
           });
+        }
         return syncInFlight;
       }
 
@@ -3029,11 +3215,39 @@
         return `<div class="empty"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(detail || "")}</p></div>`;
       }
 
-      function activateView(viewId) {
-        const allowedViews = ["tasksView", "evidenceView", "teamView", "announcementsView", "infoView"];
-        if (!allowedViews.includes(viewId)) return;
-        document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item.dataset.view === viewId));
-        document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === viewId));
+      function showToast(message, type = "success") {
+        window.clearTimeout(toastTimer);
+        els.toastRegion.innerHTML = "";
+        const toast = document.createElement("div");
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        els.toastRegion.appendChild(toast);
+        toastTimer = window.setTimeout(() => {
+          toast.remove();
+        }, 5200);
+      }
+
+      function activateView(viewId, { updateUrl = false, historyMode = "replace", scroll = false } = {}) {
+        const nextView = ALLOWED_VIEW_IDS.includes(viewId) ? viewId : "tasksView";
+        activeViewId = nextView;
+        document.querySelectorAll(".tab").forEach((item) => {
+          const selected = item.dataset.view === nextView;
+          item.classList.toggle("active", selected);
+          item.setAttribute("aria-selected", String(selected));
+        });
+        document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === nextView));
+        if (updateUrl) {
+          const url = new URL(window.location.href);
+          url.searchParams.set("view", nextView);
+          if (nextView !== "evidenceView") {
+            url.searchParams.delete("file");
+            url.searchParams.delete("photo");
+          }
+          window.history[historyMode === "push" ? "pushState" : "replaceState"]({}, "", url);
+        }
+        if (scroll) {
+          window.requestAnimationFrame(() => els.mainTabs.scrollIntoView({ behavior: "smooth", block: "start" }));
+        }
       }
 
       function render() {
@@ -3071,7 +3285,7 @@
           : "Organiza tus propias tareas de la semana. Solo puedes asignarlas a tu usuario.";
         els.taskSubmitButton.textContent = isCoordinator() ? "Asignar tarea" : "Agregar a mi semana";
         els.taskOwner.disabled = !isCoordinator();
-        activateView(new URLSearchParams(window.location.search).get("view") || document.querySelector(".tab.active")?.dataset.view || "tasksView");
+        activateView(activeViewId);
 
         refreshSelects();
         renderMotivation();
@@ -3462,7 +3676,8 @@
       }
 
       function openEvidenceForTask(task) {
-        document.querySelector('[data-view="evidenceView"]').click();
+        activateView("evidenceView", { updateUrl: true, historyMode: "push", scroll: true });
+        render();
         els.evidenceTask.value = task.id;
         els.evidenceStore.focus();
       }
@@ -3478,8 +3693,8 @@
         }
         if (task.status === "En revision") {
           const note = document.createElement("span");
-          note.className = "review-note";
-          note.textContent = "Pendiente de revision de Pablo";
+          note.className = "workflow-status";
+          note.textContent = "Sustento enviado | pendiente de aprobacion de Pablo";
           container.appendChild(note);
           return;
         }
@@ -3581,6 +3796,7 @@
         tasks.forEach((task) => {
           const card = document.createElement("article");
           card.className = `item task-item ${task.status === "Cumplida" ? "is-approved" : ""}`;
+          card.dataset.taskId = task.id;
           const latestEvidence = task.evidence?.at(-1);
           card.innerHTML = `
             <div class="stack">
@@ -3615,7 +3831,8 @@
             const approveButton = document.createElement("button");
             approveButton.className = "small";
             approveButton.type = "button";
-            approveButton.textContent = "Aprobar";
+            approveButton.className = "primary";
+            approveButton.textContent = "Aprobar y completar";
             approveButton.addEventListener("click", () => reviewTask(task.id, "Cumplida"));
 
             const observeButton = document.createElement("button");
@@ -3653,18 +3870,26 @@
         });
       }
 
-      function reviewTask(taskId, status) {
+      async function reviewTask(taskId, status) {
         const task = state.tasks.find((item) => item.id === taskId);
-        if (!task) return;
-        task.status = status;
-        const latestEvidence = task.evidence?.at(-1);
-        if (latestEvidence) {
-          latestEvidence.review = status === "Cumplida" ? "Aprobado" : "Observado";
-          latestEvidence.reviewedById = state.activeUserId;
-          latestEvidence.reviewedAt = Date.now();
+        if (!task || !isCoordinator()) return;
+        try {
+          if (syncInFlight) await syncInFlight;
+          const data = await apiRequest("/tasks/review", {
+            method: "POST",
+            body: JSON.stringify({ taskId, status })
+          });
+          applyCloudState(data.state);
+          render();
+          showToast(
+            status === "Cumplida"
+              ? `Tarea completada. ${userName(task.ownerId)} ya vera el check de aprobacion.`
+              : "Sustento observado. El trainer podra corregirlo y enviarlo nuevamente.",
+            "success"
+          );
+        } catch (error) {
+          showToast(error.message || "No se pudo guardar la revision.", "error");
         }
-        saveState();
-        render();
       }
 
       function renderEvidence() {
@@ -3733,13 +3958,19 @@
             ${files.length ? `<div class="evidence-file-list">${filesMarkup}</div>` : `<p class="muted">Sustento sin archivo adjunto.</p>`}
           `;
 
-          if (isCoordinator() && entry.review !== "Aprobado") {
+          const latestEvidence = entry.task.evidence?.at(-1);
+          const canReview =
+            isCoordinator() &&
+            latestEvidence?.id === entry.id &&
+            entry.review === "Pendiente" &&
+            entry.task.status === "En revision";
+          if (canReview) {
             const actions = document.createElement("div");
             actions.className = "actions";
             const approveButton = document.createElement("button");
-            approveButton.className = "small";
+            approveButton.className = "primary";
             approveButton.type = "button";
-            approveButton.textContent = "Aprobar tarea";
+            approveButton.textContent = "Aprobar y completar";
             approveButton.addEventListener("click", () => reviewTask(entry.task.id, "Cumplida"));
             const observeButton = document.createElement("button");
             observeButton.className = "small";
@@ -3956,7 +4187,7 @@
           button.className = product.id === state.selectedProduct ? "active" : "";
           button.addEventListener("click", () => {
             state.selectedProduct = product.id;
-            saveState();
+            saveUiState();
             renderProducts();
           });
           els.productTabs.appendChild(button);
@@ -4205,6 +4436,8 @@
           state.activeUserId = "";
           state.users = [];
           state.tasks = [];
+          activeViewId = "tasksView";
+          activateView("tasksView", { updateUrl: true });
           els.loginEmail.value = "";
           els.loginPassword.value = "";
           render();
@@ -4219,10 +4452,15 @@
 
         document.querySelectorAll(".tab").forEach((tab) => {
           tab.addEventListener("click", () => {
-            document.querySelectorAll(".tab").forEach((item) => item.classList.toggle("active", item === tab));
-            document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === tab.dataset.view));
+            activateView(tab.dataset.view, { updateUrl: true, historyMode: "push", scroll: true });
             render();
           });
+        });
+
+        window.addEventListener("popstate", () => {
+          const requestedView = new URLSearchParams(window.location.search).get("view");
+          activeViewId = ALLOWED_VIEW_IDS.includes(requestedView) ? requestedView : "tasksView";
+          render();
         });
 
         els.editMotivation.addEventListener("click", () => {
@@ -4258,19 +4496,19 @@
 
         els.prevDay.addEventListener("click", () => {
           state.selectedCoordinatorDate = addWorkingDays(state.selectedCoordinatorDate || todayIso, -1);
-          saveState();
+          saveUiState();
           renderCoordinatorDay();
         });
 
         els.todayDay.addEventListener("click", () => {
           state.selectedCoordinatorDate = nearestWorkingDay(todayIso);
-          saveState();
+          saveUiState();
           renderCoordinatorDay();
         });
 
         els.nextDay.addEventListener("click", () => {
           state.selectedCoordinatorDate = addWorkingDays(state.selectedCoordinatorDate || todayIso, 1);
-          saveState();
+          saveUiState();
           renderCoordinatorDay();
         });
 
@@ -4280,25 +4518,25 @@
             window.alert("Los domingos no forman parte de la jornada laboral.");
           }
           state.selectedCoordinatorDate = nearestWorkingDay(els.coordinatorDate.value);
-          saveState();
+          saveUiState();
           renderCoordinatorDay();
         });
 
         els.prevWeek.addEventListener("click", () => {
           state.selectedWeekStart = addDaysIso(state.selectedWeekStart || weekStartIso(todayIso), -7);
-          saveState();
+          saveUiState();
           render();
         });
 
         els.todayWeek.addEventListener("click", () => {
           state.selectedWeekStart = weekStartIso(todayIso);
-          saveState();
+          saveUiState();
           render();
         });
 
         els.nextWeek.addEventListener("click", () => {
           state.selectedWeekStart = addDaysIso(state.selectedWeekStart || weekStartIso(todayIso), 7);
-          saveState();
+          saveUiState();
           render();
         });
 
@@ -4423,6 +4661,7 @@
 
         els.evidenceForm.addEventListener("submit", async (event) => {
           event.preventDefault();
+          if (els.evidenceSubmitButton.disabled) return;
           const task = state.tasks.find((item) => item.id === els.evidenceTask.value);
           if (!task) {
             setMessage(els.evidenceMessage, "No hay tarea seleccionada.", "err");
@@ -4433,9 +4672,13 @@
             setMessage(els.evidenceMessage, "Explica el motivo para que el coordinador pueda reasignar o dar seguimiento.", "err");
             return;
           }
+          els.evidenceSubmitButton.disabled = true;
+          els.evidenceSubmitButton.textContent = "Enviando...";
           const selectedFiles = Array.from(els.evidenceFiles.files || []);
           if (selectedFiles.length > MAX_EVIDENCE_FILES) {
             setMessage(els.evidenceMessage, `Puedes adjuntar un maximo de ${MAX_EVIDENCE_FILES} archivos por sustento.`, "err");
+            els.evidenceSubmitButton.disabled = false;
+            els.evidenceSubmitButton.textContent = "Enviar sustento";
             return;
           }
           setMessage(els.evidenceMessage, "Validando archivos...", "");
@@ -4444,6 +4687,8 @@
             preparedFiles = await Promise.all(selectedFiles.map(prepareEvidenceFile));
           } catch (error) {
             setMessage(els.evidenceMessage, error.message, "err");
+            els.evidenceSubmitButton.disabled = false;
+            els.evidenceSubmitButton.textContent = "Enviar sustento";
             return;
           }
           const uploadedFiles = [];
@@ -4466,6 +4711,8 @@
             }
           } catch (error) {
             setMessage(els.evidenceMessage, `No se pudieron subir todos los archivos: ${error.message}`, "err");
+            els.evidenceSubmitButton.disabled = false;
+            els.evidenceSubmitButton.textContent = "Enviar sustento";
             return;
           }
           const evidence = {
@@ -4480,38 +4727,32 @@
             review: "Pendiente"
           };
           evidence.cloudPath = cloudFolderForEvidence(evidence, task);
-          task.evidence = task.evidence || [];
-          task.evidence.push(evidence);
-          if (els.evidenceResult.value === "No se pudo cumplir") {
-            task.status = "No disponible";
-            task.blockedReason = notes;
-            task.blockedAt = Date.now();
-            task.history = task.history || [];
-            task.history.push({
-              type: "Bloqueo",
-              fromId: state.activeUserId,
-              reason: notes,
-              at: Date.now()
-            });
-          } else {
-            task.status = "En revision";
-          }
-          saveState();
           try {
-            await syncState();
+            const data = await apiRequest("/tasks/evidence", {
+              method: "POST",
+              body: JSON.stringify({ taskId: task.id, evidence })
+            });
+            applyCloudState(data.state);
           } catch (error) {
             setMessage(els.evidenceMessage, `El archivo se guardo, pero falta sincronizar el formulario: ${error.message}`, "err");
+            els.evidenceSubmitButton.disabled = false;
+            els.evidenceSubmitButton.textContent = "Reintentar envio";
             return;
           }
           els.evidenceForm.reset();
-          setMessage(
-            els.evidenceMessage,
+          els.evidenceSubmitButton.disabled = false;
+          els.evidenceSubmitButton.textContent = "Enviar sustento";
+          const successMessage =
             evidence.result === "No se pudo cumplir"
-              ? "Feedback guardado en la nube. Reasigna la tarea indicando quien puede atenderla."
-              : `Sustento guardado en la nube con ${uploadedFiles.length} archivo${uploadedFiles.length === 1 ? "" : "s"}. Queda pendiente de revision del coordinador.`,
-            "ok"
-          );
+              ? "Feedback guardado. Pablo ya puede reasignar o dar seguimiento."
+              : `Sustento guardado con ${uploadedFiles.length} archivo${uploadedFiles.length === 1 ? "" : "s"}. Pablo debe aprobarlo para completar la tarea.`;
+          activateView("tasksView", { updateUrl: true, historyMode: "replace" });
           render();
+          showToast(successMessage, "success");
+          window.requestAnimationFrame(() => {
+            const taskCard = document.querySelector(`[data-task-id="${CSS.escape(task.id)}"]`);
+            taskCard?.scrollIntoView({ behavior: "smooth", block: "center" });
+          });
         });
 
         els.createTrainerForm.addEventListener("submit", async (event) => {
