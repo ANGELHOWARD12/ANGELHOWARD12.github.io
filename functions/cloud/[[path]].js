@@ -18,6 +18,8 @@ const SATURDAY_END = "14:00";
 const BREAK_START = "12:30";
 const BREAK_END = "14:00";
 const MAX_FILE_BASE64 = 1_800_000;
+const MAX_FILE_TOTAL_BASE64 = 21_000_000;
+const MAX_FILE_CHUNK_BASE64 = 900_000;
 const ALLOWED_FILE_EXTENSIONS = new Set([
   "jpg",
   "jpeg",
@@ -79,11 +81,24 @@ export async function onRequest(context) {
     const session = await authenticate(request, env.DB);
     if (!session) return json({ ok: false, message: "Sesion no valida." }, 401);
 
+    if (route === "notifications/config" && request.method === "GET") return notificationConfig(env.DB);
+    if (route === "notifications/subscribe" && request.method === "POST") {
+      return subscribeNotifications(request, env.DB, session.user, context);
+    }
+    if (route === "notifications/unsubscribe" && request.method === "POST") {
+      return unsubscribeNotifications(request, env.DB, session.user);
+    }
+    if (route === "notifications/pending" && request.method === "GET") {
+      return pendingNotifications(env.DB, session.user);
+    }
     if (route === "evidence/upload" && request.method === "POST") return uploadEvidence(request, env.DB, session.user);
+    if (route === "evidence/upload/init" && request.method === "POST") return initEvidenceUpload(request, env.DB, session.user);
+    if (route === "evidence/upload/chunk" && request.method === "POST") return uploadEvidenceChunk(request, env.DB, session.user);
+    if (route === "evidence/upload/complete" && request.method === "POST") return completeEvidenceUpload(request, env.DB, session.user);
     const evidenceFileMatch = route.match(/^evidence\/([^/]+)\/(?:file|photo)$/);
     if (evidenceFileMatch && request.method === "GET") return evidenceFile(env.DB, session.user, evidenceFileMatch[1]);
-    if (route === "state" && request.method === "GET") return getState(env.DB, session.user);
-    if (route === "state" && request.method === "PUT") return putState(request, env.DB, session.user);
+    if (route === "state" && request.method === "GET") return getState(env.DB, session.user, context);
+    if (route === "state" && request.method === "PUT") return putState(request, env.DB, session.user, context);
     if (route === "admin/users" && request.method === "POST") return createUser(request, env.DB, session.user);
     if (route === "admin/reset-password" && request.method === "POST") return resetPassword(request, env.DB, session.user);
 
@@ -129,11 +144,47 @@ async function ensureSchema(db) {
       photo_base64 TEXT NOT NULL,
       created_at INTEGER NOT NULL
     )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS evidence_file_chunks (
+      file_id TEXT NOT NULL,
+      chunk_index INTEGER NOT NULL,
+      chunk_base64 TEXT NOT NULL,
+      PRIMARY KEY (file_id, chunk_index),
+      FOREIGN KEY (file_id) REFERENCES evidence_files(id) ON DELETE CASCADE
+    )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS notification_subscriptions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      endpoint TEXT NOT NULL UNIQUE,
+      p256dh TEXT NOT NULL DEFAULT '',
+      auth TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS user_notifications (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      target_url TEXT NOT NULL DEFAULT '/',
+      source_key TEXT NOT NULL UNIQUE,
+      created_at INTEGER NOT NULL,
+      delivered_at INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`),
     db.prepare("INSERT OR IGNORE INTO app_data (id, data, updated_at) VALUES (1, ?, 0)").bind(JSON.stringify(EMPTY_DATA)),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_evidence_task ON evidence_files(task_id)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_evidence_submitter ON evidence_files(submitted_by_id)")
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_evidence_submitter ON evidence_files(submitted_by_id)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_evidence_chunks_file ON evidence_file_chunks(file_id)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_notification_subscriptions_user ON notification_subscriptions(user_id)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_user_notifications_pending ON user_notifications(user_id, delivered_at)")
   ]);
 }
 
@@ -236,8 +287,73 @@ async function authenticate(request, db) {
   return { user: row };
 }
 
-async function getState(db, user) {
-  return stateResponse(db, user);
+async function getState(db, user, context) {
+  const data = await loadData(db);
+  context.waitUntil(dispatchDueReminders(db, data));
+  return stateResponse(db, user, data);
+}
+
+async function notificationConfig(db) {
+  const keys = await ensureVapidKeys(db);
+  return json({ ok: true, publicKey: keys.publicKey });
+}
+
+async function subscribeNotifications(request, db, user, context) {
+  const body = await readJson(request);
+  const endpoint = clean(body.endpoint);
+  const p256dh = clean(body.keys?.p256dh);
+  const auth = clean(body.keys?.auth);
+  if (!endpoint.startsWith("https://") || endpoint.length > 2000) {
+    return json({ ok: false, message: "La suscripcion de notificaciones no es valida." }, 400);
+  }
+  const subscriptionId = await sha256Hex(endpoint);
+  const now = Date.now();
+  await db
+    .prepare(
+      `INSERT INTO notification_subscriptions (id, user_id, endpoint, p256dh, auth, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh,
+       auth = excluded.auth, updated_at = excluded.updated_at`
+    )
+    .bind(subscriptionId, user.id, endpoint, p256dh, auth, now, now)
+    .run();
+  context.waitUntil(pushNotificationsForUsers(db, [user.id]));
+  return json({ ok: true });
+}
+
+async function unsubscribeNotifications(request, db, user) {
+  const body = await readJson(request);
+  const endpoint = clean(body.endpoint);
+  if (endpoint) {
+    await db.prepare("DELETE FROM notification_subscriptions WHERE endpoint = ? AND user_id = ?").bind(endpoint, user.id).run();
+  }
+  return json({ ok: true });
+}
+
+async function pendingNotifications(db, user) {
+  const rows = await db
+    .prepare(
+      `SELECT id, title, body, target_url, created_at
+       FROM user_notifications WHERE user_id = ? AND delivered_at = 0
+       ORDER BY created_at ASC LIMIT 20`
+    )
+    .bind(user.id)
+    .all();
+  const notifications = (rows.results || []).map((row) => ({
+    id: row.id,
+    title: row.title,
+    body: row.body,
+    url: row.target_url,
+    createdAt: row.created_at
+  }));
+  if (notifications.length) {
+    await db.batch(
+      notifications.map((item) =>
+        db.prepare("UPDATE user_notifications SET delivered_at = ? WHERE id = ? AND user_id = ?").bind(Date.now(), item.id, user.id)
+      )
+    );
+  }
+  return json({ ok: true, notifications });
 }
 
 async function uploadEvidence(request, db, user) {
@@ -276,13 +392,120 @@ async function uploadEvidence(request, db, user) {
   }, 201);
 }
 
+async function initEvidenceUpload(request, db, user) {
+  const body = await readJson(request);
+  const taskId = clean(body.taskId);
+  const data = await loadData(db);
+  const task = data.tasks.find((item) => item.id === taskId);
+  if (!task) return json({ ok: false, message: "La tarea ya no existe." }, 404);
+  if (user.role !== "Coordinador" && task.ownerId !== user.id) {
+    return json({ ok: false, message: "No puedes subir sustentos para esa tarea." }, 403);
+  }
+
+  const fileName = clean(body.fileName).replace(/[\\/:*?"<>|]/g, "-").slice(0, 120) || "archivo-sustento";
+  const extension = fileName.includes(".") ? fileName.split(".").pop().toLowerCase() : "";
+  const mimeType = clean(body.mimeType).toLowerCase() || mimeTypeForExtension(extension);
+  const totalBase64 = Number(body.totalBase64 || 0);
+  const chunkCount = Number(body.chunkCount || 0);
+  if (
+    !ALLOWED_FILE_EXTENSIONS.has(extension) ||
+    !ALLOWED_FILE_MIME_TYPES.has(mimeType) ||
+    !Number.isInteger(chunkCount) ||
+    chunkCount < 1 ||
+    chunkCount > 30 ||
+    totalBase64 < 1 ||
+    totalBase64 > MAX_FILE_TOTAL_BASE64
+  ) {
+    return json({ ok: false, message: "El archivo no tiene un formato o tamano permitido." }, 400);
+  }
+
+  const fileId = crypto.randomUUID();
+  const createdAt = Date.now();
+  await db
+    .prepare(
+      "INSERT INTO evidence_files (id, task_id, owner_id, submitted_by_id, file_name, mime_type, photo_base64, created_at) VALUES (?, ?, ?, ?, ?, ?, '', ?)"
+    )
+    .bind(fileId, task.id, task.ownerId, user.id, fileName, mimeType, createdAt)
+    .run();
+  return json({ ok: true, fileId, chunkCount, createdAt }, 201);
+}
+
+async function uploadEvidenceChunk(request, db, user) {
+  const body = await readJson(request, 1_050_000);
+  const fileId = clean(body.fileId);
+  const chunkIndex = Number(body.chunkIndex);
+  const chunkBase64 = String(body.chunkBase64 || "");
+  const row = await db.prepare("SELECT owner_id, submitted_by_id FROM evidence_files WHERE id = ?").bind(fileId).first();
+  if (!row) return json({ ok: false, message: "La carga ya no existe." }, 404);
+  if (user.role !== "Coordinador" && row.submitted_by_id !== user.id && row.owner_id !== user.id) {
+    return json({ ok: false, message: "No puedes completar esta carga." }, 403);
+  }
+  if (
+    !Number.isInteger(chunkIndex) ||
+    chunkIndex < 0 ||
+    chunkIndex > 29 ||
+    !chunkBase64 ||
+    chunkBase64.length > MAX_FILE_CHUNK_BASE64 ||
+    !/^[A-Za-z0-9+/=]+$/.test(chunkBase64)
+  ) {
+    return json({ ok: false, message: "Uno de los bloques del archivo no es valido." }, 400);
+  }
+  await db
+    .prepare("INSERT OR REPLACE INTO evidence_file_chunks (file_id, chunk_index, chunk_base64) VALUES (?, ?, ?)")
+    .bind(fileId, chunkIndex, chunkBase64)
+    .run();
+  return json({ ok: true, chunkIndex });
+}
+
+async function completeEvidenceUpload(request, db, user) {
+  const body = await readJson(request);
+  const fileId = clean(body.fileId);
+  const expectedChunks = Number(body.chunkCount);
+  const row = await db.prepare("SELECT * FROM evidence_files WHERE id = ?").bind(fileId).first();
+  if (!row) return json({ ok: false, message: "La carga ya no existe." }, 404);
+  if (user.role !== "Coordinador" && row.submitted_by_id !== user.id && row.owner_id !== user.id) {
+    return json({ ok: false, message: "No puedes completar esta carga." }, 403);
+  }
+  const summary = await db
+    .prepare("SELECT COUNT(*) AS chunks, COALESCE(SUM(LENGTH(chunk_base64)), 0) AS total FROM evidence_file_chunks WHERE file_id = ?")
+    .bind(fileId)
+    .first();
+  if (
+    !Number.isInteger(expectedChunks) ||
+    expectedChunks < 1 ||
+    Number(summary?.chunks || 0) !== expectedChunks ||
+    Number(summary?.total || 0) > MAX_FILE_TOTAL_BASE64
+  ) {
+    return json({ ok: false, message: "Faltan bloques del archivo. Intenta subirlo nuevamente." }, 400);
+  }
+  return json({
+    ok: true,
+    file: {
+      id: row.id,
+      name: row.file_name,
+      mimeType: row.mime_type,
+      createdAt: row.created_at,
+      url: `/cloud/evidence/${row.id}/file`
+    }
+  }, 201);
+}
+
 async function evidenceFile(db, user, fileId) {
   const row = await db.prepare("SELECT * FROM evidence_files WHERE id = ?").bind(clean(fileId)).first();
   if (!row) return json({ ok: false, message: "Archivo no encontrado." }, 404);
   const allowed = user.role === "Coordinador" || row.submitted_by_id === user.id || row.owner_id === user.id;
   if (!allowed) return json({ ok: false, message: "No tienes acceso a este archivo." }, 403);
 
-  const binary = atob(row.photo_base64);
+  let fileBase64 = row.photo_base64 || "";
+  if (!fileBase64) {
+    const chunks = await db
+      .prepare("SELECT chunk_base64 FROM evidence_file_chunks WHERE file_id = ? ORDER BY chunk_index ASC")
+      .bind(row.id)
+      .all();
+    fileBase64 = (chunks.results || []).map((item) => item.chunk_base64).join("");
+  }
+  if (!fileBase64) return json({ ok: false, message: "El archivo esta incompleto." }, 409);
+  const binary = atob(fileBase64);
   const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
   const safeName = String(row.file_name || "sustento.jpg").replace(/["\r\n]/g, "-");
   const disposition = String(row.mime_type).startsWith("image/") || row.mime_type === "application/pdf" ? "inline" : "attachment";
@@ -297,8 +520,8 @@ async function evidenceFile(db, user, fileId) {
   });
 }
 
-async function stateResponse(db, user) {
-  const data = await loadData(db);
+async function stateResponse(db, user, loadedData = null) {
+  const data = loadedData || (await loadData(db));
   const coordinator = user.role === "Coordinador";
   const userRows = coordinator
     ? await db.prepare("SELECT id, name, email, zone, role, status, created_at FROM users ORDER BY created_at ASC").all()
@@ -324,20 +547,45 @@ async function stateResponse(db, user) {
   return json({ ok: true, state, user: publicUser(user) });
 }
 
-async function putState(request, db, user) {
+async function putState(request, db, user, context) {
   const body = await readJson(request, 6_000_000);
   const submitted = body.state || {};
   const current = await loadData(db);
+  const notifications = [];
 
   if (user.role === "Coordinador") {
     for (const key of ["registrationRequests", "passwordRecoveryRequests", "announcements", "supportRequests", "dailyMotivations"]) {
       if (Array.isArray(submitted[key])) current[key] = submitted[key];
     }
     if (Array.isArray(submitted.tasks)) {
+      const previousTasks = new Map(current.tasks.map((task) => [clean(task.id), task]));
       const submittedTaskIds = new Set(submitted.tasks.map((task) => clean(task.id)).filter(Boolean));
       const removedTaskIds = current.tasks.map((task) => clean(task.id)).filter((taskId) => taskId && !submittedTaskIds.has(taskId));
       current.tasks = submitted.tasks;
+      for (const task of current.tasks) {
+        const previous = previousTasks.get(clean(task.id));
+        const assignedNow = !previous && clean(task.ownerId);
+        const reassignedNow = previous && clean(previous.ownerId) !== clean(task.ownerId);
+        const scheduleChanged =
+          previous &&
+          (previous.dueDate !== task.dueDate || previous.startTime !== task.startTime || previous.endTime !== task.endTime);
+        if ((assignedNow || reassignedNow || scheduleChanged) && task.ownerId !== user.id) {
+          const action = assignedNow ? "Nueva tarea asignada" : reassignedNow ? "Tarea reasignada" : "Horario actualizado";
+          const marker = task.history?.at(-1)?.at || task.createdAt || Date.now();
+          notifications.push({
+            userId: task.ownerId,
+            title: action,
+            body: `${clean(task.title)} | ${clean(task.dueDate)} ${clean(task.startTime)}-${clean(task.endTime)}`,
+            url: `/?view=tasksView&task=${encodeURIComponent(clean(task.id))}`,
+            sourceKey: `task:${clean(task.id)}:${clean(task.ownerId)}:${action}:${marker}`
+          });
+        }
+      }
       for (const taskId of removedTaskIds) {
+        await db
+          .prepare("DELETE FROM evidence_file_chunks WHERE file_id IN (SELECT id FROM evidence_files WHERE task_id = ?)")
+          .bind(taskId)
+          .run();
         await db.prepare("DELETE FROM evidence_files WHERE task_id = ?").bind(taskId).run();
       }
     }
@@ -382,6 +630,15 @@ async function putState(request, db, user) {
         clean(lastHistory.reason) &&
         validWorkSchedule(requestedDate, requestedStart, requestedEnd) &&
         !hasTaskConflict(current.tasks, user.id, requestedDate, requestedStart, requestedEnd, task.id);
+      if (validReassignment) {
+        notifications.push({
+          userId: requestedOwnerId,
+          title: "Tarea reasignada",
+          body: `${clean(task.title)} | ${clean(task.dueDate)} ${clean(task.startTime)}-${clean(task.endTime)}`,
+          url: `/?view=tasksView&task=${encodeURIComponent(clean(task.id))}`,
+          sourceKey: `task:${clean(task.id)}:${requestedOwnerId}:reassigned:${lastHistory.at || Date.now()}`
+        });
+      }
       return {
         ...task,
         ownerId: validReassignment ? requestedOwnerId : task.ownerId,
@@ -390,6 +647,11 @@ async function putState(request, db, user) {
         endTime: validReschedule ? requestedEnd : task.endTime,
         status: validReassignment ? "Pendiente" : clean(next.status) || task.status,
         evidence: Array.isArray(next.evidence) ? next.evidence : task.evidence,
+        reminders: validReassignment
+          ? []
+          : validReminderList(next.reminders, user.id, task.ownerId)
+            ? next.reminders
+            : task.reminders || [],
         history:
           validReassignment || validReschedule
             ? nextHistory
@@ -443,14 +705,181 @@ async function putState(request, db, user) {
             at: createdAt
           }
         ],
-        evidence: []
+        evidence: [],
+        reminders: []
       });
       knownTaskIds.add(taskId);
     }
   }
 
   await saveData(db, current);
-  return stateResponse(db, user);
+  const notifiedUsers = await queueNotifications(db, notifications);
+  if (notifiedUsers.length) context.waitUntil(pushNotificationsForUsers(db, notifiedUsers));
+  context.waitUntil(dispatchDueReminders(db, current));
+  return stateResponse(db, user, current);
+}
+
+function validReminderList(reminders, actorId, ownerId) {
+  if (!Array.isArray(reminders) || actorId !== ownerId || reminders.length > 30) return false;
+  return reminders.every(
+    (reminder) =>
+      clean(reminder.id) &&
+      clean(reminder.userId) === actorId &&
+      Number.isFinite(Number(reminder.at)) &&
+      Number(reminder.at) > 0
+  );
+}
+
+async function queueNotifications(db, notifications) {
+  const notifiedUsers = new Set();
+  for (const item of notifications) {
+    if (!clean(item.userId) || !clean(item.sourceKey)) continue;
+    const result = await db
+      .prepare(
+        `INSERT OR IGNORE INTO user_notifications
+         (id, user_id, title, body, target_url, source_key, created_at, delivered_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0)`
+      )
+      .bind(
+        crypto.randomUUID(),
+        clean(item.userId),
+        clean(item.title).slice(0, 100) || "LGTASK",
+        clean(item.body).slice(0, 280),
+        clean(item.url).slice(0, 500) || "/",
+        clean(item.sourceKey).slice(0, 500),
+        Date.now()
+      )
+      .run();
+    if (Number(result?.meta?.changes || 0) > 0) notifiedUsers.add(clean(item.userId));
+  }
+  return Array.from(notifiedUsers);
+}
+
+async function dispatchDueReminders(db, data) {
+  const now = Date.now();
+  const notifications = [];
+  for (const task of data.tasks || []) {
+    if (task.status === "Cumplida") continue;
+    for (const reminder of task.reminders || []) {
+      const reminderAt = Number(reminder.at || 0);
+      const userId = clean(reminder.userId || task.ownerId);
+      if (!userId || !reminderAt || reminderAt > now) continue;
+      notifications.push({
+        userId,
+        title: "Recordatorio de tarea",
+        body: `${clean(task.title)} | ${clean(task.dueDate)} ${clean(task.startTime)}-${clean(task.endTime)}`,
+        url: `/?view=tasksView&task=${encodeURIComponent(clean(task.id))}`,
+        sourceKey: `reminder:${clean(task.id)}:${clean(reminder.id)}`
+      });
+    }
+  }
+  const notifiedUsers = await queueNotifications(db, notifications);
+  if (notifiedUsers.length) await pushNotificationsForUsers(db, notifiedUsers);
+}
+
+async function ensureVapidKeys(db) {
+  const row = await db.prepare("SELECT value FROM app_settings WHERE key = 'vapid_keys'").first();
+  if (row?.value) {
+    try {
+      return JSON.parse(row.value);
+    } catch {
+      // Regenerate invalid configuration.
+    }
+  }
+  const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  const privateJwk = await crypto.subtle.exportKey("jwk", pair.privateKey);
+  const publicJwk = await crypto.subtle.exportKey("jwk", pair.publicKey);
+  const x = fromBase64Url(publicJwk.x);
+  const y = fromBase64Url(publicJwk.y);
+  const publicBytes = new Uint8Array(65);
+  publicBytes[0] = 4;
+  publicBytes.set(x, 1);
+  publicBytes.set(y, 33);
+  const keys = {
+    publicKey: toBase64Url(publicBytes),
+    privateJwk
+  };
+  await db
+    .prepare(
+      `INSERT INTO app_settings (key, value, updated_at) VALUES ('vapid_keys', ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+    )
+    .bind(JSON.stringify(keys), Date.now())
+    .run();
+  return keys;
+}
+
+async function pushNotificationsForUsers(db, userIds) {
+  const uniqueUserIds = Array.from(new Set(userIds.map(clean).filter(Boolean)));
+  if (!uniqueUserIds.length) return;
+  const keys = await ensureVapidKeys(db);
+  for (const userId of uniqueUserIds) {
+    const rows = await db.prepare("SELECT id, endpoint FROM notification_subscriptions WHERE user_id = ?").bind(userId).all();
+    for (const subscription of rows.results || []) {
+      try {
+        const response = await sendWebPush(subscription.endpoint, keys);
+        if (response.status === 404 || response.status === 410) {
+          await db.prepare("DELETE FROM notification_subscriptions WHERE id = ?").bind(subscription.id).run();
+        }
+      } catch (error) {
+        console.error("LGTASK push", error);
+      }
+    }
+  }
+}
+
+async function sendWebPush(endpoint, keys) {
+  const audience = new URL(endpoint).origin;
+  const header = toBase64Url(new TextEncoder().encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
+  const payload = toBase64Url(
+    new TextEncoder().encode(
+      JSON.stringify({
+        aud: audience,
+        exp: Math.floor(Date.now() / 1000) + 12 * 60 * 60,
+        sub: "mailto:soporte@lgtask.pages.dev"
+      })
+    )
+  );
+  const unsignedToken = `${header}.${payload}`;
+  const privateKey = await crypto.subtle.importKey(
+    "jwk",
+    keys.privateJwk,
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["sign"]
+  );
+  const signature = new Uint8Array(
+    await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, privateKey, new TextEncoder().encode(unsignedToken))
+  );
+  const token = `${unsignedToken}.${toBase64Url(signature)}`;
+  return fetch(endpoint, {
+    method: "POST",
+    headers: {
+      Authorization: `vapid t=${token}, k=${keys.publicKey}`,
+      "Crypto-Key": `p256ecdsa=${keys.publicKey}`,
+      TTL: "86400",
+      Urgency: "normal"
+    }
+  });
+}
+
+function mimeTypeForExtension(extension) {
+  const types = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+    pdf: "application/pdf",
+    doc: "application/msword",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    xls: "application/vnd.ms-excel",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ppt: "application/vnd.ms-powerpoint",
+    pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    csv: "text/csv",
+    txt: "text/plain"
+  };
+  return types[extension] || "application/octet-stream";
 }
 
 async function createUser(request, db, actor) {
