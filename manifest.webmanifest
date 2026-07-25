@@ -1,0 +1,51 @@
+{
+  "id": "/",
+  "name": "LGTASK",
+  "short_name": "LGTASK",
+  "description": "Gestion diaria de tareas, recordatorios y sustentos del equipo Training LG Peru.",
+  "lang": "es-PE",
+  "start_url": "/?source=app",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#a50034",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/lgtask-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/lgtask-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Mis tareas",
+      "short_name": "Tareas",
+      "url": "/?view=tasksView",
+      "icons": [
+        {
+          "src": "/icons/lgtask-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Sustentos",
+      "short_name": "Sustentos",
+      "url": "/?view=evidenceView",
+      "icons": [
+        {
+          "src": "/icons/lgtask-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

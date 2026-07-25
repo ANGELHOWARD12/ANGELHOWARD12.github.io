@@ -3,7 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>LG Task Hub</title>
+    <meta name="theme-color" content="#a50034" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/lgtask-192.png" />
+    <link rel="apple-touch-icon" href="/icons/lgtask-192.png" />
+    <title>LGTASK</title>
     <style>
       :root {
         --bg: #f4f7fb;
@@ -256,6 +263,27 @@
         display: flex;
         gap: 10px;
         min-width: 360px;
+      }
+
+      .notification-button {
+        align-items: center;
+        display: inline-flex;
+        gap: 7px;
+        white-space: nowrap;
+      }
+
+      .notification-button.is-active {
+        background: var(--green-soft);
+        border-color: #83d3b3;
+        color: #07583e;
+      }
+
+      .notification-dot {
+        background: currentColor;
+        border-radius: 50%;
+        display: inline-block;
+        height: 8px;
+        width: 8px;
       }
 
       .shell {
@@ -672,6 +700,20 @@
         background: rgba(23, 32, 51, 0.48);
       }
 
+      .reminder-summary {
+        align-items: center;
+        background: #eef6ff;
+        border: 1px solid #bfd7ff;
+        border-radius: 6px;
+        color: #174ea6;
+        display: inline-flex;
+        font-size: 12px;
+        font-weight: 800;
+        gap: 6px;
+        padding: 6px 9px;
+        width: fit-content;
+      }
+
       .evidence-cloud-badge {
         align-items: center;
         background: var(--green-soft);
@@ -1061,6 +1103,10 @@
       <div class="session">
         <span id="sessionName" class="muted"></span>
         <span id="sessionRole" class="pill"></span>
+        <button id="notificationButton" class="ghost notification-button" type="button">
+          <span class="notification-dot"></span>
+          <span id="notificationButtonText">Activar notificaciones</span>
+        </button>
         <button id="logoutButton" class="ghost" type="button">Salir</button>
       </div>
     </header>
@@ -1283,7 +1329,7 @@
                   accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt"
                 />
               </label>
-              <p class="muted wide">Puedes adjuntar hasta 8 archivos. Maximo 1.35 MB por archivo; las imagenes se optimizan automaticamente.</p>
+              <p class="muted wide">Puedes adjuntar hasta 8 archivos de 15 MB cada uno. Las fotos se guardan en su calidad original.</p>
               <label class="wide">
                 Observaciones
                 <textarea id="evidenceNotes" placeholder="Describe que se realizo, hallazgos, incidencias o acuerdos"></textarea>
@@ -1509,6 +1555,25 @@
       </form>
     </dialog>
 
+    <dialog id="reminderDialog">
+      <form id="reminderForm" class="stack">
+        <div>
+          <h2>Recordatorio de tarea</h2>
+          <p id="reminderTaskLabel" class="muted"></p>
+        </div>
+        <label>
+          Fecha y hora del aviso
+          <input id="reminderDateTime" type="datetime-local" required />
+        </label>
+        <p class="helper">El aviso llegara al navegador o a la app Android cuando las notificaciones esten activadas.</p>
+        <div class="actions">
+          <button class="primary" type="submit">Guardar recordatorio</button>
+          <button id="cancelReminder" class="ghost" type="button">Cancelar</button>
+        </div>
+        <p id="reminderMessage" class="message" aria-live="polite"></p>
+      </form>
+    </dialog>
+
     <script src="./vendor/exceljs-4.4.0.min.js"></script>
     <script src="./vendor/jszip-3.10.1.min.js"></script>
     <script>
@@ -1520,7 +1585,9 @@
       const BREAK_START = "12:30";
       const BREAK_END = "14:00";
       const MAX_EVIDENCE_FILES = 8;
-      const MAX_EVIDENCE_FILE_BYTES = 1_350_000;
+      const MAX_EVIDENCE_FILE_BYTES = 15_000_000;
+      const EVIDENCE_CHUNK_BASE64 = 750_000;
+      const NOTIFICATION_TASKS_KEY = "lgtask-notified-tasks-v1";
       const EVIDENCE_FILE_EXTENSIONS = new Set([
         "jpg",
         "jpeg",
@@ -1646,6 +1713,8 @@
       let state = loadState();
       let syncTimer = 0;
       let syncInFlight = null;
+      let serviceWorkerRegistration = null;
+      let notificationCheckInFlight = null;
 
       const els = {
         loginScreen: document.querySelector("#loginScreen"),
@@ -1671,6 +1740,8 @@
         registrationMessage: document.querySelector("#registrationMessage"),
         sessionName: document.querySelector("#sessionName"),
         sessionRole: document.querySelector("#sessionRole"),
+        notificationButton: document.querySelector("#notificationButton"),
+        notificationButtonText: document.querySelector("#notificationButtonText"),
         logoutButton: document.querySelector("#logoutButton"),
         todayLabel: document.querySelector("#todayLabel"),
         progressPercent: document.querySelector("#progressPercent"),
@@ -1773,6 +1844,12 @@
         scheduleReason: document.querySelector("#scheduleReason"),
         scheduleMessage: document.querySelector("#scheduleMessage"),
         cancelSchedule: document.querySelector("#cancelSchedule"),
+        reminderDialog: document.querySelector("#reminderDialog"),
+        reminderForm: document.querySelector("#reminderForm"),
+        reminderTaskLabel: document.querySelector("#reminderTaskLabel"),
+        reminderDateTime: document.querySelector("#reminderDateTime"),
+        reminderMessage: document.querySelector("#reminderMessage"),
+        cancelReminder: document.querySelector("#cancelReminder"),
         productTabs: document.querySelector("#productTabs"),
         productInfo: document.querySelector("#productInfo"),
         quizBox: document.querySelector("#quizBox")
@@ -1799,7 +1876,8 @@
         nextState.tasks = (nextState.tasks || []).map((task) => ({
           ...task,
           startTime: task.startTime || "08:30",
-          endTime: task.endTime || "09:30"
+          endTime: task.endTime || "09:30",
+          reminders: Array.isArray(task.reminders) ? task.reminders : []
         }));
         nextState.announcements = nextState.announcements || [];
         nextState.supportRequests = nextState.supportRequests || [];
@@ -1840,6 +1918,141 @@
         return data;
       }
 
+      function urlBase64ToUint8Array(value) {
+        const padding = "=".repeat((4 - (value.length % 4)) % 4);
+        const base64 = (value + padding).replaceAll("-", "+").replaceAll("_", "/");
+        const raw = atob(base64);
+        return Uint8Array.from(raw, (character) => character.charCodeAt(0));
+      }
+
+      async function registerServiceWorker() {
+        if (!("serviceWorker" in navigator)) return null;
+        try {
+          await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+          serviceWorkerRegistration = await navigator.serviceWorker.ready;
+          return serviceWorkerRegistration;
+        } catch (error) {
+          console.error("No se pudo registrar el modo app", error);
+          return null;
+        }
+      }
+
+      async function updateNotificationButton() {
+        if (!els.notificationButton) return;
+        if (!("Notification" in window) || !("PushManager" in window)) {
+          els.notificationButton.disabled = true;
+          els.notificationButtonText.textContent = "Avisos no compatibles";
+          return;
+        }
+        const registration = serviceWorkerRegistration || (await registerServiceWorker());
+        const subscription = registration ? await registration.pushManager.getSubscription() : null;
+        const active = Notification.permission === "granted" && Boolean(subscription);
+        els.notificationButton.classList.toggle("is-active", active);
+        els.notificationButton.disabled = active || Notification.permission === "denied";
+        els.notificationButtonText.textContent = active
+          ? "Notificaciones activas"
+          : Notification.permission === "denied"
+            ? "Avisos bloqueados"
+            : "Activar notificaciones";
+      }
+
+      async function enableNotifications() {
+        if (!state.activeUserId) return;
+        if (!("Notification" in window) || !("PushManager" in window)) {
+          window.alert("Este navegador no permite notificaciones.");
+          return;
+        }
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") {
+          await updateNotificationButton();
+          window.alert("Debes permitir las notificaciones desde la configuracion del navegador.");
+          return;
+        }
+        const registration = serviceWorkerRegistration || (await registerServiceWorker());
+        if (!registration) throw new Error("No se pudo activar el servicio de notificaciones.");
+        const config = await apiRequest("/notifications/config");
+        let subscription = await registration.pushManager.getSubscription();
+        if (!subscription) {
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(config.publicKey)
+          });
+        }
+        await apiRequest("/notifications/subscribe", {
+          method: "POST",
+          body: JSON.stringify(subscription.toJSON())
+        });
+        if ("periodicSync" in registration) {
+          try {
+            await registration.periodicSync.register("lgtask-reminders", { minInterval: 15 * 60 * 1000 });
+          } catch {
+            // Android decides whether periodic background checks are available.
+          }
+        }
+        await updateNotificationButton();
+        await registration.showNotification("LGTASK conectado", {
+          body: "Recibiras avisos de tareas asignadas y recordatorios.",
+          icon: "/icons/lgtask-192.png",
+          badge: "/icons/lgtask-96.png",
+          tag: "lgtask-ready",
+          data: { url: "/?view=tasksView" }
+        });
+        await checkPendingNotifications();
+      }
+
+      async function syncNotificationSubscription() {
+        if (
+          !state.activeUserId ||
+          !("Notification" in window) ||
+          Notification.permission !== "granted"
+        ) {
+          return;
+        }
+        const registration = serviceWorkerRegistration || (await registerServiceWorker());
+        const subscription = registration ? await registration.pushManager.getSubscription() : null;
+        if (!subscription) {
+          await updateNotificationButton();
+          return;
+        }
+        await apiRequest("/notifications/subscribe", {
+          method: "POST",
+          body: JSON.stringify(subscription.toJSON())
+        });
+        await updateNotificationButton();
+        await checkPendingNotifications();
+      }
+
+      async function checkPendingNotifications() {
+        if (
+          notificationCheckInFlight ||
+          !state.activeUserId ||
+          !("Notification" in window) ||
+          Notification.permission !== "granted"
+        ) {
+          return;
+        }
+        notificationCheckInFlight = (async () => {
+          const registration = serviceWorkerRegistration || (await registerServiceWorker());
+          if (!registration) return;
+          const data = await apiRequest("/notifications/pending");
+          for (const notification of data.notifications || []) {
+            await registration.showNotification(notification.title || "LGTASK", {
+              body: notification.body || "Tienes una actualizacion pendiente.",
+              icon: "/icons/lgtask-192.png",
+              badge: "/icons/lgtask-96.png",
+              tag: notification.id,
+              renotify: true,
+              data: { url: notification.url || "/?view=tasksView" }
+            });
+          }
+        })()
+          .catch((error) => console.error("No se pudieron consultar los avisos", error))
+          .finally(() => {
+            notificationCheckInFlight = null;
+          });
+        return notificationCheckInFlight;
+      }
+
       function applyCloudState(nextState) {
         const selectedProduct = state.selectedProduct;
         const selectedWeekStart = state.selectedWeekStart;
@@ -1858,6 +2071,7 @@
           const data = await apiRequest("/state");
           applyCloudState(data.state);
           if (!quiet) render();
+          checkPendingNotifications();
           return true;
         } catch (error) {
           if (error.status === 401) {
@@ -2126,6 +2340,9 @@
           return `${userName(entry.byId)} movio el horario de ${before} a ${after}. Motivo: ${entry.reason || "Sin detalle"}`;
         }
         if (entry.type === "Bloqueo") return `${userName(entry.fromId)} reporto una dificultad: ${entry.reason || "Sin detalle"}`;
+        if (entry.type === "Recordatorio") {
+          return `${userName(entry.byId)} programo un recordatorio para ${formatDateTime(entry.reminderAt)}`;
+        }
         return `${entry.type || "Actualizacion"}${entry.reason ? `: ${entry.reason}` : ""}`;
       }
 
@@ -2300,7 +2517,7 @@
         { header: "Revision de Pablo", width: 20 },
         { header: "Archivo adjunto", width: 28 },
         { header: "Tipo de archivo", width: 25 },
-        { header: "Evidencia incluida", width: 27 },
+        { header: "Evidencia incluida", width: 40 },
         { header: "Respaldo en LGTASK", width: 20 },
         { header: "Historial LGTASK", width: 20 }
       ];
@@ -2340,7 +2557,7 @@
         return "";
       }
 
-      function imageDisplaySize(dataUrl, maxWidth = 180, maxHeight = 110) {
+      function imageDisplaySize(dataUrl, maxWidth = 250, maxHeight = 160) {
         return new Promise((resolve) => {
           const image = new Image();
           image.onload = () => {
@@ -2369,14 +2586,34 @@
         } else {
           attachment = dataUrlToAttachment(row.fileDataUrl, row.fileType);
         }
-        const imageExtension = excelImageExtension(attachment.mimeType);
+        let imageExtension = excelImageExtension(attachment.mimeType);
+        let workbookDataUrl = attachment.dataUrl;
+        if (attachment.mimeType === "image/webp") {
+          workbookDataUrl = await convertImageDataUrlToPng(attachment.dataUrl);
+          imageExtension = "png";
+        }
         return {
           ...attachment,
           key: reportFileKey(row),
           name: row.fileName || "archivo-sustento",
           imageExtension,
-          displaySize: imageExtension ? await imageDisplaySize(attachment.dataUrl) : null
+          workbookDataUrl,
+          displaySize: imageExtension ? await imageDisplaySize(workbookDataUrl) : null
         };
+      }
+
+      async function convertImageDataUrlToPng(dataUrl) {
+        const image = await new Promise((resolve, reject) => {
+          const element = new Image();
+          element.onload = () => resolve(element);
+          element.onerror = () => reject(new Error("No se pudo preparar una imagen WebP para Excel."));
+          element.src = dataUrl;
+        });
+        const canvas = document.createElement("canvas");
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        canvas.getContext("2d").drawImage(image, 0, 0);
+        return canvas.toDataURL("image/png");
       }
 
       async function loadEvidenceReportAttachments(rows, onProgress) {
@@ -2500,7 +2737,7 @@
           const attachment = key ? attachments.get(key) : null;
           const dataRow = worksheet.addRow(reportRowValues(reportRow, attachment));
           dataRow.height = attachment?.imageExtension
-            ? Math.max(86, Math.round((attachment.displaySize?.height || 95) * 0.75 + 12))
+            ? Math.max(125, Math.round((attachment.displaySize?.height || 150) * 0.75 + 10))
             : 42;
           dataRow.eachCell({ includeEmpty: true }, (cell) => {
             cell.font = { name: "Aptos", size: 10, color: { argb: "FF1D2939" } };
@@ -2535,7 +2772,7 @@
           const imageId = imageIds.get(key);
           if (imageId !== undefined && attachment?.displaySize) {
             worksheet.addImage(imageId, {
-              tl: { col: 17.12, row: dataRow.number - 1 + 0.1 },
+              tl: { col: 17.08, row: dataRow.number - 1 + 0.08 },
               ext: { width: attachment.displaySize.width, height: attachment.displaySize.height },
               editAs: "oneCell"
             });
@@ -2552,7 +2789,7 @@
       }
 
       function addInternalFilesSheet(workbook, attachments) {
-        const documents = Array.from(attachments.values()).filter((attachment) => !attachment.imageExtension);
+        const documents = Array.from(attachments.values());
         if (!documents.length) return;
         const worksheet = workbook.addWorksheet("_Archivos internos", {
           state: "veryHidden",
@@ -2567,7 +2804,7 @@
           { width: 12 },
           { width: 110 }
         ];
-        worksheet.addRow(["ARCHIVOS INTERNOS LGTASK - No modificar esta hoja."]);
+        worksheet.addRow(["ARCHIVOS ORIGINALES LGTASK - No modificar esta hoja."]);
         worksheet.mergeCells("A1:G1");
         const header = worksheet.addRow(["ID interno", "Nombre", "Tipo", "Bytes", "Parte", "Total", "Contenido Base64"]);
         header.eachCell((cell) => {
@@ -2608,7 +2845,7 @@
           imageIds.set(
             key,
             workbook.addImage({
-              base64: attachment.dataUrl,
+              base64: attachment.workbookDataUrl,
               extension: attachment.imageExtension
             })
           );
@@ -2810,6 +3047,7 @@
 
         els.sessionName.textContent = user.name;
         els.sessionRole.textContent = user.role;
+        updateNotificationButton();
         els.todayLabel.textContent = new Intl.DateTimeFormat("es-PE", {
           weekday: "long",
           day: "2-digit",
@@ -3040,6 +3278,80 @@
         container.appendChild(button);
       }
 
+      function canManageReminder(task) {
+        return Boolean(task && task.status !== "Cumplida" && (isCoordinator() || task.ownerId === state.activeUserId));
+      }
+
+      function nextTaskReminder(task) {
+        return (task.reminders || [])
+          .filter((reminder) => reminder.userId === task.ownerId && Number(reminder.at) > Date.now())
+          .sort((a, b) => Number(a.at) - Number(b.at))[0];
+      }
+
+      function dateTimeLocalValue(timestamp) {
+        const date = new Date(timestamp);
+        const offset = date.getTimezoneOffset() * 60000;
+        return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+      }
+
+      function openReminderDialog(taskId) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        if (!canManageReminder(task)) return;
+        const scheduled = new Date(`${task.dueDate}T${task.startTime || WORKDAY_START}:00`).getTime() - 15 * 60_000;
+        const defaultTime = Math.max(Date.now() + 30 * 60_000, scheduled);
+        els.reminderForm.dataset.taskId = task.id;
+        els.reminderTaskLabel.textContent = `${task.title} | ${formatDate(task.dueDate)} | ${taskTimeLabel(task)}`;
+        els.reminderDateTime.min = dateTimeLocalValue(Date.now() + 60_000);
+        els.reminderDateTime.value = dateTimeLocalValue(defaultTime);
+        setMessage(els.reminderMessage, "", "");
+        els.reminderDialog.showModal();
+      }
+
+      function saveTaskReminder(taskId, value) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        const reminderAt = new Date(value).getTime();
+        if (!canManageReminder(task) || !Number.isFinite(reminderAt) || reminderAt <= Date.now()) {
+          setMessage(els.reminderMessage, "Elige una fecha y hora futura.", "err");
+          return false;
+        }
+        task.reminders = task.reminders || [];
+        const reminder = {
+          id: id(),
+          userId: task.ownerId,
+          at: reminderAt,
+          createdAt: Date.now(),
+          createdById: state.activeUserId
+        };
+        task.reminders.push(reminder);
+        task.history = task.history || [];
+        task.history.push({
+          type: "Recordatorio",
+          byId: state.activeUserId,
+          reminderAt,
+          at: Date.now()
+        });
+        saveState();
+        render();
+        return true;
+      }
+
+      function renderReminderControl(container, task) {
+        if (!canManageReminder(task)) return;
+        const button = document.createElement("button");
+        button.className = "small";
+        button.type = "button";
+        button.textContent = "Recordatorio";
+        button.addEventListener("click", () => openReminderDialog(task.id));
+        container.appendChild(button);
+        const nextReminder = nextTaskReminder(task);
+        if (nextReminder) {
+          const summary = document.createElement("span");
+          summary.className = "reminder-summary";
+          summary.textContent = `Aviso: ${formatDateTime(nextReminder.at)}`;
+          container.appendChild(summary);
+        }
+      }
+
       function markTaskBlocked(taskId) {
         const task = state.tasks.find((item) => item.id === taskId);
         if (!task || isCoordinator()) return;
@@ -3192,6 +3504,7 @@
         }
         renderScheduleControl(container, task);
         renderReassignControl(container, task);
+        renderReminderControl(container, task);
       }
 
       function renderTrainerWeek() {
@@ -3323,6 +3636,7 @@
             }
             renderScheduleControl(actions, task);
             renderReassignControl(actions, task);
+            renderReminderControl(actions, task);
             const deleteButton = document.createElement("button");
             deleteButton.className = "small";
             deleteButton.type = "button";
@@ -3713,45 +4027,23 @@
         });
       }
 
-      async function compressImage(file) {
-        const dataUrl = await readFileAsDataUrl(file);
-        const extension = file.name.includes(".") ? file.name.split(".").pop().toLowerCase() : "";
-        const originalBase64 = String(dataUrl).split(",")[1] || "";
-        if (["jpg", "jpeg", "png"].includes(extension) && originalBase64.length <= 1_795_000) {
-          return { fileData: dataUrl, fileName: file.name };
-        }
-        const img = await new Promise((resolve, reject) => {
-          const image = new Image();
-          image.onload = () => resolve(image);
-          image.onerror = () => reject(new Error(`No se pudo procesar la imagen ${file.name}.`));
-          image.src = dataUrl;
-        });
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        let scale = Math.min(1, 2400 / Math.max(img.width, img.height));
-        let quality = 0.94;
-        for (let attempt = 0; attempt < 14; attempt += 1) {
-          canvas.width = Math.max(1, Math.round(img.width * scale));
-          canvas.height = Math.max(1, Math.round(img.height * scale));
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          const optimized = canvas.toDataURL("image/jpeg", quality);
-          const optimizedBase64 = String(optimized).split(",")[1] || "";
-          if (optimizedBase64.length <= 1_795_000) {
-            return {
-              fileData: optimized,
-              fileName: `${file.name.replace(/\.[^.]+$/, "").slice(0, 105) || "sustento"}.jpg`
-            };
-          }
-          if (quality > 0.8) {
-            quality = Math.max(0.8, quality - 0.04);
-          } else {
-            scale *= 0.82;
-            quality = 0.92;
-          }
-        }
-        throw new Error(`${file.name}: no se pudo optimizar dentro del limite permitido.`);
+      function evidenceMimeType(extension, currentType = "") {
+        const types = {
+          jpg: "image/jpeg",
+          jpeg: "image/jpeg",
+          png: "image/png",
+          webp: "image/webp",
+          pdf: "application/pdf",
+          doc: "application/msword",
+          docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          xls: "application/vnd.ms-excel",
+          xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          ppt: "application/vnd.ms-powerpoint",
+          pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          csv: "text/csv",
+          txt: "text/plain"
+        };
+        return types[extension] || currentType || "application/octet-stream";
       }
 
       async function prepareEvidenceFile(file) {
@@ -3759,18 +4051,66 @@
         if (!EVIDENCE_FILE_EXTENSIONS.has(extension)) {
           throw new Error(`${file.name}: formato no permitido.`);
         }
-        const image = ["jpg", "jpeg", "png", "webp"].includes(extension);
-        if (!image && file.size > MAX_EVIDENCE_FILE_BYTES) {
-          throw new Error(`${file.name}: supera el maximo de 1.35 MB permitido por la nube.`);
+        if (file.size > MAX_EVIDENCE_FILE_BYTES) {
+          throw new Error(`${file.name}: supera el maximo de 15 MB permitido por la nube.`);
         }
-        const preparedImage = image ? await compressImage(file) : null;
-        const fileData = preparedImage ? preparedImage.fileData : await readFileAsDataUrl(file);
-        const base64 = String(fileData).split(",")[1] || "";
-        if (base64.length > 1_800_000) {
-          throw new Error(`${file.name}: sigue siendo demasiado grande despues de procesarlo.`);
+        const originalDataUrl = await readFileAsDataUrl(file);
+        const base64 = String(originalDataUrl).split(",")[1] || "";
+        if (!base64 || base64.length > 21_000_000) {
+          throw new Error(`${file.name}: no se pudo preparar dentro del limite de 15 MB.`);
         }
-        const fileName = preparedImage?.fileName || file.name;
-        return { fileData, fileName };
+        const mimeType = evidenceMimeType(extension, file.type);
+        return {
+          fileData: `data:${mimeType};base64,${base64}`,
+          fileName: file.name,
+          mimeType,
+          base64
+        };
+      }
+
+      async function uploadPreparedEvidenceFile(taskId, prepared, onChunk) {
+        if (prepared.base64.length <= 1_800_000) {
+          return apiRequest("/evidence/upload", {
+            method: "POST",
+            body: JSON.stringify({
+              taskId,
+              fileData: prepared.fileData,
+              fileName: prepared.fileName
+            })
+          });
+        }
+        const chunks = Math.ceil(prepared.base64.length / EVIDENCE_CHUNK_BASE64);
+        const initialized = await apiRequest("/evidence/upload/init", {
+          method: "POST",
+          body: JSON.stringify({
+            taskId,
+            fileName: prepared.fileName,
+            mimeType: prepared.mimeType,
+            totalBase64: prepared.base64.length,
+            chunkCount: chunks
+          })
+        });
+        for (let chunkIndex = 0; chunkIndex < chunks; chunkIndex += 1) {
+          onChunk?.(chunkIndex + 1, chunks);
+          await apiRequest("/evidence/upload/chunk", {
+            method: "POST",
+            body: JSON.stringify({
+              fileId: initialized.fileId,
+              chunkIndex,
+              chunkBase64: prepared.base64.slice(
+                chunkIndex * EVIDENCE_CHUNK_BASE64,
+                (chunkIndex + 1) * EVIDENCE_CHUNK_BASE64
+              )
+            })
+          });
+        }
+        return apiRequest("/evidence/upload/complete", {
+          method: "POST",
+          body: JSON.stringify({
+            fileId: initialized.fileId,
+            chunkCount: chunks
+          })
+        });
       }
 
       function addEventListeners() {
@@ -3825,6 +4165,7 @@
             els.loginPassword.value = "";
             setMessage(els.loginMessage, "", "");
             render();
+            syncNotificationSubscription().catch(() => {});
           } catch (error) {
             setMessage(els.loginMessage, error.message, "err");
           }
@@ -3867,6 +4208,13 @@
           els.loginEmail.value = "";
           els.loginPassword.value = "";
           render();
+        });
+
+        els.notificationButton.addEventListener("click", () => {
+          enableNotifications().catch((error) => {
+            window.alert(error.message || "No se pudieron activar las notificaciones.");
+            updateNotificationButton();
+          });
         });
 
         document.querySelectorAll(".tab").forEach((tab) => {
@@ -3987,6 +4335,13 @@
           if (success) els.scheduleDialog.close();
         });
 
+        els.cancelReminder.addEventListener("click", () => els.reminderDialog.close());
+        els.reminderForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const success = saveTaskReminder(els.reminderForm.dataset.taskId, els.reminderDateTime.value);
+          if (success) els.reminderDialog.close();
+        });
+
         els.taskForm.addEventListener("submit", (event) => {
           event.preventDefault();
           if (!isCoordinator()) els.taskOwner.value = state.activeUserId;
@@ -4028,7 +4383,8 @@
                 at: Date.now()
               }
             ],
-            evidence: []
+            evidence: [],
+            reminders: []
           });
           saveState();
           els.taskForm.reset();
@@ -4095,13 +4451,12 @@
             for (let index = 0; index < preparedFiles.length; index += 1) {
               const prepared = preparedFiles[index];
               setMessage(els.evidenceMessage, `Subiendo archivo ${index + 1} de ${preparedFiles.length}...`, "");
-              const upload = await apiRequest("/evidence/upload", {
-                method: "POST",
-                body: JSON.stringify({
-                  taskId: task.id,
-                  fileData: prepared.fileData,
-                  fileName: prepared.fileName
-                })
+              const upload = await uploadPreparedEvidenceFile(task.id, prepared, (chunk, total) => {
+                setMessage(
+                  els.evidenceMessage,
+                  `Subiendo archivo ${index + 1} de ${preparedFiles.length} | bloque ${chunk} de ${total}...`,
+                  ""
+                );
               });
               uploadedFiles.push({
                 id: upload.file.id,
@@ -4232,7 +4587,9 @@
       async function bootstrap() {
         addEventListeners();
         render();
+        await registerServiceWorker();
         await refreshStateFromServer();
+        await syncNotificationSubscription().catch(() => {});
         window.setInterval(() => {
           if (state.activeUserId && !document.hidden && !syncInFlight) {
             refreshStateFromServer().catch(() => {});
