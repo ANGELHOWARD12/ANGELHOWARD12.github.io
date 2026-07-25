@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.lgtask.app",
+      "sha256_cert_fingerprints": [
+        "9E:B4:AA:71:37:25:3F:4C:4F:39:47:28:8A:88:30:4D:FD:F1:81:18:22:40:DA:C1:B7:A5:C9:F8:41:A6:D0:DD"
+      ]
+    }
+  }
+]
