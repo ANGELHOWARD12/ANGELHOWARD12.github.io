@@ -3,11 +3,12 @@ const SESSION_DAYS = 14;
 const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb9775180ea780b71";
 
 const EMPTY_DATA = {
-  version: 8,
+  version: 9,
   workSettings: {
     breakStart: "12:30",
     breakEnd: "14:00"
   },
+  breakSettingsByUser: {},
   registrationRequests: [],
   passwordRecoveryRequests: [],
   tasks: [],
@@ -769,11 +770,15 @@ async function putState(request, db, user, context) {
   const submitted = body.state || {};
   const current = await loadData(db);
   const notifications = [];
+  const personalBreak = submitted.breakSettingsByUser?.[user.id];
+  if (validWorkSettings(personalBreak)) {
+    current.breakSettingsByUser = {
+      ...(current.breakSettingsByUser || {}),
+      [user.id]: normalizeWorkSettings(personalBreak)
+    };
+  }
 
   if (user.role === "Coordinador") {
-    if (validWorkSettings(submitted.workSettings)) {
-      current.workSettings = normalizeWorkSettings(submitted.workSettings);
-    }
     for (const key of ["registrationRequests", "passwordRecoveryRequests", "announcements", "supportRequests", "dailyMotivations"]) {
       if (Array.isArray(submitted[key])) current[key] = submitted[key];
     }
@@ -781,10 +786,33 @@ async function putState(request, db, user, context) {
       const previousTasks = new Map(current.tasks.map((task) => [clean(task.id), task]));
       const submittedTaskIds = new Set(submitted.tasks.map((task) => clean(task.id)).filter(Boolean));
       const removedTasks = current.tasks.filter((task) => clean(task.id) && !submittedTaskIds.has(clean(task.id)));
-      current.tasks = submitted.tasks.map((task) => ({
-        ...task,
-        category: normalizeTaskCategory(task.category)
-      }));
+      current.tasks = submitted.tasks
+        .map((task) => {
+          const normalizedTask = {
+            ...task,
+            category: normalizeTaskCategory(task.category)
+          };
+          const previous = previousTasks.get(clean(normalizedTask.id));
+          const ownerOrScheduleChanged =
+            !previous ||
+            clean(previous.ownerId) !== clean(normalizedTask.ownerId) ||
+            previous.dueDate !== normalizedTask.dueDate ||
+            previous.startTime !== normalizedTask.startTime ||
+            previous.endTime !== normalizedTask.endTime;
+          if (
+            ownerOrScheduleChanged &&
+            !validWorkSchedule(
+              clean(normalizedTask.dueDate),
+              clean(normalizedTask.startTime),
+              clean(normalizedTask.endTime),
+              breakSettingsForUser(current, normalizedTask.ownerId)
+            )
+          ) {
+            return previous || null;
+          }
+          return normalizedTask;
+        })
+        .filter(Boolean);
       for (const task of current.tasks) {
         const previous = previousTasks.get(clean(task.id));
         const assignedNow = !previous && clean(task.ownerId);
@@ -827,7 +855,21 @@ async function putState(request, db, user, context) {
         lastHistory.fromId === user.id &&
         lastHistory.toId === requestedOwnerId &&
         lastHistory.byId === user.id &&
-        clean(lastHistory.reason);
+        clean(lastHistory.reason) &&
+        validWorkSchedule(
+          clean(task.dueDate),
+          clean(task.startTime),
+          clean(task.endTime),
+          breakSettingsForUser(current, requestedOwnerId)
+        ) &&
+        !hasTaskConflict(
+          current.tasks,
+          requestedOwnerId,
+          clean(task.dueDate),
+          clean(task.startTime),
+          clean(task.endTime),
+          clean(task.id)
+        );
       const requestedDate = clean(next.dueDate);
       const requestedStart = clean(next.startTime);
       const requestedEnd = clean(next.endTime);
@@ -848,7 +890,7 @@ async function putState(request, db, user, context) {
         lastHistory.toStartTime === requestedStart &&
         lastHistory.toEndTime === requestedEnd &&
         clean(lastHistory.reason) &&
-        validWorkSchedule(requestedDate, requestedStart, requestedEnd, current.workSettings) &&
+        validWorkSchedule(requestedDate, requestedStart, requestedEnd, breakSettingsForUser(current, user.id)) &&
         !hasTaskConflict(current.tasks, user.id, requestedDate, requestedStart, requestedEnd, task.id);
       if (validReassignment) {
         notifications.push({
@@ -894,7 +936,7 @@ async function putState(request, db, user, context) {
         task.ownerId !== user.id ||
         task.createdById !== user.id ||
         clean(task.title).length < 2 ||
-        !validWorkSchedule(dueDate, startTime, endTime, current.workSettings) ||
+        !validWorkSchedule(dueDate, startTime, endTime, breakSettingsForUser(current, user.id)) ||
         hasTaskConflict(current.tasks, user.id, dueDate, startTime, endTime)
       ) {
         continue;
@@ -1168,6 +1210,20 @@ function normalizeWorkSettings(settings) {
     : { breakStart: BREAK_START, breakEnd: BREAK_END };
 }
 
+function normalizeBreakSettingsByUser(settingsByUser) {
+  if (!settingsByUser || typeof settingsByUser !== "object" || Array.isArray(settingsByUser)) return {};
+  return Object.fromEntries(
+    Object.entries(settingsByUser)
+      .filter(([userId, settings]) => clean(userId) && validWorkSettings(settings))
+      .map(([userId, settings]) => [clean(userId), normalizeWorkSettings(settings)])
+  );
+}
+
+function breakSettingsForUser(data, userId) {
+  const personal = data.breakSettingsByUser?.[clean(userId)];
+  return validWorkSettings(personal) ? normalizeWorkSettings(personal) : normalizeWorkSettings(data.workSettings);
+}
+
 function normalizeTaskCategory(category) {
   if (category === "PDV") return "PDP";
   if (category === "Producto") return "ULG";
@@ -1211,6 +1267,7 @@ async function loadData(db) {
       ...structuredClone(EMPTY_DATA),
       ...parsed,
       workSettings: normalizeWorkSettings(parsed.workSettings),
+      breakSettingsByUser: normalizeBreakSettingsByUser(parsed.breakSettingsByUser),
       tasks: (parsed.tasks || []).map((task) => ({ ...task, category: normalizeTaskCategory(task.category) })),
       deletedTasks: (parsed.deletedTasks || []).map((task) => ({ ...task, category: normalizeTaskCategory(task.category) }))
     };
@@ -1221,8 +1278,9 @@ async function loadData(db) {
 
 async function saveData(db, data) {
   const payload = {
-    version: 8,
+    version: 9,
     workSettings: normalizeWorkSettings(data.workSettings),
+    breakSettingsByUser: normalizeBreakSettingsByUser(data.breakSettingsByUser),
     registrationRequests: data.registrationRequests || [],
     passwordRecoveryRequests: data.passwordRecoveryRequests || [],
     tasks: data.tasks || [],
