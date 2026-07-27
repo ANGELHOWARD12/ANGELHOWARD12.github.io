@@ -1486,6 +1486,25 @@
       </nav>
 
       <section id="tasksView" class="view active">
+        <section id="personalBreakPanel" class="panel stack">
+          <div>
+            <h2>Mi horario de break</h2>
+            <p class="muted">Este horario es personal. Solo modifica tu agenda y no cambia el break de los demas usuarios.</p>
+          </div>
+          <form id="breakSettingsForm" class="break-settings">
+            <label>
+              Inicio de mi break
+              <input id="breakStartTime" type="time" lang="en-GB" min="08:30" max="18:30" step="900" required />
+            </label>
+            <label>
+              Fin de mi break
+              <input id="breakEndTime" type="time" lang="en-GB" min="08:45" max="19:00" step="900" required />
+            </label>
+            <button class="small" type="submit">Guardar mi break</button>
+            <p id="breakSettingsMessage" class="message" aria-live="polite"></p>
+          </form>
+        </section>
+
         <section id="coordinatorDayPanel" class="panel stack">
           <div class="week-toolbar">
             <div>
@@ -1500,18 +1519,6 @@
             </div>
           </div>
           <strong id="coordinatorDayLabel"></strong>
-          <form id="breakSettingsForm" class="break-settings">
-            <label>
-              Inicio del break
-              <input id="breakStartTime" type="time" lang="en-GB" min="08:30" max="18:30" step="900" required />
-            </label>
-            <label>
-              Fin del break
-              <input id="breakEndTime" type="time" lang="en-GB" min="08:45" max="19:00" step="900" required />
-            </label>
-            <button class="small" type="submit">Guardar break</button>
-            <p id="breakSettingsMessage" class="message" aria-live="polite"></p>
-          </form>
           <div class="daily-roster-scroll">
             <div id="coordinatorDayRoster" class="daily-roster"></div>
           </div>
@@ -2012,7 +2019,7 @@
       ];
 
       const initialState = {
-        version: 8,
+        version: 9,
         activeUserId: "",
         selectedProduct: "oled",
         selectedWeekStart: "",
@@ -2021,6 +2028,7 @@
           breakStart: DEFAULT_BREAK_START,
           breakEnd: DEFAULT_BREAK_END
         },
+        breakSettingsByUser: {},
         users: [],
         registrationRequests: [],
         passwordRecoveryRequests: [],
@@ -2109,6 +2117,7 @@
       let activePreviewObjectUrl = "";
       let previewRequestId = 0;
       let lastAutoOpenedFileId = "";
+      let breakSettingsUserId = "";
       let activeViewId = ALLOWED_VIEW_IDS.includes(new URLSearchParams(window.location.search).get("view"))
         ? new URLSearchParams(window.location.search).get("view")
         : "tasksView";
@@ -2320,6 +2329,14 @@
         nextState.registrationRequests = nextState.registrationRequests || [];
         nextState.passwordRecoveryRequests = nextState.passwordRecoveryRequests || [];
         nextState.workSettings = normalizeWorkSettings(nextState.workSettings);
+        nextState.breakSettingsByUser =
+          nextState.breakSettingsByUser && typeof nextState.breakSettingsByUser === "object"
+            ? Object.fromEntries(
+                Object.entries(nextState.breakSettingsByUser)
+                  .filter(([userId]) => clean(userId))
+                  .map(([userId, settings]) => [clean(userId), normalizeWorkSettings(settings)])
+              )
+            : {};
         nextState.tasks = (nextState.tasks || []).map((task) => ({
           ...task,
           category: normalizedTaskCategory(task.category),
@@ -2677,9 +2694,14 @@
         return new Date(`${dateValue}T12:00:00`).getDay() === 6;
       }
 
-      function workScheduleForDate(dateValue) {
+      function breakSettingsForUser(userId = state.activeUserId) {
+        const personal = state.breakSettingsByUser?.[userId];
+        return normalizeWorkSettings(personal || state.workSettings);
+      }
+
+      function workScheduleForDate(dateValue, userId = state.activeUserId) {
         const saturday = isSaturday(dateValue);
-        const settings = normalizeWorkSettings(state.workSettings);
+        const settings = breakSettingsForUser(userId);
         return {
           start: WORKDAY_START,
           end: saturday ? SATURDAY_END : WEEKDAY_END,
@@ -2694,15 +2716,15 @@
         return Math.ceil((timeToMinutes(schedule.end) - timeToMinutes(schedule.start)) / 30);
       }
 
-      function overlapsBreak(dateValue, startTime, endTime) {
-        const schedule = workScheduleForDate(dateValue);
+      function overlapsBreak(dateValue, startTime, endTime, userId = state.activeUserId) {
+        const schedule = workScheduleForDate(dateValue, userId);
         if (!schedule.hasBreak) return false;
         return timeToMinutes(startTime) < timeToMinutes(schedule.breakEnd) && timeToMinutes(endTime) > timeToMinutes(schedule.breakStart);
       }
 
-      function validateTaskSchedule(dateValue, startTime, endTime) {
+      function validateTaskSchedule(dateValue, startTime, endTime, userId = state.activeUserId) {
         if (!dateValue || isSunday(dateValue)) return "No se asignan tareas los domingos.";
-        const schedule = workScheduleForDate(dateValue);
+        const schedule = workScheduleForDate(dateValue, userId);
         if (
           timeToMinutes(startTime) < timeToMinutes(schedule.start) ||
           timeToMinutes(endTime) > timeToMinutes(schedule.end) ||
@@ -2710,14 +2732,14 @@
         ) {
           return `El horario del dia debe estar entre ${schedule.start} y ${schedule.end}, con cierre posterior al inicio.`;
         }
-        if (overlapsBreak(dateValue, startTime, endTime)) {
+        if (overlapsBreak(dateValue, startTime, endTime, userId)) {
           return `El break de lunes a viernes es de ${schedule.breakStart} a ${schedule.breakEnd}. Elige un horario fuera de ese bloque.`;
         }
         return "";
       }
 
-      function applyTimeInputLimits(dateValue, startInput, endInput) {
-        const schedule = workScheduleForDate(dateValue || todayIso);
+      function applyTimeInputLimits(dateValue, startInput, endInput, userId = state.activeUserId) {
+        const schedule = workScheduleForDate(dateValue || todayIso, userId);
         startInput.min = schedule.start;
         startInput.max = minutesToTime(timeToMinutes(schedule.end) - 15);
         endInput.min = minutesToTime(timeToMinutes(schedule.start) + 15);
@@ -3703,6 +3725,7 @@
         renderMotivation();
         renderDashboard();
         if (activeViewId === "tasksView") {
+          renderPersonalBreakSettings();
           renderCoordinatorDay();
           renderTrainerWeek();
           renderTasks();
@@ -3720,6 +3743,16 @@
 
       function renderMotivation() {
         els.dailyMotivation.textContent = dailyMotivationText();
+      }
+
+      function renderPersonalBreakSettings() {
+        if (breakSettingsUserId !== state.activeUserId) {
+          breakSettingsUserId = state.activeUserId;
+          setMessage(els.breakSettingsMessage, "", "");
+        }
+        const settings = breakSettingsForUser(state.activeUserId);
+        els.breakStartTime.value = settings.breakStart;
+        els.breakEndTime.value = settings.breakEnd;
       }
 
       function refreshSelects() {
@@ -3747,7 +3780,12 @@
         els.taskDueDate.value = els.taskDueDate.value || nearestWorkingDay(todayIso);
         els.taskStartTime.value = els.taskStartTime.value || WORKDAY_START;
         els.taskEndTime.value = els.taskEndTime.value || "09:30";
-        applyTimeInputLimits(els.taskDueDate.value, els.taskStartTime, els.taskEndTime);
+        applyTimeInputLimits(
+          els.taskDueDate.value,
+          els.taskStartTime,
+          els.taskEndTime,
+          els.taskOwner.value || state.activeUserId
+        );
         if (!isCoordinator()) els.taskOwner.value = state.activeUserId;
       }
 
@@ -3809,6 +3847,11 @@
         const task = state.tasks.find((item) => item.id === taskId);
         const nextOwner = state.users.find((user) => user.id === newOwnerId && user.role === "Trainer" && user.status === "Activo");
         if (!canReassignTask(task) || !nextOwner || !clean(reason)) return false;
+        const scheduleError = validateTaskSchedule(task.dueDate, task.startTime, task.endTime, newOwnerId);
+        if (scheduleError) {
+          setMessage(els.reassignMessage, `${nextOwner.name}: ${scheduleError}`, "err");
+          return false;
+        }
         if (hasScheduleConflict(newOwnerId, task.dueDate, task.startTime, task.endTime, task.id)) {
           setMessage(els.reassignMessage, `${nextOwner.name} ya tiene una tarea entre ${taskTimeLabel(task)}.`, "err");
           return false;
@@ -3854,7 +3897,7 @@
         els.scheduleDate.value = task.dueDate;
         els.scheduleStartTime.value = task.startTime || WORKDAY_START;
         els.scheduleEndTime.value = task.endTime || "09:30";
-        applyTimeInputLimits(task.dueDate, els.scheduleStartTime, els.scheduleEndTime);
+        applyTimeInputLimits(task.dueDate, els.scheduleStartTime, els.scheduleEndTime, task.ownerId);
         els.scheduleReason.value = "";
         setMessage(els.scheduleMessage, "", "");
         els.scheduleDialog.showModal();
@@ -3863,7 +3906,7 @@
       function rescheduleTask(taskId, dateValue, startTime, endTime, reason) {
         const task = state.tasks.find((item) => item.id === taskId);
         if (!canRescheduleTask(task)) return false;
-        const scheduleError = validateTaskSchedule(dateValue, startTime, endTime);
+        const scheduleError = validateTaskSchedule(dateValue, startTime, endTime, task.ownerId);
         if (scheduleError) {
           setMessage(els.scheduleMessage, scheduleError, "err");
           return false;
@@ -3985,11 +4028,12 @@
         }
       }
 
-      function focusTaskFormForDate(dateValue) {
+      function focusTaskFormForDate(dateValue, ownerId = state.activeUserId) {
         els.taskDueDate.value = dateValue;
+        if (ownerId) els.taskOwner.value = ownerId;
         els.taskStartTime.value = WORKDAY_START;
         els.taskEndTime.value = "09:30";
-        applyTimeInputLimits(dateValue, els.taskStartTime, els.taskEndTime);
+        applyTimeInputLimits(dateValue, els.taskStartTime, els.taskEndTime, ownerId);
         if (!isCoordinator()) els.taskOwner.value = state.activeUserId;
         els.taskTitle.focus();
         setMessage(
@@ -4011,8 +4055,8 @@
         }).join("");
       }
 
-      function scheduleBreakMarkup(dateValue) {
-        const schedule = workScheduleForDate(dateValue);
+      function scheduleBreakMarkup(dateValue, userId = state.activeUserId) {
+        const schedule = workScheduleForDate(dateValue, userId);
         if (!schedule.hasBreak) return "";
         const startColumn = Math.floor((timeToMinutes(schedule.breakStart) - timeToMinutes(schedule.start)) / 30) + 1;
         const span = Math.ceil((timeToMinutes(schedule.breakEnd) - timeToMinutes(schedule.breakStart)) / 30);
@@ -4022,13 +4066,11 @@
       function renderCoordinatorDay() {
         if (!isCoordinator()) return;
         const dateValue = nearestWorkingDay(state.selectedCoordinatorDate || todayIso);
-        const schedule = workScheduleForDate(dateValue);
+        const schedule = workScheduleForDate(dateValue, state.activeUserId);
         const scheduleSlots = scheduleSlotsForDate(dateValue);
         state.selectedCoordinatorDate = dateValue;
         els.coordinatorDate.value = dateValue;
-        els.breakStartTime.value = schedule.breakStart;
-        els.breakEndTime.value = schedule.breakEnd;
-        els.coordinatorDayLabel.textContent = `${formatShortDate(dateValue)} | Week ${isoWeekNumber(dateValue)} | ${schedule.start} - ${schedule.end}${schedule.hasBreak ? ` | Break ${schedule.breakStart} - ${schedule.breakEnd}` : " | Sin break"}`;
+        els.coordinatorDayLabel.textContent = `${formatShortDate(dateValue)} | Week ${isoWeekNumber(dateValue)} | ${schedule.start} - ${schedule.end}${schedule.hasBreak ? " | Break personalizado por usuario" : " | Sin break"}`;
         els.coordinatorDayRoster.innerHTML = `
           <div class="roster-head">
             <span>TRAINER / ZONA</span>
@@ -4038,6 +4080,7 @@
         `;
 
         assignableUsers().forEach((person) => {
+          const personSchedule = workScheduleForDate(dateValue, person.id);
           const tasks = state.tasks
             .filter((task) => task.ownerId === person.id && task.dueDate === dateValue)
             .sort((a, b) => (a.startTime || WORKDAY_START).localeCompare(b.startTime || WORKDAY_START));
@@ -4051,21 +4094,20 @@
               <span>${escapeHtml(person.role === "Coordinador" ? "Coordinador" : person.zone || "Sin zona")}</span>
               <button class="small" type="button">+ Tarea</button>
             </div>
-            <div class="schedule-track" style="--schedule-slots: ${scheduleSlots}">${scheduleBreakMarkup(dateValue)}</div>
+            <div class="schedule-track" style="--schedule-slots: ${scheduleSlots}">${scheduleBreakMarkup(dateValue, person.id)}</div>
             <div class="roster-progress"><strong>${percent}%</strong><span>${done}/${tasks.length} aprobadas</span></div>
           `;
           row.querySelector(".roster-person button").addEventListener("click", () => {
-            focusTaskFormForDate(dateValue);
-            els.taskOwner.value = person.id;
+            focusTaskFormForDate(dateValue, person.id);
           });
           const track = row.querySelector(".schedule-track");
           if (!tasks.length) {
             track.innerHTML = `<span class="schedule-empty">Sin tareas programadas</span>`;
-            if (schedule.hasBreak) track.insertAdjacentHTML("afterbegin", scheduleBreakMarkup(dateValue));
+            if (personSchedule.hasBreak) track.insertAdjacentHTML("afterbegin", scheduleBreakMarkup(dateValue, person.id));
           } else {
             tasks.forEach((task) => {
               const start = Math.max(timeToMinutes(WORKDAY_START), timeToMinutes(task.startTime || WORKDAY_START));
-              const end = Math.min(timeToMinutes(schedule.end), timeToMinutes(task.endTime || "09:30"));
+              const end = Math.min(timeToMinutes(personSchedule.end), timeToMinutes(task.endTime || "09:30"));
               const startColumn = Math.max(1, Math.floor((start - timeToMinutes(WORKDAY_START)) / 30) + 1);
               const span = Math.max(1, Math.ceil((end - start) / 30));
               const block = document.createElement("button");
@@ -4139,7 +4181,7 @@
         els.weekLabel.textContent = `Week ${isoWeekNumber(days[0])} | ${formatShortDate(days[0])} - ${formatShortDate(days[5])}`;
         els.weeklySummary.innerHTML = "";
         days.forEach((day) => {
-          const schedule = workScheduleForDate(day);
+          const schedule = workScheduleForDate(day, state.activeUserId);
           const tasks = state.tasks
             .filter((task) => task.ownerId === state.activeUserId && task.dueDate === day)
             .sort((a, b) => (a.startTime || WORKDAY_START).localeCompare(b.startTime || WORKDAY_START));
@@ -4156,7 +4198,7 @@
             <div class="workday-note">${schedule.start}-${schedule.end}${schedule.hasBreak ? ` | Break ${schedule.breakStart}-${schedule.breakEnd}` : " | Sin break"}</div>
             <div class="day-tasks"></div>
           `;
-          column.querySelector(".add-personal-task").addEventListener("click", () => focusTaskFormForDate(day));
+          column.querySelector(".add-personal-task").addEventListener("click", () => focusTaskFormForDate(day, state.activeUserId));
           const wrap = column.querySelector(".day-tasks");
           if (!tasks.length) {
             wrap.innerHTML = `<div class="empty"><strong>Dia libre</strong><p>Sin tareas asignadas.</p></div>`;
@@ -5072,7 +5114,21 @@
 
         els.taskDueDate.addEventListener("change", () => {
           if (!els.taskDueDate.value) return;
-          applyTimeInputLimits(els.taskDueDate.value, els.taskStartTime, els.taskEndTime);
+          applyTimeInputLimits(
+            els.taskDueDate.value,
+            els.taskStartTime,
+            els.taskEndTime,
+            els.taskOwner.value || state.activeUserId
+          );
+          setMessage(els.taskMessage, "", "");
+        });
+        els.taskOwner.addEventListener("change", () => {
+          applyTimeInputLimits(
+            els.taskDueDate.value,
+            els.taskStartTime,
+            els.taskEndTime,
+            els.taskOwner.value || state.activeUserId
+          );
           setMessage(els.taskMessage, "", "");
         });
 
@@ -5087,7 +5143,13 @@
         els.cancelSchedule.addEventListener("click", () => els.scheduleDialog.close());
         els.scheduleDate.addEventListener("change", () => {
           if (!els.scheduleDate.value) return;
-          applyTimeInputLimits(els.scheduleDate.value, els.scheduleStartTime, els.scheduleEndTime);
+          const task = state.tasks.find((item) => item.id === els.scheduleForm.dataset.taskId);
+          applyTimeInputLimits(
+            els.scheduleDate.value,
+            els.scheduleStartTime,
+            els.scheduleEndTime,
+            task?.ownerId || state.activeUserId
+          );
           setMessage(els.scheduleMessage, "", "");
         });
 
@@ -5136,12 +5198,15 @@
             );
             return;
           }
-          state.workSettings = normalized;
+          state.breakSettingsByUser = {
+            ...(state.breakSettingsByUser || {}),
+            [state.activeUserId]: normalized
+          };
           saveState();
-          renderCoordinatorDay();
+          render();
           setMessage(
             els.breakSettingsMessage,
-            `Break actualizado: ${normalized.breakStart}-${normalized.breakEnd}.`,
+            `Tu break personal se actualizo: ${normalized.breakStart}-${normalized.breakEnd}.`,
             "ok"
           );
         });
@@ -5155,7 +5220,12 @@
           }
           const startTime = els.taskStartTime.value;
           const endTime = els.taskEndTime.value;
-          const scheduleError = validateTaskSchedule(els.taskDueDate.value, startTime, endTime);
+          const scheduleError = validateTaskSchedule(
+            els.taskDueDate.value,
+            startTime,
+            endTime,
+            els.taskOwner.value
+          );
           if (scheduleError) {
             setMessage(els.taskMessage, scheduleError, "err");
             return;
