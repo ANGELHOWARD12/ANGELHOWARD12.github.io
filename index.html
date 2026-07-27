@@ -1656,22 +1656,19 @@
               </label>
               <label>
                 Resultado
-                <select id="evidenceResult">
-                  <option>Cumplida</option>
-                  <option>Cumplida parcialmente</option>
-                  <option>No se pudo cumplir</option>
-                </select>
+                <input id="evidenceResult" type="text" value="Realizado" readonly required />
               </label>
               <label>
-                Fotos o archivos
+                Fotos o archivos obligatorios
                 <input
                   id="evidenceFiles"
                   type="file"
                   multiple
+                  required
                   accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt"
                 />
               </label>
-              <p class="muted wide">Puedes adjuntar hasta 8 archivos de 15 MB cada uno. Las fotos se guardan en su calidad original.</p>
+              <p class="muted wide">Debes adjuntar al menos un sustento. Puedes cargar hasta 8 archivos de 15 MB cada uno y las fotos conservan su calidad original.</p>
               <label class="wide">
                 Observaciones
                 <textarea id="evidenceNotes" placeholder="Describe que se realizo, hallazgos, incidencias o acuerdos"></textarea>
@@ -2652,6 +2649,10 @@
         return review === "Observado" || review === "Rechazado" ? "Rechazado" : review || "Pendiente";
       }
 
+      function evidenceResultLabel(result) {
+        return result === "Cumplida" || result === "Cumplida parcialmente" ? "Realizado" : result || "Realizado";
+      }
+
       function priorityClass(priority) {
         if (priority === "Alta") return "high";
         if (priority === "Media") return "medium";
@@ -3068,7 +3069,7 @@
                 : "",
               store: evidence?.store || "",
               reviewedProduct: evidence?.product || "",
-              result: evidence?.result || "",
+              result: evidenceResultLabel(evidence?.result),
               notes: evidence?.notes || "",
               review: evidence ? evidenceReviewLabel(evidence.review) : task.status === "Cumplida" ? "Aprobado" : "",
               fileName: file?.name || "",
@@ -3984,16 +3985,6 @@
         }
       }
 
-      function markTaskBlocked(taskId) {
-        const task = state.tasks.find((item) => item.id === taskId);
-        if (!task || isCoordinator()) return;
-        document.querySelector('[data-view="evidenceView"]').click();
-        els.evidenceTask.value = task.id;
-        els.evidenceResult.value = "No se pudo cumplir";
-        els.evidenceNotes.focus();
-        setMessage(els.evidenceMessage, "Escribe el motivo. Pablo vera este feedback para reasignar o dar seguimiento.", "err");
-      }
-
       function focusTaskFormForDate(dateValue) {
         els.taskDueDate.value = dateValue;
         els.taskStartTime.value = WORKDAY_START;
@@ -4332,7 +4323,7 @@
               ${taskHistoryMarkup(task)}
               ${
                 latestEvidence
-                  ? `<div class="note"><strong>Ultimo sustento:</strong><p class="muted">${escapeHtml(latestEvidence.result)} | ${escapeHtml(latestEvidence.store)} | ${formatDateTime(latestEvidence.submittedAt)}</p></div>`
+                  ? `<div class="note"><strong>Ultimo sustento:</strong><p class="muted">${escapeHtml(evidenceResultLabel(latestEvidence.result))} | ${escapeHtml(latestEvidence.store)} | ${formatDateTime(latestEvidence.submittedAt)}</p></div>`
                   : ""
               }
             </div>
@@ -4474,7 +4465,7 @@
             <div class="meta">
               <span>Trainer: ${escapeHtml(userName(entry.submittedById))}</span>
               <span>PDV: ${escapeHtml(entry.store)}</span>
-              <span>Resultado: ${escapeHtml(entry.result)}</span>
+              <span>Resultado: ${escapeHtml(evidenceResultLabel(entry.result))}</span>
               <span>${formatDateTime(entry.submittedAt)}</span>
             </div>
             ${entry.product ? `<p><strong>Producto:</strong> ${escapeHtml(entry.product)}</p>` : ""}
@@ -5253,6 +5244,15 @@
         els.exportEvidenceExcel.addEventListener("click", exportEvidenceWorkbook);
         els.exportEvidencePackage.addEventListener("click", exportEvidencePackage);
 
+        els.evidenceFiles.addEventListener("change", () => {
+          els.evidenceFiles.setCustomValidity("");
+          setMessage(els.evidenceMessage, "", "");
+        });
+        els.evidenceFiles.addEventListener("invalid", () => {
+          els.evidenceFiles.setCustomValidity("Debes adjuntar al menos una foto o archivo de sustento.");
+          setMessage(els.evidenceMessage, "Debes adjuntar al menos una foto o archivo antes de enviar el sustento.", "err");
+        });
+
         els.evidenceForm.addEventListener("submit", async (event) => {
           event.preventDefault();
           if (els.evidenceSubmitButton.disabled) return;
@@ -5262,13 +5262,16 @@
             return;
           }
           const notes = clean(els.evidenceNotes.value);
-          if (els.evidenceResult.value === "No se pudo cumplir" && !notes) {
-            setMessage(els.evidenceMessage, "Explica el motivo para que el coordinador pueda reasignar o dar seguimiento.", "err");
+          const selectedFiles = Array.from(els.evidenceFiles.files || []);
+          if (!selectedFiles.length) {
+            els.evidenceFiles.setCustomValidity("Debes adjuntar al menos una foto o archivo de sustento.");
+            els.evidenceFiles.reportValidity();
+            setMessage(els.evidenceMessage, "Debes adjuntar al menos una foto o archivo antes de enviar el sustento.", "err");
             return;
           }
+          els.evidenceFiles.setCustomValidity("");
           els.evidenceSubmitButton.disabled = true;
           els.evidenceSubmitButton.textContent = "Enviando...";
-          const selectedFiles = Array.from(els.evidenceFiles.files || []);
           if (selectedFiles.length > MAX_EVIDENCE_FILES) {
             setMessage(els.evidenceMessage, `Puedes adjuntar un maximo de ${MAX_EVIDENCE_FILES} archivos por sustento.`, "err");
             els.evidenceSubmitButton.disabled = false;
@@ -5315,7 +5318,7 @@
             submittedAt: Date.now(),
             store: clean(els.evidenceStore.value),
             product: clean(els.evidenceProduct.value),
-            result: els.evidenceResult.value,
+            result: "Realizado",
             notes,
             files: uploadedFiles,
             review: "Pendiente"
@@ -5334,12 +5337,10 @@
             return;
           }
           els.evidenceForm.reset();
+          els.evidenceResult.value = "Realizado";
           els.evidenceSubmitButton.disabled = false;
           els.evidenceSubmitButton.textContent = "Enviar sustento";
-          const successMessage =
-            evidence.result === "No se pudo cumplir"
-              ? "Feedback guardado. Pablo ya puede reasignar o dar seguimiento."
-              : `Sustento guardado con ${uploadedFiles.length} archivo${uploadedFiles.length === 1 ? "" : "s"}. Pablo debe aprobarlo para completar la tarea.`;
+          const successMessage = `Sustento guardado con ${uploadedFiles.length} archivo${uploadedFiles.length === 1 ? "" : "s"}. Pablo debe aprobarlo para completar la tarea.`;
           activateView("tasksView", { updateUrl: true, historyMode: "replace" });
           render();
           showToast(successMessage, "success");
