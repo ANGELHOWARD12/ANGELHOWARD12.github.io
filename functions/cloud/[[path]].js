@@ -3,10 +3,15 @@ const SESSION_DAYS = 14;
 const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb9775180ea780b71";
 
 const EMPTY_DATA = {
-  version: 7,
+  version: 8,
+  workSettings: {
+    breakStart: "12:30",
+    breakEnd: "14:00"
+  },
   registrationRequests: [],
   passwordRecoveryRequests: [],
   tasks: [],
+  deletedTasks: [],
   announcements: [],
   supportRequests: [],
   dailyMotivations: []
@@ -99,6 +104,7 @@ export async function onRequest(context) {
     if (evidenceFileMatch && request.method === "GET") return evidenceFile(env.DB, session.user, evidenceFileMatch[1]);
     if (route === "tasks/evidence" && request.method === "POST") return submitTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/review" && request.method === "POST") return reviewTaskEvidence(request, env.DB, session.user, context);
+    if (route === "tasks/delete" && request.method === "POST") return deleteTaskAndArchive(request, env.DB, session.user, context);
     if (route === "state" && request.method === "GET") return getState(env.DB, session.user, context);
     if (route === "state" && request.method === "PUT") return putState(request, env.DB, session.user, context);
     if (route === "admin/users" && request.method === "POST") return createUser(request, env.DB, session.user);
@@ -630,7 +636,7 @@ async function submitTaskEvidence(request, db, user, context) {
 
 async function reviewTaskEvidence(request, db, user, context) {
   if (user.role !== "Coordinador") {
-    return json({ ok: false, message: "Solo el coordinador puede aprobar o observar sustentos." }, 403);
+    return json({ ok: false, message: "Solo el coordinador puede aprobar o rechazar sustentos." }, 403);
   }
   const body = await readJson(request);
   const taskId = clean(body.taskId);
@@ -648,26 +654,95 @@ async function reviewTaskEvidence(request, db, user, context) {
 
   const reviewedAt = Date.now();
   task.status = status;
-  latestEvidence.review = status === "Cumplida" ? "Aprobado" : "Observado";
+  latestEvidence.review = status === "Cumplida" ? "Aprobado" : "Rechazado";
   latestEvidence.reviewedById = user.id;
   latestEvidence.reviewedAt = reviewedAt;
   task.history = Array.isArray(task.history) ? task.history : [];
   task.history.push({
-    type: status === "Cumplida" ? "Aprobacion" : "Observacion",
+    type: status === "Cumplida" ? "Aprobacion" : "Rechazo",
     byId: user.id,
-    reason: status === "Cumplida" ? "Sustento aprobado y tarea completada" : "Sustento observado por el coordinador",
+    reason: status === "Cumplida" ? "Sustento aprobado y tarea completada" : "Sustento rechazado por el coordinador",
     at: reviewedAt
   });
   await saveData(db, data);
 
   const notification = {
     userId: task.ownerId,
-    title: status === "Cumplida" ? "Tarea aprobada y completada" : "Sustento observado",
+    title: status === "Cumplida" ? "Tarea aprobada y completada" : "Sustento rechazado",
     body: clean(task.title),
     url: `/?view=tasksView&task=${encodeURIComponent(taskId)}`,
     sourceKey: `review:${taskId}:${status}:${reviewedAt}`
   };
   const notifiedUsers = await queueNotifications(db, [notification]);
+  if (notifiedUsers.length) context.waitUntil(pushNotificationsForUsers(db, notifiedUsers));
+  return stateResponse(db, user, data);
+}
+
+function archiveDeletedTask(data, task, actor, reason = "") {
+  data.deletedTasks = Array.isArray(data.deletedTasks) ? data.deletedTasks : [];
+  const deletedAt = Date.now();
+  const record = {
+    id: crypto.randomUUID(),
+    originalTaskId: clean(task.id),
+    title: clean(task.title),
+    ownerId: clean(task.ownerId),
+    createdById: clean(task.createdById),
+    category: normalizeTaskCategory(task.category),
+    priority: clean(task.priority),
+    dueDate: clean(task.dueDate),
+    startTime: clean(task.startTime) || WORKDAY_START,
+    endTime: clean(task.endTime) || "09:30",
+    product: clean(task.product),
+    description: clean(task.description),
+    status: clean(task.status),
+    evidenceCount: Array.isArray(task.evidence) ? task.evidence.length : 0,
+    deletedById: clean(actor.id),
+    deletedByName: clean(actor.name) || "Coordinador",
+    deletedAt,
+    reason: clean(reason).slice(0, 1000) || "Tarea retirada de la agenda por el coordinador."
+  };
+  data.deletedTasks.unshift(record);
+  data.deletedTasks = data.deletedTasks.slice(0, 500);
+  return record;
+}
+
+async function deleteTaskEvidenceFiles(db, taskId) {
+  await db
+    .prepare("DELETE FROM evidence_file_chunks WHERE file_id IN (SELECT id FROM evidence_files WHERE task_id = ?)")
+    .bind(taskId)
+    .run();
+  await db.prepare("DELETE FROM evidence_files WHERE task_id = ?").bind(taskId).run();
+}
+
+async function deleteTaskAndArchive(request, db, user, context) {
+  if (user.role !== "Coordinador") {
+    return json({ ok: false, message: "Solo el coordinador puede eliminar tareas." }, 403);
+  }
+  const body = await readJson(request);
+  const taskId = clean(body.taskId);
+  const reason = clean(body.reason);
+  if (!taskId || !reason) {
+    return json({ ok: false, message: "Indica la tarea y el motivo de la eliminacion." }, 400);
+  }
+  const data = await loadData(db);
+  const taskIndex = data.tasks.findIndex((task) => clean(task.id) === taskId);
+  if (taskIndex < 0) return json({ ok: false, message: "La tarea ya no existe." }, 404);
+  const task = data.tasks[taskIndex];
+  const archived = archiveDeletedTask(data, task, user, reason);
+  data.tasks.splice(taskIndex, 1);
+  await deleteTaskEvidenceFiles(db, taskId);
+  await saveData(db, data);
+
+  const notifications = task.ownerId === user.id
+    ? []
+    : [{
+        userId: task.ownerId,
+        title: "Tarea eliminada por el coordinador",
+        body: `${clean(task.title)} | ${clean(task.dueDate)} ${clean(task.startTime)}-${clean(task.endTime)}`,
+        url: "/?view=tasksView",
+        sourceKey: `task-deleted:${taskId}:${archived.deletedAt}`
+      }];
+  const notifiedUsers = await queueNotifications(db, notifications);
   if (notifiedUsers.length) context.waitUntil(pushNotificationsForUsers(db, notifiedUsers));
   return stateResponse(db, user, data);
 }
@@ -687,6 +762,9 @@ async function stateResponse(db, user, loadedData = null) {
     activeUserId: user.id,
     users,
     tasks: coordinator ? data.tasks : data.tasks.filter((task) => task.ownerId === user.id),
+    deletedTasks: coordinator
+      ? data.deletedTasks
+      : (data.deletedTasks || []).filter((task) => task.ownerId === user.id),
     announcements: coordinator
       ? data.announcements
       : data.announcements.filter((item) => item.audience === "all" || item.targetId === user.id),
@@ -706,14 +784,20 @@ async function putState(request, db, user, context) {
   const notifications = [];
 
   if (user.role === "Coordinador") {
+    if (validWorkSettings(submitted.workSettings)) {
+      current.workSettings = normalizeWorkSettings(submitted.workSettings);
+    }
     for (const key of ["registrationRequests", "passwordRecoveryRequests", "announcements", "supportRequests", "dailyMotivations"]) {
       if (Array.isArray(submitted[key])) current[key] = submitted[key];
     }
     if (Array.isArray(submitted.tasks)) {
       const previousTasks = new Map(current.tasks.map((task) => [clean(task.id), task]));
       const submittedTaskIds = new Set(submitted.tasks.map((task) => clean(task.id)).filter(Boolean));
-      const removedTaskIds = current.tasks.map((task) => clean(task.id)).filter((taskId) => taskId && !submittedTaskIds.has(taskId));
-      current.tasks = submitted.tasks;
+      const removedTasks = current.tasks.filter((task) => clean(task.id) && !submittedTaskIds.has(clean(task.id)));
+      current.tasks = submitted.tasks.map((task) => ({
+        ...task,
+        category: normalizeTaskCategory(task.category)
+      }));
       for (const task of current.tasks) {
         const previous = previousTasks.get(clean(task.id));
         const assignedNow = !previous && clean(task.ownerId);
@@ -733,12 +817,9 @@ async function putState(request, db, user, context) {
           });
         }
       }
-      for (const taskId of removedTaskIds) {
-        await db
-          .prepare("DELETE FROM evidence_file_chunks WHERE file_id IN (SELECT id FROM evidence_files WHERE task_id = ?)")
-          .bind(taskId)
-          .run();
-        await db.prepare("DELETE FROM evidence_files WHERE task_id = ?").bind(taskId).run();
+      for (const removedTask of removedTasks) {
+        archiveDeletedTask(current, removedTask, user, "Tarea retirada de la agenda por el coordinador.");
+        await deleteTaskEvidenceFiles(db, clean(removedTask.id));
       }
     }
   } else {
@@ -780,7 +861,7 @@ async function putState(request, db, user, context) {
         lastHistory.toStartTime === requestedStart &&
         lastHistory.toEndTime === requestedEnd &&
         clean(lastHistory.reason) &&
-        validWorkSchedule(requestedDate, requestedStart, requestedEnd) &&
+        validWorkSchedule(requestedDate, requestedStart, requestedEnd, current.workSettings) &&
         !hasTaskConflict(current.tasks, user.id, requestedDate, requestedStart, requestedEnd, task.id);
       if (validReassignment) {
         notifications.push({
@@ -828,7 +909,7 @@ async function putState(request, db, user, context) {
         task.ownerId !== user.id ||
         task.createdById !== user.id ||
         clean(task.title).length < 2 ||
-        !validWorkSchedule(dueDate, startTime, endTime) ||
+        !validWorkSchedule(dueDate, startTime, endTime, current.workSettings) ||
         hasTaskConflict(current.tasks, user.id, dueDate, startTime, endTime)
       ) {
         continue;
@@ -839,7 +920,7 @@ async function putState(request, db, user, context) {
         title: clean(task.title).slice(0, 140),
         ownerId: user.id,
         createdById: user.id,
-        category: ["PDV", "Entrenamiento", "Producto", "Reporte", "Coordinacion"].includes(task.category) ? task.category : "PDV",
+        category: normalizeTaskCategory(task.category),
         priority: ["Alta", "Media", "Baja"].includes(task.priority) ? task.priority : "Media",
         dueDate,
         startTime,
@@ -1085,7 +1166,30 @@ function timeToMinutes(value) {
   return match ? Number(match[1]) * 60 + Number(match[2]) : -1;
 }
 
-function validWorkSchedule(dateValue, startTime, endTime) {
+function validWorkSettings(settings) {
+  const start = timeToMinutes(settings?.breakStart);
+  const end = timeToMinutes(settings?.breakEnd);
+  return (
+    start >= timeToMinutes(WORKDAY_START) &&
+    end <= timeToMinutes(WEEKDAY_END) &&
+    end - start >= 15 &&
+    end - start <= 180
+  );
+}
+
+function normalizeWorkSettings(settings) {
+  return validWorkSettings(settings)
+    ? { breakStart: clean(settings.breakStart), breakEnd: clean(settings.breakEnd) }
+    : { breakStart: BREAK_START, breakEnd: BREAK_END };
+}
+
+function normalizeTaskCategory(category) {
+  if (category === "PDV") return "PDP";
+  if (category === "Producto") return "ULG";
+  return ["PDP", "Entrenamiento", "ULG", "Reporte", "Coordinacion"].includes(category) ? category : "PDP";
+}
+
+function validWorkSchedule(dateValue, startTime, endTime, workSettings = null) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateValue || ""))) return false;
   const day = new Date(`${dateValue}T12:00:00Z`).getUTCDay();
   if (day === 0) return false;
@@ -1093,7 +1197,8 @@ function validWorkSchedule(dateValue, startTime, endTime) {
   const end = timeToMinutes(endTime);
   const workEnd = timeToMinutes(day === 6 ? SATURDAY_END : WEEKDAY_END);
   if (start < timeToMinutes(WORKDAY_START) || end > workEnd || end <= start) return false;
-  if (day !== 6 && start < timeToMinutes(BREAK_END) && end > timeToMinutes(BREAK_START)) return false;
+  const settings = normalizeWorkSettings(workSettings);
+  if (day !== 6 && start < timeToMinutes(settings.breakEnd) && end > timeToMinutes(settings.breakStart)) return false;
   return true;
 }
 
@@ -1116,7 +1221,14 @@ function hasTaskConflict(tasks, ownerId, dateValue, startTime, endTime, excludeT
 async function loadData(db) {
   const row = await db.prepare("SELECT data FROM app_data WHERE id = 1").first();
   try {
-    return { ...structuredClone(EMPTY_DATA), ...JSON.parse(row?.data || "{}") };
+    const parsed = JSON.parse(row?.data || "{}");
+    return {
+      ...structuredClone(EMPTY_DATA),
+      ...parsed,
+      workSettings: normalizeWorkSettings(parsed.workSettings),
+      tasks: (parsed.tasks || []).map((task) => ({ ...task, category: normalizeTaskCategory(task.category) })),
+      deletedTasks: (parsed.deletedTasks || []).map((task) => ({ ...task, category: normalizeTaskCategory(task.category) }))
+    };
   } catch {
     return structuredClone(EMPTY_DATA);
   }
@@ -1124,10 +1236,12 @@ async function loadData(db) {
 
 async function saveData(db, data) {
   const payload = {
-    version: 6,
+    version: 8,
+    workSettings: normalizeWorkSettings(data.workSettings),
     registrationRequests: data.registrationRequests || [],
     passwordRecoveryRequests: data.passwordRecoveryRequests || [],
     tasks: data.tasks || [],
+    deletedTasks: data.deletedTasks || [],
     announcements: data.announcements || [],
     supportRequests: data.supportRequests || [],
     dailyMotivations: data.dailyMotivations || []
