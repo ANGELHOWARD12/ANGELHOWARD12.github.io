@@ -543,13 +543,13 @@ async function submitTaskEvidence(request, db, user, context) {
     return json({ ok: false, message: "La tarea ya fue aprobada y completada." }, 409);
   }
 
-  const result = clean(submittedEvidence.result);
+  const result = "Realizado";
   const notes = clean(submittedEvidence.notes).slice(0, 3000);
-  const store = clean(submittedEvidence.store).slice(0, 180);
+  const category = clean(task.category).toUpperCase();
+  const store =
+    clean(submittedEvidence.store).slice(0, 180) ||
+    (["PDP", "PDV"].includes(category) ? "No especificada" : "No aplica");
   const product = clean(submittedEvidence.product).slice(0, 180);
-  if (result !== "Realizado" || !store) {
-    return json({ ok: false, message: "Completa la tienda. El resultado debe ser Realizado." }, 400);
-  }
 
   const submittedFiles = Array.isArray(submittedEvidence.files) ? submittedEvidence.files.slice(0, 8) : [];
   if (!submittedFiles.length) {
