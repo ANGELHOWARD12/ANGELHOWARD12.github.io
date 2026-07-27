@@ -546,15 +546,14 @@ async function submitTaskEvidence(request, db, user, context) {
   const notes = clean(submittedEvidence.notes).slice(0, 3000);
   const store = clean(submittedEvidence.store).slice(0, 180);
   const product = clean(submittedEvidence.product).slice(0, 180);
-  const allowedResults = new Set(["Cumplida", "Cumplida parcialmente", "No se pudo cumplir"]);
-  if (!allowedResults.has(result) || !store) {
-    return json({ ok: false, message: "Completa la tienda y selecciona un resultado valido." }, 400);
-  }
-  if (result === "No se pudo cumplir" && !notes) {
-    return json({ ok: false, message: "Explica por que no se pudo cumplir la tarea." }, 400);
+  if (result !== "Realizado" || !store) {
+    return json({ ok: false, message: "Completa la tienda. El resultado debe ser Realizado." }, 400);
   }
 
   const submittedFiles = Array.isArray(submittedEvidence.files) ? submittedEvidence.files.slice(0, 8) : [];
+  if (!submittedFiles.length) {
+    return json({ ok: false, message: "Debes adjuntar al menos una foto o archivo de sustento." }, 400);
+  }
   const files = [];
   for (const submittedFile of submittedFiles) {
     const fileId = clean(submittedFile.id);
@@ -594,27 +593,15 @@ async function submitTaskEvidence(request, db, user, context) {
   };
   task.evidence.push(evidence);
   task.history = Array.isArray(task.history) ? task.history : [];
-  if (result === "No se pudo cumplir") {
-    task.status = "No disponible";
-    task.blockedReason = notes;
-    task.blockedAt = submittedAt;
-    task.history.push({
-      type: "Bloqueo",
-      fromId: user.id,
-      reason: notes,
-      at: submittedAt
-    });
-  } else {
-    task.status = "En revision";
-    task.blockedReason = "";
-    task.blockedAt = 0;
-    task.history.push({
-      type: "Sustento enviado",
-      fromId: user.id,
-      reason: `${files.length} archivo${files.length === 1 ? "" : "s"} enviado${files.length === 1 ? "" : "s"}`,
-      at: submittedAt
-    });
-  }
+  task.status = "En revision";
+  task.blockedReason = "";
+  task.blockedAt = 0;
+  task.history.push({
+    type: "Sustento enviado",
+    fromId: user.id,
+    reason: `${files.length} archivo${files.length === 1 ? "" : "s"} enviado${files.length === 1 ? "" : "s"}`,
+    at: submittedAt
+  });
 
   await saveData(db, data);
   const coordinators = await db
@@ -624,7 +611,7 @@ async function submitTaskEvidence(request, db, user, context) {
     .filter((coordinator) => clean(coordinator.id) !== user.id)
     .map((coordinator) => ({
       userId: coordinator.id,
-      title: result === "No se pudo cumplir" ? "Tarea con incidencia" : "Nuevo sustento por revisar",
+      title: "Nuevo sustento por revisar",
       body: `${clean(task.title)} | ${clean(user.name)}`,
       url: `/?view=evidenceView&task=${encodeURIComponent(taskId)}`,
       sourceKey: `evidence:${taskId}:${evidenceId}:${clean(coordinator.id)}`
@@ -872,14 +859,16 @@ async function putState(request, db, user, context) {
           sourceKey: `task:${clean(task.id)}:${requestedOwnerId}:reassigned:${lastHistory.at || Date.now()}`
         });
       }
+      const requestedStatus = clean(next.status);
+      const validStart = task.status === "Pendiente" && requestedStatus === "En proceso";
       return {
         ...task,
         ownerId: validReassignment ? requestedOwnerId : task.ownerId,
         dueDate: validReschedule ? requestedDate : task.dueDate,
         startTime: validReschedule ? requestedStart : task.startTime,
         endTime: validReschedule ? requestedEnd : task.endTime,
-        status: validReassignment ? "Pendiente" : clean(next.status) || task.status,
-        evidence: Array.isArray(next.evidence) ? next.evidence : task.evidence,
+        status: validReassignment ? "Pendiente" : validStart ? "En proceso" : task.status,
+        evidence: task.evidence,
         reminders: validReassignment
           ? []
           : validReminderList(next.reminders, user.id, task.ownerId)
@@ -888,13 +877,9 @@ async function putState(request, db, user, context) {
         history:
           validReassignment || validReschedule
             ? nextHistory
-            : scheduleChanged
-              ? task.history
-              : Array.isArray(next.history)
-                ? next.history
-                : task.history,
-        blockedReason: validReassignment ? "" : clean(next.blockedReason),
-        blockedAt: validReassignment ? 0 : Number(next.blockedAt || 0)
+            : task.history,
+        blockedReason: validReassignment ? "" : task.blockedReason,
+        blockedAt: validReassignment ? 0 : task.blockedAt
       };
     });
 
