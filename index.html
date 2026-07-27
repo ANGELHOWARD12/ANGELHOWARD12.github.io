@@ -200,7 +200,8 @@
 
       .primary,
       .ghost,
-      .small {
+      .small,
+      .danger {
         border-radius: 8px;
         font-weight: 900;
         min-height: 42px;
@@ -241,6 +242,17 @@
       .ghost:hover {
         background: var(--soft);
         border-color: #9ab7f8;
+      }
+
+      .danger {
+        background: var(--red);
+        border: 1px solid var(--red);
+        color: #fff;
+      }
+
+      .danger:hover {
+        background: #a9202d;
+        border-color: #a9202d;
       }
 
       .topbar {
@@ -463,11 +475,47 @@
         border-radius: 8px;
         display: grid;
         gap: 10px;
+        min-width: 0;
         padding: 14px;
       }
 
       .task-item {
         grid-template-columns: minmax(0, 1fr) auto;
+      }
+
+      .task-item > .actions {
+        align-content: start;
+        justify-content: flex-end;
+        max-width: 290px;
+      }
+
+      .item h3,
+      .item p,
+      .item strong,
+      .meta span,
+      .trainer-task-card strong,
+      .trainer-task-card span {
+        overflow-wrap: anywhere;
+      }
+
+      .break-settings {
+        align-items: end;
+        background: #f8fbff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(2, minmax(130px, 180px)) auto minmax(180px, 1fr);
+        padding: 12px;
+      }
+
+      .break-settings .message {
+        align-self: center;
+        margin: 0;
+      }
+
+      .deleted-task-item {
+        border-left: 5px solid var(--red);
       }
 
       .week-toolbar {
@@ -629,6 +677,8 @@
 
       .schedule-task strong,
       .schedule-task span {
+        display: block;
+        max-width: 100%;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -1091,6 +1141,14 @@
           grid-template-columns: 1fr;
         }
 
+        .break-settings {
+          grid-template-columns: repeat(2, minmax(130px, 1fr)) auto;
+        }
+
+        .break-settings .message {
+          grid-column: 1 / -1;
+        }
+
         .topbar,
         .session {
           align-items: stretch;
@@ -1216,6 +1274,50 @@
 
         .task-item {
           grid-template-columns: 1fr;
+        }
+
+        .task-item > .actions {
+          justify-content: stretch;
+          max-width: none;
+          width: 100%;
+        }
+
+        .task-item > .actions > button,
+        .task-item > .actions > a {
+          flex: 1 1 135px;
+          min-width: 0;
+          white-space: normal;
+        }
+
+        .title-row {
+          align-items: flex-start;
+        }
+
+        .meta {
+          align-items: start;
+          display: grid;
+          gap: 6px;
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .trainer-task-card {
+          min-width: 0;
+        }
+
+        .trainer-task-card .actions > button {
+          flex: 1 1 120px;
+          min-width: 0;
+          white-space: normal;
+        }
+
+        .break-settings {
+          align-items: stretch;
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .break-settings button,
+        .break-settings .message {
+          grid-column: 1 / -1;
         }
 
         .panel-header {
@@ -1398,6 +1500,18 @@
             </div>
           </div>
           <strong id="coordinatorDayLabel"></strong>
+          <form id="breakSettingsForm" class="break-settings">
+            <label>
+              Inicio del break
+              <input id="breakStartTime" type="time" lang="en-GB" min="08:30" max="18:30" step="900" required />
+            </label>
+            <label>
+              Fin del break
+              <input id="breakEndTime" type="time" lang="en-GB" min="08:45" max="19:00" step="900" required />
+            </label>
+            <button class="small" type="submit">Guardar break</button>
+            <p id="breakSettingsMessage" class="message" aria-live="polite"></p>
+          </form>
           <div class="daily-roster-scroll">
             <div id="coordinatorDayRoster" class="daily-roster"></div>
           </div>
@@ -1439,9 +1553,9 @@
               <label>
                 Categoria
                 <select id="taskCategory">
-                  <option>PDV</option>
+                  <option>PDP</option>
                   <option>Entrenamiento</option>
-                  <option>Producto</option>
+                  <option>ULG</option>
                   <option>Reporte</option>
                   <option>Coordinacion</option>
                 </select>
@@ -1472,6 +1586,7 @@
                   <option>HS</option>
                   <option>TV</option>
                   <option>AV</option>
+                  <option>GENERAL</option>
                 </select>
               </label>
               <label class="wide">
@@ -1497,7 +1612,7 @@
                   <option value="En proceso">En proceso</option>
                   <option value="En revision">En revision</option>
                   <option value="Cumplida">Cumplidas</option>
-                  <option value="Observada">Observadas</option>
+                  <option value="Observada">Rechazadas</option>
                   <option value="No disponible">No disponibles</option>
                 </select>
               </label>
@@ -1509,6 +1624,14 @@
             <div id="taskList" class="list"></div>
           </aside>
         </div>
+
+        <section id="deletedTasksPanel" class="panel stack">
+          <div>
+            <h2>Historial de tareas eliminadas</h2>
+            <p class="muted">Pablo ve todo el historial. Cada trainer ve solamente las tareas eliminadas de su agenda.</p>
+          </div>
+          <div id="deletedTasksList" class="list"></div>
+        </section>
       </section>
 
       <section id="evidenceView" class="view">
@@ -1795,6 +1918,25 @@
       </form>
     </dialog>
 
+    <dialog id="deleteTaskDialog">
+      <form id="deleteTaskForm" class="stack">
+        <div>
+          <h2>Eliminar y archivar tarea</h2>
+          <p id="deleteTaskLabel" class="muted"></p>
+        </div>
+        <label>
+          Motivo de la eliminacion
+          <textarea id="deleteTaskReason" placeholder="Explica por que se retira esta tarea de la agenda" required></textarea>
+        </label>
+        <p class="helper">La tarea desaparecera de la agenda, pero quedara registrada en el historial del trainer.</p>
+        <div class="actions">
+          <button id="confirmDeleteTask" class="danger" type="submit">Eliminar y guardar historial</button>
+          <button id="cancelDeleteTask" class="ghost" type="button">Cancelar</button>
+        </div>
+        <p id="deleteTaskMessage" class="message" aria-live="polite"></p>
+      </form>
+    </dialog>
+
     <dialog id="filePreviewDialog" class="file-preview-dialog" aria-labelledby="filePreviewTitle">
       <div class="file-preview-shell">
         <div class="file-preview-head">
@@ -1825,8 +1967,8 @@
       const WORKDAY_START = "08:30";
       const WEEKDAY_END = "19:00";
       const SATURDAY_END = "14:00";
-      const BREAK_START = "12:30";
-      const BREAK_END = "14:00";
+      const DEFAULT_BREAK_START = "12:30";
+      const DEFAULT_BREAK_END = "14:00";
       const MAX_EVIDENCE_FILES = 8;
       const MAX_EVIDENCE_FILE_BYTES = 15_000_000;
       const EVIDENCE_CHUNK_BASE64 = 750_000;
@@ -1873,15 +2015,20 @@
       ];
 
       const initialState = {
-        version: 7,
+        version: 8,
         activeUserId: "",
         selectedProduct: "oled",
         selectedWeekStart: "",
         selectedCoordinatorDate: "",
+        workSettings: {
+          breakStart: DEFAULT_BREAK_START,
+          breakEnd: DEFAULT_BREAK_END
+        },
         users: [],
         registrationRequests: [],
         passwordRecoveryRequests: [],
         tasks: [],
+        deletedTasks: [],
         announcements: [],
         supportRequests: [],
         dailyMotivations: []
@@ -2017,6 +2164,10 @@
         coordinatorDate: document.querySelector("#coordinatorDate"),
         coordinatorDayLabel: document.querySelector("#coordinatorDayLabel"),
         coordinatorDayRoster: document.querySelector("#coordinatorDayRoster"),
+        breakSettingsForm: document.querySelector("#breakSettingsForm"),
+        breakStartTime: document.querySelector("#breakStartTime"),
+        breakEndTime: document.querySelector("#breakEndTime"),
+        breakSettingsMessage: document.querySelector("#breakSettingsMessage"),
         prevWeek: document.querySelector("#prevWeek"),
         todayWeek: document.querySelector("#todayWeek"),
         nextWeek: document.querySelector("#nextWeek"),
@@ -2041,6 +2192,8 @@
         trainerFilterWrap: document.querySelector("#trainerFilterWrap"),
         taskTrainerFilter: document.querySelector("#taskTrainerFilter"),
         taskList: document.querySelector("#taskList"),
+        deletedTasksPanel: document.querySelector("#deletedTasksPanel"),
+        deletedTasksList: document.querySelector("#deletedTasksList"),
         evidenceForm: document.querySelector("#evidenceForm"),
         evidenceTask: document.querySelector("#evidenceTask"),
         evidenceStore: document.querySelector("#evidenceStore"),
@@ -2106,6 +2259,13 @@
         reminderDateTime: document.querySelector("#reminderDateTime"),
         reminderMessage: document.querySelector("#reminderMessage"),
         cancelReminder: document.querySelector("#cancelReminder"),
+        deleteTaskDialog: document.querySelector("#deleteTaskDialog"),
+        deleteTaskForm: document.querySelector("#deleteTaskForm"),
+        deleteTaskLabel: document.querySelector("#deleteTaskLabel"),
+        deleteTaskReason: document.querySelector("#deleteTaskReason"),
+        deleteTaskMessage: document.querySelector("#deleteTaskMessage"),
+        confirmDeleteTask: document.querySelector("#confirmDeleteTask"),
+        cancelDeleteTask: document.querySelector("#cancelDeleteTask"),
         filePreviewDialog: document.querySelector("#filePreviewDialog"),
         filePreviewTitle: document.querySelector("#filePreviewTitle"),
         filePreviewMeta: document.querySelector("#filePreviewMeta"),
@@ -2135,15 +2295,44 @@
         }
       }
 
+      function normalizeWorkSettings(settings = {}) {
+        const breakStart = clean(settings.breakStart) || DEFAULT_BREAK_START;
+        const breakEnd = clean(settings.breakEnd) || DEFAULT_BREAK_END;
+        const startMinutes = timeToMinutes(breakStart);
+        const endMinutes = timeToMinutes(breakEnd);
+        const valid =
+          /^\d{2}:\d{2}$/.test(breakStart) &&
+          /^\d{2}:\d{2}$/.test(breakEnd) &&
+          startMinutes >= timeToMinutes(WORKDAY_START) &&
+          endMinutes <= timeToMinutes(WEEKDAY_END) &&
+          endMinutes - startMinutes >= 15 &&
+          endMinutes - startMinutes <= 180;
+        return valid
+          ? { breakStart, breakEnd }
+          : { breakStart: DEFAULT_BREAK_START, breakEnd: DEFAULT_BREAK_END };
+      }
+
+      function normalizedTaskCategory(category) {
+        if (category === "PDV") return "PDP";
+        if (category === "Producto") return "ULG";
+        return ["PDP", "Entrenamiento", "ULG", "Reporte", "Coordinacion"].includes(category) ? category : "PDP";
+      }
+
       function normalizeState(nextState) {
         nextState.users = nextState.users?.length ? nextState.users : structuredClone(initialState.users);
         nextState.registrationRequests = nextState.registrationRequests || [];
         nextState.passwordRecoveryRequests = nextState.passwordRecoveryRequests || [];
+        nextState.workSettings = normalizeWorkSettings(nextState.workSettings);
         nextState.tasks = (nextState.tasks || []).map((task) => ({
           ...task,
+          category: normalizedTaskCategory(task.category),
           startTime: task.startTime || "08:30",
           endTime: task.endTime || "09:30",
           reminders: Array.isArray(task.reminders) ? task.reminders : []
+        }));
+        nextState.deletedTasks = (nextState.deletedTasks || []).map((task) => ({
+          ...task,
+          category: normalizedTaskCategory(task.category)
         }));
         nextState.announcements = nextState.announcements || [];
         nextState.supportRequests = nextState.supportRequests || [];
@@ -2455,6 +2644,14 @@
         return "pending";
       }
 
+      function taskStatusLabel(status) {
+        return status === "Observada" ? "Rechazada" : status;
+      }
+
+      function evidenceReviewLabel(review) {
+        return review === "Observado" || review === "Rechazado" ? "Rechazado" : review || "Pendiente";
+      }
+
       function priorityClass(priority) {
         if (priority === "Alta") return "high";
         if (priority === "Media") return "medium";
@@ -2481,12 +2678,13 @@
 
       function workScheduleForDate(dateValue) {
         const saturday = isSaturday(dateValue);
+        const settings = normalizeWorkSettings(state.workSettings);
         return {
           start: WORKDAY_START,
           end: saturday ? SATURDAY_END : WEEKDAY_END,
           hasBreak: !saturday,
-          breakStart: BREAK_START,
-          breakEnd: BREAK_END
+          breakStart: settings.breakStart,
+          breakEnd: settings.breakEnd
         };
       }
 
@@ -2512,7 +2710,7 @@
           return `El horario del dia debe estar entre ${schedule.start} y ${schedule.end}, con cierre posterior al inicio.`;
         }
         if (overlapsBreak(dateValue, startTime, endTime)) {
-          return `El break de lunes a viernes es de ${BREAK_START} a ${BREAK_END}. Elige un horario fuera de ese bloque.`;
+          return `El break de lunes a viernes es de ${schedule.breakStart} a ${schedule.breakEnd}. Elige un horario fuera de ese bloque.`;
         }
         return "";
       }
@@ -2858,7 +3056,7 @@
               task: task.title,
               line: task.product || "",
               category: task.category || "",
-              taskStatus: task.status || "",
+              taskStatus: taskStatusLabel(task.status || ""),
               evidenceDate: evidence?.submittedAt ? dateIsoInLima(evidence.submittedAt) : "",
               evidenceTime: evidence?.submittedAt
                 ? new Intl.DateTimeFormat("es-PE", {
@@ -2872,7 +3070,7 @@
               reviewedProduct: evidence?.product || "",
               result: evidence?.result || "",
               notes: evidence?.notes || "",
-              review: evidence?.review || (task.status === "Cumplida" ? "Aprobado" : ""),
+              review: evidence ? evidenceReviewLabel(evidence.review) : task.status === "Cumplida" ? "Aprobado" : "",
               fileName: file?.name || "",
               fileType: file?.mimeType || "",
               fileId: file?.id || "",
@@ -3076,7 +3274,7 @@
       function statusCellStyle(status) {
         if (status === "Cumplida" || status === "Aprobado") return { fill: "FFE7F6EC", font: "FF166534" };
         if (status === "En revision" || status === "Pendiente") return { fill: "FFFFF4CC", font: "FF7A4B00" };
-        if (status === "Observada" || status === "No disponible") return { fill: "FFFFE3E8", font: "FFA50034" };
+        if (status === "Observada" || status === "Rechazada" || status === "No disponible") return { fill: "FFFFE3E8", font: "FFA50034" };
         return { fill: "FFEAF2FF", font: "FF174EA6" };
       }
 
@@ -3503,13 +3701,20 @@
         refreshSelects();
         renderMotivation();
         renderDashboard();
-        renderCoordinatorDay();
-        renderTrainerWeek();
-        renderTasks();
-        renderEvidence();
-        renderTeam();
-        renderAnnouncements();
-        renderProducts();
+        if (activeViewId === "tasksView") {
+          renderCoordinatorDay();
+          renderTrainerWeek();
+          renderTasks();
+          renderDeletedTasks();
+        } else if (activeViewId === "evidenceView") {
+          renderEvidence();
+        } else if (activeViewId === "teamView") {
+          renderTeam();
+        } else if (activeViewId === "announcementsView") {
+          renderAnnouncements();
+        } else if (activeViewId === "infoView") {
+          renderProducts();
+        }
       }
 
       function renderMotivation() {
@@ -3830,6 +4035,8 @@
         const scheduleSlots = scheduleSlotsForDate(dateValue);
         state.selectedCoordinatorDate = dateValue;
         els.coordinatorDate.value = dateValue;
+        els.breakStartTime.value = schedule.breakStart;
+        els.breakEndTime.value = schedule.breakEnd;
         els.coordinatorDayLabel.textContent = `${formatShortDate(dateValue)} | Week ${isoWeekNumber(dateValue)} | ${schedule.start} - ${schedule.end}${schedule.hasBreak ? ` | Break ${schedule.breakStart} - ${schedule.breakEnd}` : " | Sin break"}`;
         els.coordinatorDayRoster.innerHTML = `
           <div class="roster-head">
@@ -3874,7 +4081,7 @@
               block.className = `schedule-task ${taskStatusClass(task.status)}`;
               block.type = "button";
               block.style.gridColumn = `${startColumn} / span ${Math.min(span, scheduleSlots + 1 - startColumn)}`;
-              block.innerHTML = `<strong>${escapeHtml(task.title)}</strong><span>${escapeHtml(taskTimeLabel(task))} | ${escapeHtml(task.status)}</span>`;
+              block.innerHTML = `<strong>${escapeHtml(task.title)}</strong><span>${escapeHtml(taskTimeLabel(task))} | ${escapeHtml(taskStatusLabel(task.status))}</span>`;
               block.addEventListener("click", () => {
                 els.taskStatusFilter.value = "all";
                 els.taskTrainerFilter.value = task.ownerId;
@@ -3994,6 +4201,101 @@
         els.trainerCount.textContent = trainers().length;
       }
 
+      function openEvidenceForReview(task) {
+        const latestEvidence = task?.evidence?.at(-1);
+        if (!latestEvidence) {
+          showToast("Esta tarea aun no tiene evidencia para revisar.", "error");
+          return;
+        }
+        const url = new URL(window.location.href);
+        url.searchParams.set("view", "evidenceView");
+        url.searchParams.set("evidence", latestEvidence.id);
+        url.searchParams.delete("file");
+        url.searchParams.delete("photo");
+        window.history.pushState({}, "", url);
+        activeViewId = "evidenceView";
+        activateView("evidenceView");
+        render();
+        window.requestAnimationFrame(() => {
+          els.evidenceList.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
+
+      function renderDeletedTasks() {
+        const deleted = (state.deletedTasks || [])
+          .filter((task) => isCoordinator() || task.ownerId === state.activeUserId)
+          .sort((a, b) => Number(b.deletedAt || 0) - Number(a.deletedAt || 0));
+        els.deletedTasksList.innerHTML = "";
+        if (!deleted.length) {
+          els.deletedTasksList.innerHTML = emptyState(
+            "No hay tareas eliminadas",
+            isCoordinator()
+              ? "Las tareas que elimines quedaran registradas aqui."
+              : "Cuando Pablo elimine una tarea de tu agenda, podras verla aqui."
+          );
+          return;
+        }
+        deleted.forEach((task) => {
+          const card = document.createElement("article");
+          card.className = "item deleted-task-item";
+          card.innerHTML = `
+            <div class="title-row">
+              <h3>${escapeHtml(task.title || "Tarea eliminada")}</h3>
+              <span class="pill observed">Eliminada</span>
+            </div>
+            <div class="meta">
+              <span>Trainer: ${escapeHtml(userName(task.ownerId))}</span>
+              <span>Fecha original: ${formatDate(task.dueDate)}</span>
+              <span>Horario: ${escapeHtml(taskTimeLabel(task))}</span>
+              <span>Categoria: ${escapeHtml(normalizedTaskCategory(task.category))}</span>
+              ${task.product ? `<span>Linea: ${escapeHtml(task.product)}</span>` : ""}
+            </div>
+            ${task.description ? `<p>${escapeHtml(task.description)}</p>` : ""}
+            <div class="note">
+              <strong>Eliminada por ${escapeHtml(task.deletedByName || userName(task.deletedById) || "Pablo")}</strong>
+              <p class="muted">${escapeHtml(task.reason || "Tarea retirada de la agenda.")} | ${formatDateTime(task.deletedAt)}</p>
+            </div>
+          `;
+          els.deletedTasksList.appendChild(card);
+        });
+      }
+
+      function openDeleteTaskDialog(task) {
+        if (!task || !isCoordinator()) return;
+        els.deleteTaskForm.dataset.taskId = task.id;
+        els.deleteTaskLabel.textContent = `${task.title} | ${userName(task.ownerId)} | ${formatDate(task.dueDate)} ${taskTimeLabel(task)}`;
+        els.deleteTaskReason.value = "";
+        setMessage(els.deleteTaskMessage, "", "");
+        els.deleteTaskDialog.showModal();
+        els.deleteTaskReason.focus();
+      }
+
+      async function deleteTaskAndArchive(taskId, reason) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        if (!task || !isCoordinator()) return false;
+        els.confirmDeleteTask.disabled = true;
+        setMessage(els.deleteTaskMessage, "Guardando historial y retirando la tarea...", "");
+        try {
+          window.clearTimeout(syncTimer);
+          syncTimer = 0;
+          await syncState();
+          const data = await apiRequest("/tasks/delete", {
+            method: "POST",
+            body: JSON.stringify({ taskId, reason: clean(reason) })
+          });
+          applyCloudState(data.state);
+          els.deleteTaskDialog.close();
+          render();
+          showToast(`Tarea eliminada. ${userName(task.ownerId)} puede verla en su historial.`, "success");
+          return true;
+        } catch (error) {
+          setMessage(els.deleteTaskMessage, error.message || "No se pudo eliminar la tarea.", "err");
+          return false;
+        } finally {
+          els.confirmDeleteTask.disabled = false;
+        }
+      }
+
       function renderTasks() {
         const tasks = filteredTasks();
         els.taskList.innerHTML = "";
@@ -4015,7 +4317,7 @@
             <div class="stack">
               <div class="title-row">
                 <h3>${escapeHtml(task.title)}</h3>
-                ${!isCoordinator() && task.status === "Cumplida" ? "" : `<span class="pill ${taskStatusClass(task.status)}">${escapeHtml(task.status)}</span>`}
+                ${!isCoordinator() && task.status === "Cumplida" ? "" : `<span class="pill ${taskStatusClass(task.status)}">${escapeHtml(taskStatusLabel(task.status))}</span>`}
                 <span class="pill ${priorityClass(task.priority)}">${escapeHtml(task.priority)}</span>
               </div>
               <div class="meta">
@@ -4041,19 +4343,24 @@
           if (!isCoordinator()) renderTrainerTaskActions(actions, task);
 
           if (isCoordinator() && task.status === "En revision") {
+            const viewEvidenceButton = document.createElement("button");
+            viewEvidenceButton.className = "small";
+            viewEvidenceButton.type = "button";
+            viewEvidenceButton.textContent = "Ver evidencia";
+            viewEvidenceButton.addEventListener("click", () => openEvidenceForReview(task));
+
             const approveButton = document.createElement("button");
-            approveButton.className = "small";
             approveButton.type = "button";
             approveButton.className = "primary";
             approveButton.textContent = "Aprobar y completar";
             approveButton.addEventListener("click", () => reviewTask(task.id, "Cumplida"));
 
-            const observeButton = document.createElement("button");
-            observeButton.className = "small";
-            observeButton.type = "button";
-            observeButton.textContent = "Observar";
-            observeButton.addEventListener("click", () => reviewTask(task.id, "Observada"));
-            actions.append(approveButton, observeButton);
+            const rejectButton = document.createElement("button");
+            rejectButton.className = "danger";
+            rejectButton.type = "button";
+            rejectButton.textContent = "Rechazar";
+            rejectButton.addEventListener("click", () => reviewTask(task.id, "Observada"));
+            actions.append(viewEvidenceButton, approveButton, rejectButton);
           }
 
           if (isCoordinator()) {
@@ -4068,14 +4375,10 @@
             renderReassignControl(actions, task);
             renderReminderControl(actions, task);
             const deleteButton = document.createElement("button");
-            deleteButton.className = "small";
+            deleteButton.className = "danger";
             deleteButton.type = "button";
             deleteButton.textContent = "Eliminar";
-            deleteButton.addEventListener("click", () => {
-              state.tasks = state.tasks.filter((item) => item.id !== task.id);
-              saveState();
-              render();
-            });
+            deleteButton.addEventListener("click", () => openDeleteTaskDialog(task));
             actions.appendChild(deleteButton);
           }
 
@@ -4097,7 +4400,7 @@
           showToast(
             status === "Cumplida"
               ? `Tarea completada. ${userName(task.ownerId)} ya vera el check de aprobacion.`
-              : "Sustento observado. El trainer podra corregirlo y enviarlo nuevamente.",
+              : "Sustento rechazado. El trainer podra corregirlo y enviarlo nuevamente.",
             "success"
           );
         } catch (error) {
@@ -4166,7 +4469,7 @@
           card.innerHTML = `
             <div class="title-row">
               <h3>${escapeHtml(entry.task.title)}</h3>
-              <span class="pill ${entry.review === "Aprobado" ? "approved" : entry.review === "Observado" ? "observed" : "review"}">${escapeHtml(entry.review || "Pendiente")}</span>
+              <span class="pill ${entry.review === "Aprobado" ? "approved" : entry.review === "Observado" || entry.review === "Rechazado" ? "observed" : "review"}">${escapeHtml(evidenceReviewLabel(entry.review))}</span>
             </div>
             <div class="meta">
               <span>Trainer: ${escapeHtml(userName(entry.submittedById))}</span>
@@ -4195,12 +4498,12 @@
             approveButton.type = "button";
             approveButton.textContent = "Aprobar y completar";
             approveButton.addEventListener("click", () => reviewTask(entry.task.id, "Cumplida"));
-            const observeButton = document.createElement("button");
-            observeButton.className = "small";
-            observeButton.type = "button";
-            observeButton.textContent = "Observar";
-            observeButton.addEventListener("click", () => reviewTask(entry.task.id, "Observada"));
-            actions.append(approveButton, observeButton);
+            const rejectButton = document.createElement("button");
+            rejectButton.className = "danger";
+            rejectButton.type = "button";
+            rejectButton.textContent = "Rechazar";
+            rejectButton.addEventListener("click", () => reviewTask(entry.task.id, "Observada"));
+            actions.append(approveButton, rejectButton);
             card.appendChild(actions);
           }
 
@@ -4816,6 +5119,42 @@
           if (success) els.reminderDialog.close();
         });
 
+        els.cancelDeleteTask.addEventListener("click", () => els.deleteTaskDialog.close());
+        els.deleteTaskForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const reason = clean(els.deleteTaskReason.value);
+          if (!reason) {
+            setMessage(els.deleteTaskMessage, "Escribe el motivo de la eliminacion.", "err");
+            return;
+          }
+          await deleteTaskAndArchive(els.deleteTaskForm.dataset.taskId, reason);
+        });
+
+        els.breakSettingsForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const requested = {
+            breakStart: els.breakStartTime.value,
+            breakEnd: els.breakEndTime.value
+          };
+          const normalized = normalizeWorkSettings(requested);
+          if (normalized.breakStart !== requested.breakStart || normalized.breakEnd !== requested.breakEnd) {
+            setMessage(
+              els.breakSettingsMessage,
+              "El break debe durar entre 15 minutos y 3 horas, dentro del horario 08:30-19:00.",
+              "err"
+            );
+            return;
+          }
+          state.workSettings = normalized;
+          saveState();
+          renderCoordinatorDay();
+          setMessage(
+            els.breakSettingsMessage,
+            `Break actualizado: ${normalized.breakStart}-${normalized.breakEnd}.`,
+            "ok"
+          );
+        });
+
         els.taskForm.addEventListener("submit", (event) => {
           event.preventDefault();
           if (!isCoordinator()) els.taskOwner.value = state.activeUserId;
@@ -5090,7 +5429,7 @@
           if (state.activeUserId && !document.hidden && !syncInFlight) {
             refreshStateFromServer().catch(() => {});
           }
-        }, 10000);
+        }, 5000);
       }
 
       bootstrap();
