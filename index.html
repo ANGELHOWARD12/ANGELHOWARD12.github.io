@@ -1654,8 +1654,8 @@
                 <select id="evidenceTask" required></select>
               </label>
               <label>
-                Tienda / PDV
-                <input id="evidenceStore" type="text" placeholder="Nombre de tienda o punto de venta" required />
+                Tienda / PDP (opcional)
+                <input id="evidenceStore" type="text" placeholder="Nombre de tienda; dejalo vacio si no aplica" />
               </label>
               <label>
                 Producto revisado
@@ -5386,7 +5386,9 @@
             id: id(),
             submittedById: state.activeUserId,
             submittedAt: Date.now(),
-            store: clean(els.evidenceStore.value),
+            store:
+              clean(els.evidenceStore.value) ||
+              (["PDP", "PDV"].includes(clean(task.category).toUpperCase()) ? "No especificada" : "No aplica"),
             product: clean(els.evidenceProduct.value),
             result: "Realizado",
             notes,
