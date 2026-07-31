@@ -21,6 +21,8 @@ const EMPTY_DATA = {
 const WORKDAY_START = "08:30";
 const WEEKDAY_END = "19:00";
 const SATURDAY_END = "14:00";
+const DANNY_SATURDAY_START = "09:00";
+const DANNY_SATURDAY_END = "14:30";
 const BREAK_START = "12:30";
 const BREAK_END = "14:00";
 const MAX_FILE_BASE64 = 1_800_000;
@@ -770,6 +772,9 @@ async function putState(request, db, user, context) {
   const submitted = body.state || {};
   const current = await loadData(db);
   const notifications = [];
+  const activeUserRows = await db.prepare("SELECT id, name, role FROM users WHERE status = 'Activo'").all();
+  const activeUsers = activeUserRows.results || [];
+  const userNamesById = new Map(activeUsers.map((row) => [row.id, row.name]));
   const personalBreak = submitted.breakSettingsByUser?.[user.id];
   if (validWorkSettings(personalBreak)) {
     current.breakSettingsByUser = {
@@ -805,7 +810,8 @@ async function putState(request, db, user, context) {
               clean(normalizedTask.dueDate),
               clean(normalizedTask.startTime),
               clean(normalizedTask.endTime),
-              breakSettingsForUser(current, normalizedTask.ownerId)
+              breakSettingsForUser(current, normalizedTask.ownerId),
+              userNamesById.get(clean(normalizedTask.ownerId))
             )
           ) {
             return previous || null;
@@ -839,8 +845,7 @@ async function putState(request, db, user, context) {
     }
   } else {
     const submittedTasks = new Map((submitted.tasks || []).map((task) => [task.id, task]));
-    const activeTrainerRows = await db.prepare("SELECT id FROM users WHERE role = 'Trainer' AND status = 'Activo'").all();
-    const activeTrainerIds = new Set((activeTrainerRows.results || []).map((row) => row.id));
+    const activeTrainerIds = new Set(activeUsers.filter((row) => row.role === "Trainer").map((row) => row.id));
     current.tasks = current.tasks.map((task) => {
       if (task.ownerId !== user.id) return task;
       const next = submittedTasks.get(task.id);
@@ -860,7 +865,8 @@ async function putState(request, db, user, context) {
           clean(task.dueDate),
           clean(task.startTime),
           clean(task.endTime),
-          breakSettingsForUser(current, requestedOwnerId)
+          breakSettingsForUser(current, requestedOwnerId),
+          userNamesById.get(requestedOwnerId)
         ) &&
         !hasTaskConflict(
           current.tasks,
@@ -890,7 +896,7 @@ async function putState(request, db, user, context) {
         lastHistory.toStartTime === requestedStart &&
         lastHistory.toEndTime === requestedEnd &&
         clean(lastHistory.reason) &&
-        validWorkSchedule(requestedDate, requestedStart, requestedEnd, breakSettingsForUser(current, user.id)) &&
+        validWorkSchedule(requestedDate, requestedStart, requestedEnd, breakSettingsForUser(current, user.id), user.name) &&
         !hasTaskConflict(current.tasks, user.id, requestedDate, requestedStart, requestedEnd, task.id);
       if (validReassignment) {
         notifications.push({
@@ -936,7 +942,7 @@ async function putState(request, db, user, context) {
         task.ownerId !== user.id ||
         task.createdById !== user.id ||
         clean(task.title).length < 2 ||
-        !validWorkSchedule(dueDate, startTime, endTime, breakSettingsForUser(current, user.id)) ||
+        !validWorkSchedule(dueDate, startTime, endTime, breakSettingsForUser(current, user.id), user.name) ||
         hasTaskConflict(current.tasks, user.id, dueDate, startTime, endTime)
       ) {
         continue;
@@ -1230,14 +1236,24 @@ function normalizeTaskCategory(category) {
   return ["PDP", "Entrenamiento", "ULG", "Reporte", "Coordinacion"].includes(category) ? category : "PDP";
 }
 
-function validWorkSchedule(dateValue, startTime, endTime, workSettings = null) {
+function normalizedUserName(value) {
+  return clean(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .toUpperCase();
+}
+
+function validWorkSchedule(dateValue, startTime, endTime, workSettings = null, userName = "") {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateValue || ""))) return false;
   const day = new Date(`${dateValue}T12:00:00Z`).getUTCDay();
   if (day === 0) return false;
   const start = timeToMinutes(startTime);
   const end = timeToMinutes(endTime);
-  const workEnd = timeToMinutes(day === 6 ? SATURDAY_END : WEEKDAY_END);
-  if (start < timeToMinutes(WORKDAY_START) || end > workEnd || end <= start) return false;
+  const dannySaturday = day === 6 && normalizedUserName(userName) === "DANNY DIOS";
+  const workStart = timeToMinutes(dannySaturday ? DANNY_SATURDAY_START : WORKDAY_START);
+  const workEnd = timeToMinutes(day === 6 ? (dannySaturday ? DANNY_SATURDAY_END : SATURDAY_END) : WEEKDAY_END);
+  if (start < workStart || end > workEnd || end <= start) return false;
   const settings = normalizeWorkSettings(workSettings);
   if (day !== 6 && start < timeToMinutes(settings.breakEnd) && end > timeToMinutes(settings.breakStart)) return false;
   return true;
