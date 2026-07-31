@@ -1971,6 +1971,8 @@
       const WORKDAY_START = "08:30";
       const WEEKDAY_END = "19:00";
       const SATURDAY_END = "14:00";
+      const DANNY_SATURDAY_START = "09:00";
+      const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
       const MAX_EVIDENCE_FILES = 8;
@@ -2699,21 +2701,46 @@
         return normalizeWorkSettings(personal || state.workSettings);
       }
 
+      function normalizedUserName(value) {
+        return clean(value)
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/\s+/g, " ")
+          .toUpperCase();
+      }
+
+      function isDannyDiosUser(userId) {
+        const person = state.users.find((user) => user.id === userId);
+        return normalizedUserName(person?.name) === "DANNY DIOS";
+      }
+
       function workScheduleForDate(dateValue, userId = state.activeUserId) {
         const saturday = isSaturday(dateValue);
+        const dannySaturday = saturday && isDannyDiosUser(userId);
         const settings = breakSettingsForUser(userId);
         return {
-          start: WORKDAY_START,
-          end: saturday ? SATURDAY_END : WEEKDAY_END,
+          start: dannySaturday ? DANNY_SATURDAY_START : WORKDAY_START,
+          end: saturday ? (dannySaturday ? DANNY_SATURDAY_END : SATURDAY_END) : WEEKDAY_END,
           hasBreak: !saturday,
           breakStart: settings.breakStart,
           breakEnd: settings.breakEnd
         };
       }
 
+      function coordinatorScheduleBounds(dateValue) {
+        const schedules = state.users
+          .filter((user) => user.status === "Activo")
+          .map((user) => workScheduleForDate(dateValue, user.id));
+        if (!schedules.length) return workScheduleForDate(dateValue);
+        return {
+          start: minutesToTime(Math.min(...schedules.map((schedule) => timeToMinutes(schedule.start)))),
+          end: minutesToTime(Math.max(...schedules.map((schedule) => timeToMinutes(schedule.end))))
+        };
+      }
+
       function scheduleSlotsForDate(dateValue) {
-        const schedule = workScheduleForDate(dateValue);
-        return Math.ceil((timeToMinutes(schedule.end) - timeToMinutes(schedule.start)) / 30);
+        const bounds = coordinatorScheduleBounds(dateValue);
+        return Math.ceil((timeToMinutes(bounds.end) - timeToMinutes(bounds.start)) / 30);
       }
 
       function overlapsBreak(dateValue, startTime, endTime, userId = state.activeUserId) {
@@ -2744,8 +2771,18 @@
         startInput.max = minutesToTime(timeToMinutes(schedule.end) - 15);
         endInput.min = minutesToTime(timeToMinutes(schedule.start) + 15);
         endInput.max = schedule.end;
-        if (timeToMinutes(startInput.value) > timeToMinutes(startInput.max)) startInput.value = schedule.start;
-        if (timeToMinutes(endInput.value) > timeToMinutes(schedule.end)) endInput.value = schedule.end;
+        if (
+          timeToMinutes(startInput.value) < timeToMinutes(schedule.start) ||
+          timeToMinutes(startInput.value) > timeToMinutes(startInput.max)
+        ) {
+          startInput.value = schedule.start;
+        }
+        if (
+          timeToMinutes(endInput.value) < timeToMinutes(endInput.min) ||
+          timeToMinutes(endInput.value) > timeToMinutes(schedule.end)
+        ) {
+          endInput.value = minutesToTime(Math.min(timeToMinutes(startInput.value) + 60, timeToMinutes(schedule.end)));
+        }
       }
 
       function taskTimeLabel(task) {
@@ -4067,10 +4104,14 @@
         if (!isCoordinator()) return;
         const dateValue = nearestWorkingDay(state.selectedCoordinatorDate || todayIso);
         const schedule = workScheduleForDate(dateValue, state.activeUserId);
+        const bounds = coordinatorScheduleBounds(dateValue);
         const scheduleSlots = scheduleSlotsForDate(dateValue);
+        const dannySaturday = isSaturday(dateValue) && state.users.some((user) => user.status === "Activo" && isDannyDiosUser(user.id));
         state.selectedCoordinatorDate = dateValue;
         els.coordinatorDate.value = dateValue;
-        els.coordinatorDayLabel.textContent = `${formatShortDate(dateValue)} | Week ${isoWeekNumber(dateValue)} | ${schedule.start} - ${schedule.end}${schedule.hasBreak ? " | Break personalizado por usuario" : " | Sin break"}`;
+        els.coordinatorDayLabel.textContent = dannySaturday
+          ? `${formatShortDate(dateValue)} | Week ${isoWeekNumber(dateValue)} | Danny 09:00-14:30 | Demas 08:30-14:00 | Sin break`
+          : `${formatShortDate(dateValue)} | Week ${isoWeekNumber(dateValue)} | ${bounds.start} - ${bounds.end}${schedule.hasBreak ? " | Break personalizado por usuario" : " | Sin break"}`;
         els.coordinatorDayRoster.innerHTML = `
           <div class="roster-head">
             <span>TRAINER / ZONA</span>
@@ -4091,7 +4132,7 @@
           row.innerHTML = `
             <div class="roster-person">
               <strong>${escapeHtml(person.name)}</strong>
-              <span>${escapeHtml(person.role === "Coordinador" ? "Coordinador" : person.zone || "Sin zona")}</span>
+              <span>${escapeHtml(person.role === "Coordinador" ? "Coordinador" : person.zone || "Sin zona")} | ${personSchedule.start}-${personSchedule.end}</span>
               <button class="small" type="button">+ Tarea</button>
             </div>
             <div class="schedule-track" style="--schedule-slots: ${scheduleSlots}">${scheduleBreakMarkup(dateValue, person.id)}</div>
@@ -4106,7 +4147,7 @@
             if (personSchedule.hasBreak) track.insertAdjacentHTML("afterbegin", scheduleBreakMarkup(dateValue, person.id));
           } else {
             tasks.forEach((task) => {
-              const start = Math.max(timeToMinutes(WORKDAY_START), timeToMinutes(task.startTime || WORKDAY_START));
+              const start = Math.max(timeToMinutes(personSchedule.start), timeToMinutes(task.startTime || personSchedule.start));
               const end = Math.min(timeToMinutes(personSchedule.end), timeToMinutes(task.endTime || "09:30"));
               const startColumn = Math.max(1, Math.floor((start - timeToMinutes(WORKDAY_START)) / 30) + 1);
               const span = Math.max(1, Math.ceil((end - start) / 30));
