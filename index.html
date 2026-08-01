@@ -505,12 +505,53 @@
         border-radius: 8px;
         display: grid;
         gap: 10px;
-        grid-template-columns: repeat(2, minmax(130px, 180px)) auto minmax(180px, 1fr);
+        grid-template-columns: minmax(150px, 190px) minmax(150px, 190px) minmax(220px, 1fr) auto;
         padding: 12px;
       }
 
       .break-settings .message {
         align-self: center;
+        grid-column: 1 / -1;
+        margin: 0;
+      }
+
+      .availability-note {
+        background: #eef7ff;
+        border: 1px solid #b8d8f5;
+        border-radius: 8px;
+        color: #23415f;
+        font-size: 13px;
+        line-height: 1.45;
+        margin: 0;
+        padding: 9px 11px;
+      }
+
+      .availability-note.is-blocked {
+        background: #fff1f2;
+        border-color: #f2b7bd;
+        color: #9e1c2f;
+      }
+
+      .planning-reminder {
+        align-items: center;
+        background: #eef8ff;
+        border: 2px solid #78bdea;
+        border-left: 7px solid var(--blue);
+        border-radius: 8px;
+        display: flex;
+        gap: 14px;
+        justify-content: space-between;
+        padding: 14px 16px;
+      }
+
+      .planning-reminder strong {
+        color: var(--blue-dark);
+        display: block;
+        font-size: 18px;
+        margin-bottom: 3px;
+      }
+
+      .planning-reminder p {
         margin: 0;
       }
 
@@ -1142,9 +1183,10 @@
         }
 
         .break-settings {
-          grid-template-columns: repeat(2, minmax(130px, 1fr)) auto;
+          grid-template-columns: repeat(2, minmax(150px, 1fr));
         }
 
+        .break-settings button,
         .break-settings .message {
           grid-column: 1 / -1;
         }
@@ -1320,6 +1362,15 @@
           grid-column: 1 / -1;
         }
 
+        .planning-reminder {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .planning-reminder button {
+          width: 100%;
+        }
+
         .panel-header {
           flex-direction: column;
         }
@@ -1486,21 +1537,43 @@
       </nav>
 
       <section id="tasksView" class="view active">
+        <section id="weeklyPlanningReminder" class="planning-reminder hidden" aria-live="polite">
+          <div>
+            <strong id="weeklyPlanningTitle">Planifica la siguiente Week</strong>
+            <p id="weeklyPlanningText" class="muted"></p>
+          </div>
+          <button id="openNextWeekPlanning" class="primary" type="button">Abrir siguiente Week</button>
+        </section>
+
         <section id="personalBreakPanel" class="panel stack">
           <div>
-            <h2>Mi horario de break</h2>
-            <p class="muted">Este horario es personal. Solo modifica tu agenda y no cambia el break de los demas usuarios.</p>
+            <h2>Mi break por dia</h2>
+            <p class="muted">El cambio se guarda solamente para la fecha elegida y nunca modifica los demas dias.</p>
           </div>
           <form id="breakSettingsForm" class="break-settings">
             <label>
-              Inicio de mi break
-              <input id="breakStartTime" type="time" lang="en-GB" min="08:30" max="18:30" step="900" required />
+              Fecha del break
+              <input id="breakDate" type="date" required />
             </label>
             <label>
-              Fin de mi break
-              <input id="breakEndTime" type="time" lang="en-GB" min="08:45" max="19:00" step="900" required />
+              Duracion
+              <select id="breakDuration" required>
+                <option value="15">15 minutos</option>
+                <option value="30">30 minutos</option>
+                <option value="45">45 minutos</option>
+                <option value="60">1 hora</option>
+                <option value="90" selected>1 hora 30 minutos</option>
+                <option value="120">2 horas</option>
+                <option value="150">2 horas 30 minutos</option>
+                <option value="180">3 horas</option>
+              </select>
             </label>
-            <button class="small" type="submit">Guardar mi break</button>
+            <label>
+              Horario disponible
+              <select id="breakAvailableSlot" required></select>
+            </label>
+            <button id="saveBreakButton" class="primary" type="submit">Guardar este dia</button>
+            <p id="breakAvailabilityHint" class="availability-note"></p>
             <p id="breakSettingsMessage" class="message" aria-live="polite"></p>
           </form>
         </section>
@@ -1580,12 +1653,24 @@
                 <input id="taskDueDate" type="date" required />
               </label>
               <label>
-                Hora de inicio (24 h)
-                <input id="taskStartTime" type="time" lang="en-GB" min="08:30" max="18:45" step="900" required />
+                Duracion de la actividad
+                <select id="taskDuration" required>
+                  <option value="15">15 minutos</option>
+                  <option value="30">30 minutos</option>
+                  <option value="45">45 minutos</option>
+                  <option value="60" selected>1 hora</option>
+                  <option value="90">1 hora 30 minutos</option>
+                  <option value="120">2 horas</option>
+                  <option value="180">3 horas</option>
+                  <option value="240">4 horas</option>
+                  <option value="300">5 horas</option>
+                </select>
               </label>
               <label>
-                Hora de cierre (24 h)
-                <input id="taskEndTime" type="time" lang="en-GB" min="08:45" max="19:00" step="900" required />
+                Horario disponible (24 h)
+                <select id="taskAvailableSlot" required></select>
+                <input id="taskStartTime" type="hidden" />
+                <input id="taskEndTime" type="hidden" />
               </label>
               <label>
                 Linea
@@ -1600,6 +1685,7 @@
                 Instrucciones
                 <textarea id="taskDescription" placeholder="Detalle de lo que debe revisar o ejecutar el trainer"></textarea>
               </label>
+              <p id="taskAvailabilityHint" class="availability-note wide"></p>
               <button id="taskSubmitButton" class="primary wide" type="submit">Asignar tarea</button>
             </form>
             <p id="taskMessage" class="message" aria-live="polite"></p>
@@ -1883,14 +1969,17 @@
         </label>
         <div class="form-grid">
           <label>
-            Inicio (24 h)
-            <input id="scheduleStartTime" type="time" lang="en-GB" min="08:30" max="18:45" step="900" required />
+            Duracion
+            <select id="scheduleDuration" required></select>
           </label>
           <label>
-            Cierre (24 h)
-            <input id="scheduleEndTime" type="time" lang="en-GB" min="08:45" max="19:00" step="900" required />
+            Nuevo horario disponible (24 h)
+            <select id="scheduleAvailableSlot" required></select>
+            <input id="scheduleStartTime" type="hidden" />
+            <input id="scheduleEndTime" type="hidden" />
           </label>
         </div>
+        <p id="scheduleAvailabilityHint" class="availability-note"></p>
         <label>
           Motivo del cambio
           <textarea id="scheduleReason" placeholder="Ej. La visita se reprogramo o la tarea termino antes" required></textarea>
@@ -2021,7 +2110,7 @@
       ];
 
       const initialState = {
-        version: 9,
+        version: 10,
         activeUserId: "",
         selectedProduct: "oled",
         selectedWeekStart: "",
@@ -2031,6 +2120,7 @@
           breakEnd: DEFAULT_BREAK_END
         },
         breakSettingsByUser: {},
+        breakSettingsByUserDate: {},
         users: [],
         registrationRequests: [],
         passwordRecoveryRequests: [],
@@ -2120,6 +2210,7 @@
       let previewRequestId = 0;
       let lastAutoOpenedFileId = "";
       let breakSettingsUserId = "";
+      let breakEditorKey = "";
       let activeViewId = ALLOWED_VIEW_IDS.includes(new URLSearchParams(window.location.search).get("view"))
         ? new URLSearchParams(window.location.search).get("view")
         : "tasksView";
@@ -2159,6 +2250,10 @@
         reviewCount: document.querySelector("#reviewCount"),
         doneCount: document.querySelector("#doneCount"),
         trainerCount: document.querySelector("#trainerCount"),
+        weeklyPlanningReminder: document.querySelector("#weeklyPlanningReminder"),
+        weeklyPlanningTitle: document.querySelector("#weeklyPlanningTitle"),
+        weeklyPlanningText: document.querySelector("#weeklyPlanningText"),
+        openNextWeekPlanning: document.querySelector("#openNextWeekPlanning"),
         dailyMotivation: document.querySelector("#dailyMotivation"),
         editMotivation: document.querySelector("#editMotivation"),
         motivationForm: document.querySelector("#motivationForm"),
@@ -2173,8 +2268,11 @@
         coordinatorDayLabel: document.querySelector("#coordinatorDayLabel"),
         coordinatorDayRoster: document.querySelector("#coordinatorDayRoster"),
         breakSettingsForm: document.querySelector("#breakSettingsForm"),
-        breakStartTime: document.querySelector("#breakStartTime"),
-        breakEndTime: document.querySelector("#breakEndTime"),
+        breakDate: document.querySelector("#breakDate"),
+        breakDuration: document.querySelector("#breakDuration"),
+        breakAvailableSlot: document.querySelector("#breakAvailableSlot"),
+        breakAvailabilityHint: document.querySelector("#breakAvailabilityHint"),
+        saveBreakButton: document.querySelector("#saveBreakButton"),
         breakSettingsMessage: document.querySelector("#breakSettingsMessage"),
         prevWeek: document.querySelector("#prevWeek"),
         todayWeek: document.querySelector("#todayWeek"),
@@ -2190,8 +2288,11 @@
         taskCategory: document.querySelector("#taskCategory"),
         taskPriority: document.querySelector("#taskPriority"),
         taskDueDate: document.querySelector("#taskDueDate"),
+        taskDuration: document.querySelector("#taskDuration"),
+        taskAvailableSlot: document.querySelector("#taskAvailableSlot"),
         taskStartTime: document.querySelector("#taskStartTime"),
         taskEndTime: document.querySelector("#taskEndTime"),
+        taskAvailabilityHint: document.querySelector("#taskAvailabilityHint"),
         taskProduct: document.querySelector("#taskProduct"),
         taskDescription: document.querySelector("#taskDescription"),
         taskSubmitButton: document.querySelector("#taskSubmitButton"),
@@ -2256,8 +2357,11 @@
         scheduleForm: document.querySelector("#scheduleForm"),
         scheduleTaskLabel: document.querySelector("#scheduleTaskLabel"),
         scheduleDate: document.querySelector("#scheduleDate"),
+        scheduleDuration: document.querySelector("#scheduleDuration"),
+        scheduleAvailableSlot: document.querySelector("#scheduleAvailableSlot"),
         scheduleStartTime: document.querySelector("#scheduleStartTime"),
         scheduleEndTime: document.querySelector("#scheduleEndTime"),
+        scheduleAvailabilityHint: document.querySelector("#scheduleAvailabilityHint"),
         scheduleReason: document.querySelector("#scheduleReason"),
         scheduleMessage: document.querySelector("#scheduleMessage"),
         cancelSchedule: document.querySelector("#cancelSchedule"),
@@ -2320,6 +2424,22 @@
           : { breakStart: DEFAULT_BREAK_START, breakEnd: DEFAULT_BREAK_END };
       }
 
+      function normalizeBreakSettingsByUserDate(settingsByUserDate) {
+        if (!settingsByUserDate || typeof settingsByUserDate !== "object" || Array.isArray(settingsByUserDate)) return {};
+        return Object.fromEntries(
+          Object.entries(settingsByUserDate)
+            .filter(([userId, dates]) => clean(userId) && dates && typeof dates === "object" && !Array.isArray(dates))
+            .map(([userId, dates]) => [
+              clean(userId),
+              Object.fromEntries(
+                Object.entries(dates)
+                  .filter(([dateValue]) => /^\d{4}-\d{2}-\d{2}$/.test(dateValue))
+                  .map(([dateValue, settings]) => [dateValue, normalizeWorkSettings(settings)])
+              )
+            ])
+        );
+      }
+
       function normalizedTaskCategory(category) {
         if (category === "PDV") return "PDP";
         if (category === "Producto") return "ULG";
@@ -2339,6 +2459,7 @@
                   .map(([userId, settings]) => [clean(userId), normalizeWorkSettings(settings)])
               )
             : {};
+        nextState.breakSettingsByUserDate = normalizeBreakSettingsByUserDate(nextState.breakSettingsByUserDate);
         nextState.tasks = (nextState.tasks || []).map((task) => ({
           ...task,
           category: normalizedTaskCategory(task.category),
@@ -2696,7 +2817,9 @@
         return new Date(`${dateValue}T12:00:00`).getDay() === 6;
       }
 
-      function breakSettingsForUser(userId = state.activeUserId) {
+      function breakSettingsForUser(userId = state.activeUserId, dateValue = "") {
+        const daily = dateValue ? state.breakSettingsByUserDate?.[userId]?.[dateValue] : null;
+        if (daily) return normalizeWorkSettings(daily);
         const personal = state.breakSettingsByUser?.[userId];
         return normalizeWorkSettings(personal || state.workSettings);
       }
@@ -2717,7 +2840,7 @@
       function workScheduleForDate(dateValue, userId = state.activeUserId) {
         const saturday = isSaturday(dateValue);
         const dannySaturday = saturday && isDannyDiosUser(userId);
-        const settings = breakSettingsForUser(userId);
+        const settings = breakSettingsForUser(userId, dateValue);
         return {
           start: dannySaturday ? DANNY_SATURDAY_START : WORKDAY_START,
           end: saturday ? (dannySaturday ? DANNY_SATURDAY_END : SATURDAY_END) : WEEKDAY_END,
@@ -2750,6 +2873,7 @@
       }
 
       function validateTaskSchedule(dateValue, startTime, endTime, userId = state.activeUserId) {
+        if (dateValue && dateValue < todayIso) return "No se pueden crear ni mover actividades a una fecha anterior.";
         if (!dateValue || isSunday(dateValue)) return "No se asignan tareas los domingos.";
         const schedule = workScheduleForDate(dateValue, userId);
         if (
@@ -2800,6 +2924,128 @@
         });
       }
 
+      function durationMinutes(startTime, endTime) {
+        return Math.max(15, timeToMinutes(endTime) - timeToMinutes(startTime));
+      }
+
+      function formatDuration(minutes) {
+        const hours = Math.floor(minutes / 60);
+        const remainder = minutes % 60;
+        if (!hours) return `${minutes} minutos`;
+        if (!remainder) return hours === 1 ? "1 hora" : `${hours} horas`;
+        return `${hours} h ${remainder} min`;
+      }
+
+      function slotValue(startTime, endTime) {
+        return `${startTime}|${endTime}`;
+      }
+
+      function parseSlotValue(value) {
+        const [startTime = "", endTime = ""] = String(value || "").split("|");
+        return { startTime, endTime };
+      }
+
+      function setScheduleInputs(slotSelect, startInput, endInput) {
+        const slot = parseSlotValue(slotSelect.value);
+        startInput.value = slot.startTime;
+        endInput.value = slot.endTime;
+      }
+
+      function ensureDurationOptions(select, selectedMinutes, includeLongDurations = true) {
+        const values = includeLongDurations
+          ? [15, 30, 45, 60, 90, 120, 180, 240, 300]
+          : [15, 30, 45, 60, 90, 120, 150, 180];
+        if (!values.includes(selectedMinutes)) values.push(selectedMinutes);
+        fillSelect(
+          select,
+          values.sort((a, b) => a - b).map((minutes) => ({ value: String(minutes), label: formatDuration(minutes) })),
+          String(selectedMinutes)
+        );
+      }
+
+      function availableTaskSlots(userId, dateValue, slotDuration, excludeTaskId = "") {
+        if (!userId || !dateValue || dateValue < todayIso || isSunday(dateValue) || slotDuration < 15) return [];
+        const schedule = workScheduleForDate(dateValue, userId);
+        const firstMinute = timeToMinutes(schedule.start);
+        const lastMinute = timeToMinutes(schedule.end);
+        const slots = [];
+        for (let start = firstMinute; start + slotDuration <= lastMinute; start += 15) {
+          const startTime = minutesToTime(start);
+          const endTime = minutesToTime(start + slotDuration);
+          if (overlapsBreak(dateValue, startTime, endTime, userId)) continue;
+          if (hasScheduleConflict(userId, dateValue, startTime, endTime, excludeTaskId)) continue;
+          slots.push({ value: slotValue(startTime, endTime), label: `${startTime} - ${endTime}` });
+        }
+        return slots;
+      }
+
+      function availableBreakSlots(userId, dateValue, slotDuration) {
+        if (!userId || !dateValue || dateValue < todayIso || isSunday(dateValue) || isSaturday(dateValue) || slotDuration < 15) return [];
+        const schedule = workScheduleForDate(dateValue, userId);
+        const firstMinute = timeToMinutes(schedule.start);
+        const lastMinute = timeToMinutes(schedule.end);
+        const slots = [];
+        for (let start = firstMinute; start + slotDuration <= lastMinute; start += 15) {
+          const startTime = minutesToTime(start);
+          const endTime = minutesToTime(start + slotDuration);
+          if (hasScheduleConflict(userId, dateValue, startTime, endTime)) continue;
+          slots.push({ value: slotValue(startTime, endTime), label: `${startTime} - ${endTime}` });
+        }
+        return slots;
+      }
+
+      function availabilityBlockedReason(dateValue, userId, slotDuration, forBreak = false) {
+        if (!dateValue) return "Selecciona una fecha para consultar la agenda.";
+        if (dateValue < todayIso) return "Las fechas anteriores estan bloqueadas. Elige hoy o una fecha futura.";
+        if (isSunday(dateValue)) return "El domingo no forma parte de la jornada laboral.";
+        if (forBreak && isSaturday(dateValue)) return "Los sabados no tienen break programado por la jornada corta.";
+        const schedule = workScheduleForDate(dateValue, userId);
+        const breakText = schedule.hasBreak ? ` y el break ${schedule.breakStart}-${schedule.breakEnd}` : "";
+        const occupiedTasks = state.tasks
+          .filter((task) => task.ownerId === userId && task.dueDate === dateValue && task.status !== "No disponible")
+          .sort((a, b) => (a.startTime || WORKDAY_START).localeCompare(b.startTime || WORKDAY_START))
+          .slice(0, 4)
+          .map((task) => `${task.startTime}-${task.endTime} ${task.title}`);
+        const occupiedText = occupiedTasks.length ? ` Ocupado: ${occupiedTasks.join("; ")}.` : "";
+        return `No queda un espacio continuo de ${formatDuration(slotDuration)}. La jornada es ${schedule.start}-${schedule.end}${breakText}.${occupiedText}`;
+      }
+
+      function renderTaskAvailability(preferredValue = "") {
+        const userId = els.taskOwner.value || state.activeUserId;
+        const dateValue = els.taskDueDate.value;
+        const selectedDuration = Math.max(15, Number(els.taskDuration.value || 60));
+        const previous = preferredValue || els.taskAvailableSlot.value || slotValue(els.taskStartTime.value, els.taskEndTime.value);
+        const slots = availableTaskSlots(userId, dateValue, selectedDuration);
+        const selected = slots.some((slot) => slot.value === previous) ? previous : slots[0]?.value || "";
+        fillSelect(els.taskAvailableSlot, slots.length ? slots : [{ value: "", label: "Sin horarios disponibles" }], selected);
+        els.taskAvailableSlot.disabled = !slots.length;
+        els.taskSubmitButton.disabled = !slots.length;
+        setScheduleInputs(els.taskAvailableSlot, els.taskStartTime, els.taskEndTime);
+        const schedule = dateValue && userId ? workScheduleForDate(dateValue, userId) : null;
+        els.taskAvailabilityHint.classList.toggle("is-blocked", !slots.length);
+        els.taskAvailabilityHint.textContent = slots.length
+          ? `${slots.length} opciones libres de ${formatDuration(selectedDuration)} dentro de la jornada ${schedule.start}-${schedule.end}. Break y tareas ocupadas ya fueron excluidos.`
+          : availabilityBlockedReason(dateValue, userId, selectedDuration);
+      }
+
+      function renderScheduleAvailability(preferredValue = "") {
+        const task = state.tasks.find((item) => item.id === els.scheduleForm.dataset.taskId);
+        if (!task) return;
+        const selectedDuration = Math.max(15, Number(els.scheduleDuration.value || durationMinutes(task.startTime, task.endTime)));
+        const previous = preferredValue || els.scheduleAvailableSlot.value || slotValue(els.scheduleStartTime.value, els.scheduleEndTime.value);
+        const slots = availableTaskSlots(task.ownerId, els.scheduleDate.value, selectedDuration, task.id);
+        const selected = slots.some((slot) => slot.value === previous) ? previous : slots[0]?.value || "";
+        fillSelect(els.scheduleAvailableSlot, slots.length ? slots : [{ value: "", label: "Sin horarios disponibles" }], selected);
+        els.scheduleAvailableSlot.disabled = !slots.length;
+        els.scheduleForm.querySelector('[type="submit"]').disabled = !slots.length;
+        setScheduleInputs(els.scheduleAvailableSlot, els.scheduleStartTime, els.scheduleEndTime);
+        const schedule = workScheduleForDate(els.scheduleDate.value || todayIso, task.ownerId);
+        els.scheduleAvailabilityHint.classList.toggle("is-blocked", !slots.length);
+        els.scheduleAvailabilityHint.textContent = slots.length
+          ? `${slots.length} espacios libres. Jornada ${schedule.start}-${schedule.end}; no se muestran cruces con break ni otras actividades.`
+          : availabilityBlockedReason(els.scheduleDate.value, task.ownerId, selectedDuration);
+      }
+
       function formatShortDate(dateValue) {
         return new Intl.DateTimeFormat("es-PE", { weekday: "short", day: "2-digit", month: "short" }).format(new Date(`${dateValue}T12:00:00`));
       }
@@ -2840,6 +3086,11 @@
 
       function nearestWorkingDay(dateValue) {
         return isSunday(dateValue) ? addDaysIso(dateValue, 1) : dateValue;
+      }
+
+      function nearestBreakDay(dateValue) {
+        if (isSaturday(dateValue)) return addDaysIso(dateValue, 2);
+        return nearestWorkingDay(dateValue);
       }
 
       function addWorkingDays(dateValue, direction) {
@@ -3762,6 +4013,7 @@
         renderMotivation();
         renderDashboard();
         if (activeViewId === "tasksView") {
+          renderWeeklyPlanningReminder();
           renderPersonalBreakSettings();
           renderCoordinatorDay();
           renderTrainerWeek();
@@ -3782,14 +4034,53 @@
         els.dailyMotivation.textContent = dailyMotivationText();
       }
 
-      function renderPersonalBreakSettings() {
+      function renderWeeklyPlanningReminder() {
+        const day = new Date(`${todayIso}T12:00:00`).getDay();
+        const visible = day === 5 || day === 6;
+        els.weeklyPlanningReminder.classList.toggle("hidden", !visible);
+        if (!visible) return;
+        const nextWeekStart = addDaysIso(weekStartIso(todayIso), 7);
+        const nextWeekEnd = addDaysIso(nextWeekStart, 5);
+        els.weeklyPlanningTitle.textContent = `Prepara la Week ${isoWeekNumber(nextWeekStart)}`;
+        els.weeklyPlanningText.textContent = `Completa el cronograma de ${formatShortDate(nextWeekStart)} a ${formatShortDate(nextWeekEnd)} antes de iniciar la siguiente semana.`;
+      }
+
+      function renderBreakAvailability(preferredValue = "") {
+        const dateValue = els.breakDate.value;
+        const selectedDuration = Math.max(15, Number(els.breakDuration.value || 90));
+        const previous = preferredValue || els.breakAvailableSlot.value;
+        const slots = availableBreakSlots(state.activeUserId, dateValue, selectedDuration);
+        const selected = slots.some((slot) => slot.value === previous) ? previous : slots[0]?.value || "";
+        fillSelect(els.breakAvailableSlot, slots.length ? slots : [{ value: "", label: "Sin horarios disponibles" }], selected);
+        els.breakAvailableSlot.disabled = !slots.length;
+        els.saveBreakButton.disabled = !slots.length;
+        const schedule = dateValue ? workScheduleForDate(dateValue, state.activeUserId) : null;
+        els.breakAvailabilityHint.classList.toggle("is-blocked", !slots.length);
+        els.breakAvailabilityHint.textContent = slots.length
+          ? `${slots.length} espacios libres dentro de la jornada ${schedule.start}-${schedule.end}. Las tareas y capacitaciones ya ocupadas no se pueden cruzar.`
+          : availabilityBlockedReason(dateValue, state.activeUserId, selectedDuration, true);
+      }
+
+      function renderPersonalBreakSettings(forceSaved = false) {
         if (breakSettingsUserId !== state.activeUserId) {
           breakSettingsUserId = state.activeUserId;
+          breakEditorKey = "";
+          els.breakDate.value = nearestBreakDay(todayIso);
           setMessage(els.breakSettingsMessage, "", "");
         }
-        const settings = breakSettingsForUser(state.activeUserId);
-        els.breakStartTime.value = settings.breakStart;
-        els.breakEndTime.value = settings.breakEnd;
+        els.breakDate.min = todayIso;
+        if (!els.breakDate.value || els.breakDate.value < todayIso) els.breakDate.value = nearestBreakDay(todayIso);
+        const editorKey = `${state.activeUserId}|${els.breakDate.value}`;
+        const loadSaved = forceSaved || editorKey !== breakEditorKey;
+        const settings = breakSettingsForUser(state.activeUserId, els.breakDate.value);
+        if (loadSaved) {
+          const savedDuration = durationMinutes(settings.breakStart, settings.breakEnd);
+          ensureDurationOptions(els.breakDuration, savedDuration, false);
+          renderBreakAvailability(slotValue(settings.breakStart, settings.breakEnd));
+        } else {
+          renderBreakAvailability(els.breakAvailableSlot.value);
+        }
+        breakEditorKey = editorKey;
       }
 
       function refreshSelects() {
@@ -3814,16 +4105,11 @@
           )
           .map((task) => ({ value: task.id, label: `${task.title} (${formatDate(task.dueDate)} | ${taskTimeLabel(task)})` }));
         fillSelect(els.evidenceTask, availableTasks, els.evidenceTask.value);
+        els.taskDueDate.min = todayIso;
         els.taskDueDate.value = els.taskDueDate.value || nearestWorkingDay(todayIso);
-        els.taskStartTime.value = els.taskStartTime.value || WORKDAY_START;
-        els.taskEndTime.value = els.taskEndTime.value || "09:30";
-        applyTimeInputLimits(
-          els.taskDueDate.value,
-          els.taskStartTime,
-          els.taskEndTime,
-          els.taskOwner.value || state.activeUserId
-        );
         if (!isCoordinator()) els.taskOwner.value = state.activeUserId;
+        if (!els.taskDuration.value) els.taskDuration.value = "60";
+        renderTaskAvailability(els.taskAvailableSlot.value);
       }
 
       function relevantTasks() {
@@ -3931,10 +4217,13 @@
         if (!canRescheduleTask(task)) return;
         els.scheduleForm.dataset.taskId = task.id;
         els.scheduleTaskLabel.textContent = `${task.title} | Horario actual: ${formatDate(task.dueDate)} ${taskTimeLabel(task)}`;
-        els.scheduleDate.value = task.dueDate;
+        els.scheduleDate.min = todayIso;
+        els.scheduleDate.value = task.dueDate >= todayIso ? task.dueDate : nearestWorkingDay(todayIso);
         els.scheduleStartTime.value = task.startTime || WORKDAY_START;
         els.scheduleEndTime.value = task.endTime || "09:30";
-        applyTimeInputLimits(task.dueDate, els.scheduleStartTime, els.scheduleEndTime, task.ownerId);
+        const taskDuration = durationMinutes(task.startTime || WORKDAY_START, task.endTime || "09:30");
+        ensureDurationOptions(els.scheduleDuration, taskDuration);
+        renderScheduleAvailability(task.dueDate >= todayIso ? slotValue(task.startTime || WORKDAY_START, task.endTime || "09:30") : "");
         els.scheduleReason.value = "";
         setMessage(els.scheduleMessage, "", "");
         els.scheduleDialog.showModal();
@@ -4068,10 +4357,8 @@
       function focusTaskFormForDate(dateValue, ownerId = state.activeUserId) {
         els.taskDueDate.value = dateValue;
         if (ownerId) els.taskOwner.value = ownerId;
-        els.taskStartTime.value = WORKDAY_START;
-        els.taskEndTime.value = "09:30";
-        applyTimeInputLimits(dateValue, els.taskStartTime, els.taskEndTime, ownerId);
         if (!isCoordinator()) els.taskOwner.value = state.activeUserId;
+        renderTaskAvailability();
         els.taskTitle.focus();
         setMessage(
           els.taskMessage,
@@ -5153,23 +5440,31 @@
           render();
         });
 
+        els.openNextWeekPlanning.addEventListener("click", () => {
+          const nextWeekStart = addDaysIso(weekStartIso(todayIso), 7);
+          state.selectedWeekStart = nextWeekStart;
+          state.selectedCoordinatorDate = nextWeekStart;
+          saveUiState();
+          render();
+          const target = isCoordinator() ? els.coordinatorDayPanel : els.trainerWeekPanel;
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+
         els.taskDueDate.addEventListener("change", () => {
           if (!els.taskDueDate.value) return;
-          applyTimeInputLimits(
-            els.taskDueDate.value,
-            els.taskStartTime,
-            els.taskEndTime,
-            els.taskOwner.value || state.activeUserId
-          );
+          renderTaskAvailability();
           setMessage(els.taskMessage, "", "");
         });
         els.taskOwner.addEventListener("change", () => {
-          applyTimeInputLimits(
-            els.taskDueDate.value,
-            els.taskStartTime,
-            els.taskEndTime,
-            els.taskOwner.value || state.activeUserId
-          );
+          renderTaskAvailability();
+          setMessage(els.taskMessage, "", "");
+        });
+        els.taskDuration.addEventListener("change", () => {
+          renderTaskAvailability();
+          setMessage(els.taskMessage, "", "");
+        });
+        els.taskAvailableSlot.addEventListener("change", () => {
+          setScheduleInputs(els.taskAvailableSlot, els.taskStartTime, els.taskEndTime);
           setMessage(els.taskMessage, "", "");
         });
 
@@ -5184,13 +5479,15 @@
         els.cancelSchedule.addEventListener("click", () => els.scheduleDialog.close());
         els.scheduleDate.addEventListener("change", () => {
           if (!els.scheduleDate.value) return;
-          const task = state.tasks.find((item) => item.id === els.scheduleForm.dataset.taskId);
-          applyTimeInputLimits(
-            els.scheduleDate.value,
-            els.scheduleStartTime,
-            els.scheduleEndTime,
-            task?.ownerId || state.activeUserId
-          );
+          renderScheduleAvailability();
+          setMessage(els.scheduleMessage, "", "");
+        });
+        els.scheduleDuration.addEventListener("change", () => {
+          renderScheduleAvailability();
+          setMessage(els.scheduleMessage, "", "");
+        });
+        els.scheduleAvailableSlot.addEventListener("change", () => {
+          setScheduleInputs(els.scheduleAvailableSlot, els.scheduleStartTime, els.scheduleEndTime);
           setMessage(els.scheduleMessage, "", "");
         });
 
@@ -5224,13 +5521,30 @@
           await deleteTaskAndArchive(els.deleteTaskForm.dataset.taskId, reason);
         });
 
+        els.breakDate.addEventListener("change", () => {
+          breakEditorKey = "";
+          setMessage(els.breakSettingsMessage, "", "");
+          renderPersonalBreakSettings(true);
+        });
+        els.breakDuration.addEventListener("change", () => {
+          setMessage(els.breakSettingsMessage, "", "");
+          renderBreakAvailability();
+        });
+        els.breakAvailableSlot.addEventListener("change", () => setMessage(els.breakSettingsMessage, "", ""));
+
         els.breakSettingsForm.addEventListener("submit", (event) => {
           event.preventDefault();
+          const dateValue = els.breakDate.value;
+          const selectedSlot = parseSlotValue(els.breakAvailableSlot.value);
           const requested = {
-            breakStart: els.breakStartTime.value,
-            breakEnd: els.breakEndTime.value
+            breakStart: selectedSlot.startTime,
+            breakEnd: selectedSlot.endTime
           };
           const normalized = normalizeWorkSettings(requested);
+          if (dateValue < todayIso || isSunday(dateValue) || isSaturday(dateValue)) {
+            setMessage(els.breakSettingsMessage, availabilityBlockedReason(dateValue, state.activeUserId, Number(els.breakDuration.value), true), "err");
+            return;
+          }
           if (normalized.breakStart !== requested.breakStart || normalized.breakEnd !== requested.breakEnd) {
             setMessage(
               els.breakSettingsMessage,
@@ -5239,15 +5553,24 @@
             );
             return;
           }
-          state.breakSettingsByUser = {
-            ...(state.breakSettingsByUser || {}),
-            [state.activeUserId]: normalized
+          if (hasScheduleConflict(state.activeUserId, dateValue, normalized.breakStart, normalized.breakEnd)) {
+            setMessage(els.breakSettingsMessage, "Ese espacio acaba de ser ocupado por una tarea. Elige otra opcion disponible.", "err");
+            renderBreakAvailability();
+            return;
+          }
+          state.breakSettingsByUserDate = {
+            ...(state.breakSettingsByUserDate || {}),
+            [state.activeUserId]: {
+              ...(state.breakSettingsByUserDate?.[state.activeUserId] || {}),
+              [dateValue]: normalized
+            }
           };
+          breakEditorKey = "";
           saveState();
           render();
           setMessage(
             els.breakSettingsMessage,
-            `Tu break personal se actualizo: ${normalized.breakStart}-${normalized.breakEnd}.`,
+            `Break guardado solo para ${formatDate(dateValue)}: ${normalized.breakStart}-${normalized.breakEnd}.`,
             "ok"
           );
         });
@@ -5304,8 +5627,7 @@
           saveState();
           els.taskForm.reset();
           els.taskDueDate.value = nearestWorkingDay(todayIso);
-          els.taskStartTime.value = WORKDAY_START;
-          els.taskEndTime.value = "09:30";
+          els.taskDuration.value = "60";
           setMessage(els.taskMessage, isCoordinator() ? "Tarea asignada correctamente." : "Tu tarea se agrego a la semana.", "ok");
           render();
         });
