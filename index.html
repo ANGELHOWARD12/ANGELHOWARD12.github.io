@@ -634,7 +634,7 @@
       .schedule-axis,
       .schedule-track {
         display: grid;
-        grid-template-columns: repeat(var(--schedule-slots, 19), minmax(38px, 1fr));
+        grid-template-columns: repeat(var(--schedule-slots, 38), minmax(20px, 1fr));
       }
 
       .schedule-axis {
@@ -838,6 +838,76 @@
 
       dialog::backdrop {
         background: rgba(23, 32, 51, 0.48);
+      }
+
+      .task-preview-dialog,
+      .task-history-dialog {
+        max-width: 700px;
+      }
+
+      .task-preview-popover {
+        background: #fff;
+        border: 2px solid var(--blue);
+        border-radius: 8px;
+        box-shadow: 0 18px 45px rgba(23, 32, 51, 0.24);
+        color: var(--ink);
+        display: grid;
+        gap: 7px;
+        max-width: min(360px, calc(100vw - 24px));
+        padding: 12px;
+        pointer-events: none;
+        position: fixed;
+        width: 340px;
+        z-index: 80;
+      }
+
+      .task-preview-popover strong,
+      .task-preview-popover span,
+      .task-preview-popover p {
+        overflow-wrap: anywhere;
+      }
+
+      .task-preview-popover p {
+        margin: 0;
+      }
+
+      .audit-list {
+        display: grid;
+        gap: 10px;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .audit-entry {
+        background: #f8fbff;
+        border-left: 4px solid var(--blue);
+        border-radius: 6px;
+        display: grid;
+        gap: 5px;
+        padding: 11px 12px;
+      }
+
+      .audit-entry span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .confirmation-check {
+        align-items: flex-start;
+        background: #eef7ff;
+        border: 1px solid #b8d8f5;
+        border-radius: 8px;
+        display: flex;
+        gap: 9px;
+        padding: 10px 12px;
+      }
+
+      .confirmation-check input {
+        flex: 0 0 auto;
+        margin-top: 3px;
+        min-height: auto;
+        width: auto;
       }
 
       .reminder-summary {
@@ -1649,28 +1719,16 @@
                 </select>
               </label>
               <label>
-                Fecha limite
+                Fecha de tarea
                 <input id="taskDueDate" type="date" required />
               </label>
               <label>
-                Duracion de la actividad
-                <select id="taskDuration" required>
-                  <option value="15">15 minutos</option>
-                  <option value="30">30 minutos</option>
-                  <option value="45">45 minutos</option>
-                  <option value="60" selected>1 hora</option>
-                  <option value="90">1 hora 30 minutos</option>
-                  <option value="120">2 horas</option>
-                  <option value="180">3 horas</option>
-                  <option value="240">4 horas</option>
-                  <option value="300">5 horas</option>
-                </select>
+                Hora de inicio disponible (24 h)
+                <select id="taskStartTime" required></select>
               </label>
               <label>
-                Horario disponible (24 h)
-                <select id="taskAvailableSlot" required></select>
-                <input id="taskStartTime" type="hidden" />
-                <input id="taskEndTime" type="hidden" />
+                Hora de finalizacion disponible (24 h)
+                <select id="taskEndTime" required></select>
               </label>
               <label>
                 Linea
@@ -1685,6 +1743,7 @@
                 Instrucciones
                 <textarea id="taskDescription" placeholder="Detalle de lo que debe revisar o ejecutar el trainer"></textarea>
               </label>
+              <p id="taskDurationSummary" class="availability-note wide"></p>
               <p id="taskAvailabilityHint" class="availability-note wide"></p>
               <button id="taskSubmitButton" class="primary wide" type="submit">Asignar tarea</button>
             </form>
@@ -1746,6 +1805,10 @@
               <label>
                 Producto revisado
                 <input id="evidenceProduct" type="text" placeholder="Producto LG trabajado" />
+              </label>
+              <label id="evidenceTrainingTopicWrap" class="wide hidden">
+                Tema de la capacitacion
+                <input id="evidenceTrainingTopic" type="text" placeholder="Ej. Tecnologias OLED y QNED" />
               </label>
               <label>
                 Resultado
@@ -1949,6 +2012,10 @@
           Motivo de la reasignacion
           <textarea id="reassignReason" placeholder="Explica por que otro trainer realizara esta tarea" required></textarea>
         </label>
+        <label class="confirmation-check">
+          <input id="reassignConfirm" type="checkbox" required />
+          Confirmo que revise el horario, el responsable disponible y el motivo antes de guardar.
+        </label>
         <div class="actions">
           <button class="primary" type="submit">Confirmar reasignacion</button>
           <button id="cancelReassign" class="ghost" type="button">Cancelar</button>
@@ -1969,16 +2036,15 @@
         </label>
         <div class="form-grid">
           <label>
-            Duracion
-            <select id="scheduleDuration" required></select>
+            Hora de inicio disponible (24 h)
+            <select id="scheduleStartTime" required></select>
           </label>
           <label>
-            Nuevo horario disponible (24 h)
-            <select id="scheduleAvailableSlot" required></select>
-            <input id="scheduleStartTime" type="hidden" />
-            <input id="scheduleEndTime" type="hidden" />
+            Hora de finalizacion disponible (24 h)
+            <select id="scheduleEndTime" required></select>
           </label>
         </div>
+        <p id="scheduleDurationSummary" class="availability-note"></p>
         <p id="scheduleAvailabilityHint" class="availability-note"></p>
         <label>
           Motivo del cambio
@@ -2029,6 +2095,59 @@
         <p id="deleteTaskMessage" class="message" aria-live="polite"></p>
       </form>
     </dialog>
+
+    <dialog id="renameTaskDialog">
+      <form id="renameTaskForm" class="stack">
+        <div>
+          <h2>Corregir nombre de tarea</h2>
+          <p id="renameTaskLabel" class="muted"></p>
+        </div>
+        <label>
+          Nombre corregido
+          <input id="renameTaskTitle" type="text" maxlength="140" required />
+        </label>
+        <label>
+          Motivo de la correccion
+          <textarea id="renameTaskReason" placeholder="Ej. Correccion de escritura" required></textarea>
+        </label>
+        <p class="helper">Solo cambiara el nombre. Fecha, horario, responsable, estado y evidencias permaneceran intactos.</p>
+        <div class="actions">
+          <button class="primary" type="submit">Guardar correccion</button>
+          <button id="cancelRenameTask" class="ghost" type="button">Cancelar</button>
+        </div>
+        <p id="renameTaskMessage" class="message" aria-live="polite"></p>
+      </form>
+    </dialog>
+
+    <dialog id="taskPreviewDialog" class="task-preview-dialog">
+      <div class="stack">
+        <div>
+          <h2 id="taskPreviewTitle">Detalle de tarea</h2>
+          <p id="taskPreviewSubtitle" class="muted"></p>
+        </div>
+        <div id="taskPreviewContent" class="stack"></div>
+        <div class="actions">
+          <button id="taskPreviewTracking" class="primary" type="button">Ver en seguimiento</button>
+          <button id="taskPreviewHistory" class="small" type="button">Historial completo</button>
+          <button id="closeTaskPreview" class="ghost" type="button">Cerrar</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="taskHistoryDialog" class="task-history-dialog">
+      <div class="stack">
+        <div>
+          <h2 id="taskHistoryTitle">Historial completo</h2>
+          <p id="taskHistorySubtitle" class="muted"></p>
+        </div>
+        <ol id="taskHistoryList" class="audit-list"></ol>
+        <div class="actions">
+          <button id="closeTaskHistory" class="ghost" type="button">Cerrar</button>
+        </div>
+      </div>
+    </dialog>
+
+    <div id="taskPreviewPopover" class="task-preview-popover hidden" role="tooltip"></div>
 
     <dialog id="filePreviewDialog" class="file-preview-dialog" aria-labelledby="filePreviewTitle">
       <div class="file-preview-shell">
@@ -2110,7 +2229,7 @@
       ];
 
       const initialState = {
-        version: 10,
+        version: 11,
         activeUserId: "",
         selectedProduct: "oled",
         selectedWeekStart: "",
@@ -2211,6 +2330,8 @@
       let lastAutoOpenedFileId = "";
       let breakSettingsUserId = "";
       let breakEditorKey = "";
+      let previewedTaskId = "";
+      let historyTaskId = "";
       let activeViewId = ALLOWED_VIEW_IDS.includes(new URLSearchParams(window.location.search).get("view"))
         ? new URLSearchParams(window.location.search).get("view")
         : "tasksView";
@@ -2288,10 +2409,9 @@
         taskCategory: document.querySelector("#taskCategory"),
         taskPriority: document.querySelector("#taskPriority"),
         taskDueDate: document.querySelector("#taskDueDate"),
-        taskDuration: document.querySelector("#taskDuration"),
-        taskAvailableSlot: document.querySelector("#taskAvailableSlot"),
         taskStartTime: document.querySelector("#taskStartTime"),
         taskEndTime: document.querySelector("#taskEndTime"),
+        taskDurationSummary: document.querySelector("#taskDurationSummary"),
         taskAvailabilityHint: document.querySelector("#taskAvailabilityHint"),
         taskProduct: document.querySelector("#taskProduct"),
         taskDescription: document.querySelector("#taskDescription"),
@@ -2307,6 +2427,8 @@
         evidenceTask: document.querySelector("#evidenceTask"),
         evidenceStore: document.querySelector("#evidenceStore"),
         evidenceProduct: document.querySelector("#evidenceProduct"),
+        evidenceTrainingTopicWrap: document.querySelector("#evidenceTrainingTopicWrap"),
+        evidenceTrainingTopic: document.querySelector("#evidenceTrainingTopic"),
         evidenceResult: document.querySelector("#evidenceResult"),
         evidenceFiles: document.querySelector("#evidenceFiles"),
         evidenceNotes: document.querySelector("#evidenceNotes"),
@@ -2351,16 +2473,16 @@
         reassignTaskLabel: document.querySelector("#reassignTaskLabel"),
         reassignOwner: document.querySelector("#reassignOwner"),
         reassignReason: document.querySelector("#reassignReason"),
+        reassignConfirm: document.querySelector("#reassignConfirm"),
         reassignMessage: document.querySelector("#reassignMessage"),
         cancelReassign: document.querySelector("#cancelReassign"),
         scheduleDialog: document.querySelector("#scheduleDialog"),
         scheduleForm: document.querySelector("#scheduleForm"),
         scheduleTaskLabel: document.querySelector("#scheduleTaskLabel"),
         scheduleDate: document.querySelector("#scheduleDate"),
-        scheduleDuration: document.querySelector("#scheduleDuration"),
-        scheduleAvailableSlot: document.querySelector("#scheduleAvailableSlot"),
         scheduleStartTime: document.querySelector("#scheduleStartTime"),
         scheduleEndTime: document.querySelector("#scheduleEndTime"),
+        scheduleDurationSummary: document.querySelector("#scheduleDurationSummary"),
         scheduleAvailabilityHint: document.querySelector("#scheduleAvailabilityHint"),
         scheduleReason: document.querySelector("#scheduleReason"),
         scheduleMessage: document.querySelector("#scheduleMessage"),
@@ -2378,6 +2500,26 @@
         deleteTaskMessage: document.querySelector("#deleteTaskMessage"),
         confirmDeleteTask: document.querySelector("#confirmDeleteTask"),
         cancelDeleteTask: document.querySelector("#cancelDeleteTask"),
+        renameTaskDialog: document.querySelector("#renameTaskDialog"),
+        renameTaskForm: document.querySelector("#renameTaskForm"),
+        renameTaskLabel: document.querySelector("#renameTaskLabel"),
+        renameTaskTitle: document.querySelector("#renameTaskTitle"),
+        renameTaskReason: document.querySelector("#renameTaskReason"),
+        renameTaskMessage: document.querySelector("#renameTaskMessage"),
+        cancelRenameTask: document.querySelector("#cancelRenameTask"),
+        taskPreviewDialog: document.querySelector("#taskPreviewDialog"),
+        taskPreviewTitle: document.querySelector("#taskPreviewTitle"),
+        taskPreviewSubtitle: document.querySelector("#taskPreviewSubtitle"),
+        taskPreviewContent: document.querySelector("#taskPreviewContent"),
+        taskPreviewTracking: document.querySelector("#taskPreviewTracking"),
+        taskPreviewHistory: document.querySelector("#taskPreviewHistory"),
+        closeTaskPreview: document.querySelector("#closeTaskPreview"),
+        taskHistoryDialog: document.querySelector("#taskHistoryDialog"),
+        taskHistoryTitle: document.querySelector("#taskHistoryTitle"),
+        taskHistorySubtitle: document.querySelector("#taskHistorySubtitle"),
+        taskHistoryList: document.querySelector("#taskHistoryList"),
+        closeTaskHistory: document.querySelector("#closeTaskHistory"),
+        taskPreviewPopover: document.querySelector("#taskPreviewPopover"),
         filePreviewDialog: document.querySelector("#filePreviewDialog"),
         filePreviewTitle: document.querySelector("#filePreviewTitle"),
         filePreviewMeta: document.querySelector("#filePreviewMeta"),
@@ -2465,6 +2607,7 @@
           category: normalizedTaskCategory(task.category),
           startTime: task.startTime || "08:30",
           endTime: task.endTime || "09:30",
+          history: Array.isArray(task.history) ? task.history : [],
           reminders: Array.isArray(task.reminders) ? task.reminders : []
         }));
         nextState.deletedTasks = (nextState.deletedTasks || []).map((task) => ({
@@ -2863,7 +3006,7 @@
 
       function scheduleSlotsForDate(dateValue) {
         const bounds = coordinatorScheduleBounds(dateValue);
-        return Math.ceil((timeToMinutes(bounds.end) - timeToMinutes(bounds.start)) / 30);
+        return Math.ceil((timeToMinutes(bounds.end) - timeToMinutes(bounds.start)) / 15);
       }
 
       function overlapsBreak(dateValue, startTime, endTime, userId = state.activeUserId) {
@@ -2873,7 +3016,6 @@
       }
 
       function validateTaskSchedule(dateValue, startTime, endTime, userId = state.activeUserId) {
-        if (dateValue && dateValue < todayIso) return "No se pueden crear ni mover actividades a una fecha anterior.";
         if (!dateValue || isSunday(dateValue)) return "No se asignan tareas los domingos.";
         const schedule = workScheduleForDate(dateValue, userId);
         if (
@@ -2887,26 +3029,6 @@
           return `El break de lunes a viernes es de ${schedule.breakStart} a ${schedule.breakEnd}. Elige un horario fuera de ese bloque.`;
         }
         return "";
-      }
-
-      function applyTimeInputLimits(dateValue, startInput, endInput, userId = state.activeUserId) {
-        const schedule = workScheduleForDate(dateValue || todayIso, userId);
-        startInput.min = schedule.start;
-        startInput.max = minutesToTime(timeToMinutes(schedule.end) - 15);
-        endInput.min = minutesToTime(timeToMinutes(schedule.start) + 15);
-        endInput.max = schedule.end;
-        if (
-          timeToMinutes(startInput.value) < timeToMinutes(schedule.start) ||
-          timeToMinutes(startInput.value) > timeToMinutes(startInput.max)
-        ) {
-          startInput.value = schedule.start;
-        }
-        if (
-          timeToMinutes(endInput.value) < timeToMinutes(endInput.min) ||
-          timeToMinutes(endInput.value) > timeToMinutes(schedule.end)
-        ) {
-          endInput.value = minutesToTime(Math.min(timeToMinutes(startInput.value) + 60, timeToMinutes(schedule.end)));
-        }
       }
 
       function taskTimeLabel(task) {
@@ -2945,12 +3067,6 @@
         return { startTime, endTime };
       }
 
-      function setScheduleInputs(slotSelect, startInput, endInput) {
-        const slot = parseSlotValue(slotSelect.value);
-        startInput.value = slot.startTime;
-        endInput.value = slot.endTime;
-      }
-
       function ensureDurationOptions(select, selectedMinutes, includeLongDurations = true) {
         const values = includeLongDurations
           ? [15, 30, 45, 60, 90, 120, 180, 240, 300]
@@ -2963,20 +3079,62 @@
         );
       }
 
-      function availableTaskSlots(userId, dateValue, slotDuration, excludeTaskId = "") {
-        if (!userId || !dateValue || dateValue < todayIso || isSunday(dateValue) || slotDuration < 15) return [];
-        const schedule = workScheduleForDate(dateValue, userId);
-        const firstMinute = timeToMinutes(schedule.start);
-        const lastMinute = timeToMinutes(schedule.end);
-        const slots = [];
-        for (let start = firstMinute; start + slotDuration <= lastMinute; start += 15) {
+      function personAvailableForInterval(userId, dateValue, startTime, endTime, excludeTaskId = "") {
+        return (
+          Boolean(userId && dateValue && startTime && endTime) &&
+          !validateTaskSchedule(dateValue, startTime, endTime, userId) &&
+          !hasScheduleConflict(userId, dateValue, startTime, endTime, excludeTaskId)
+        );
+      }
+
+      function taskSchedulingPeople() {
+        return isCoordinator() ? assignableUsers() : [activeUser()].filter(Boolean);
+      }
+
+      function scheduleBoundsForPeople(people, dateValue) {
+        const schedules = people.map((person) => workScheduleForDate(dateValue, person.id));
+        if (!schedules.length) return { start: WORKDAY_START, end: WEEKDAY_END };
+        return {
+          start: minutesToTime(Math.min(...schedules.map((schedule) => timeToMinutes(schedule.start)))),
+          end: minutesToTime(Math.max(...schedules.map((schedule) => timeToMinutes(schedule.end))))
+        };
+      }
+
+      function availableStartTimes(people, dateValue, excludeTaskId = "") {
+        if (!dateValue || isSunday(dateValue) || !people.length) return [];
+        const bounds = scheduleBoundsForPeople(people, dateValue);
+        const options = [];
+        for (let start = timeToMinutes(bounds.start); start + 15 <= timeToMinutes(bounds.end); start += 15) {
           const startTime = minutesToTime(start);
-          const endTime = minutesToTime(start + slotDuration);
-          if (overlapsBreak(dateValue, startTime, endTime, userId)) continue;
-          if (hasScheduleConflict(userId, dateValue, startTime, endTime, excludeTaskId)) continue;
-          slots.push({ value: slotValue(startTime, endTime), label: `${startTime} - ${endTime}` });
+          const endTime = minutesToTime(start + 15);
+          if (people.some((person) => personAvailableForInterval(person.id, dateValue, startTime, endTime, excludeTaskId))) {
+            options.push({ value: startTime, label: startTime });
+          }
         }
-        return slots;
+        return options;
+      }
+
+      function availableEndTimes(people, dateValue, startTime, excludeTaskId = "") {
+        if (!dateValue || !startTime || !people.length) return [];
+        const bounds = scheduleBoundsForPeople(people, dateValue);
+        const options = [];
+        for (let end = timeToMinutes(startTime) + 15; end <= timeToMinutes(bounds.end); end += 15) {
+          const endTime = minutesToTime(end);
+          if (people.some((person) => personAvailableForInterval(person.id, dateValue, startTime, endTime, excludeTaskId))) {
+            options.push({ value: endTime, label: endTime });
+          }
+        }
+        return options;
+      }
+
+      function availablePeopleForInterval(people, dateValue, startTime, endTime, excludeTaskId = "") {
+        return people.filter((person) => personAvailableForInterval(person.id, dateValue, startTime, endTime, excludeTaskId));
+      }
+
+      function preferredTime(options, requested, fallback = "") {
+        if (options.some((option) => option.value === requested)) return requested;
+        if (fallback && options.some((option) => option.value === fallback)) return fallback;
+        return options[0]?.value || "";
       }
 
       function availableBreakSlots(userId, dateValue, slotDuration) {
@@ -2996,7 +3154,7 @@
 
       function availabilityBlockedReason(dateValue, userId, slotDuration, forBreak = false) {
         if (!dateValue) return "Selecciona una fecha para consultar la agenda.";
-        if (dateValue < todayIso) return "Las fechas anteriores estan bloqueadas. Elige hoy o una fecha futura.";
+        if (forBreak && dateValue < todayIso) return "Los breaks anteriores quedan protegidos. Elige hoy o una fecha futura.";
         if (isSunday(dateValue)) return "El domingo no forma parte de la jornada laboral.";
         if (forBreak && isSaturday(dateValue)) return "Los sabados no tienen break programado por la jornada corta.";
         const schedule = workScheduleForDate(dateValue, userId);
@@ -3010,40 +3168,67 @@
         return `No queda un espacio continuo de ${formatDuration(slotDuration)}. La jornada es ${schedule.start}-${schedule.end}${breakText}.${occupiedText}`;
       }
 
-      function renderTaskAvailability(preferredValue = "") {
-        const userId = els.taskOwner.value || state.activeUserId;
+      function renderTaskAvailability(preferredStart = "", preferredEnd = "") {
         const dateValue = els.taskDueDate.value;
-        const selectedDuration = Math.max(15, Number(els.taskDuration.value || 60));
-        const previous = preferredValue || els.taskAvailableSlot.value || slotValue(els.taskStartTime.value, els.taskEndTime.value);
-        const slots = availableTaskSlots(userId, dateValue, selectedDuration);
-        const selected = slots.some((slot) => slot.value === previous) ? previous : slots[0]?.value || "";
-        fillSelect(els.taskAvailableSlot, slots.length ? slots : [{ value: "", label: "Sin horarios disponibles" }], selected);
-        els.taskAvailableSlot.disabled = !slots.length;
-        els.taskSubmitButton.disabled = !slots.length;
-        setScheduleInputs(els.taskAvailableSlot, els.taskStartTime, els.taskEndTime);
-        const schedule = dateValue && userId ? workScheduleForDate(dateValue, userId) : null;
-        els.taskAvailabilityHint.classList.toggle("is-blocked", !slots.length);
-        els.taskAvailabilityHint.textContent = slots.length
-          ? `${slots.length} opciones libres de ${formatDuration(selectedDuration)} dentro de la jornada ${schedule.start}-${schedule.end}. Break y tareas ocupadas ya fueron excluidos.`
-          : availabilityBlockedReason(dateValue, userId, selectedDuration);
+        const people = taskSchedulingPeople();
+        const previousOwner = els.taskOwner.value;
+        const startOptions = availableStartTimes(people, dateValue);
+        const startTime = preferredTime(startOptions, preferredStart || els.taskStartTime.value);
+        fillSelect(els.taskStartTime, startOptions.length ? startOptions : [{ value: "", label: "Sin inicios disponibles" }], startTime);
+        const endOptions = availableEndTimes(people, dateValue, startTime);
+        const defaultEnd = startTime ? minutesToTime(timeToMinutes(startTime) + 30) : "";
+        const endTime = preferredTime(endOptions, preferredEnd || els.taskEndTime.value, defaultEnd);
+        fillSelect(els.taskEndTime, endOptions.length ? endOptions : [{ value: "", label: "Sin cierres disponibles" }], endTime);
+        const availablePeople = availablePeopleForInterval(people, dateValue, startTime, endTime);
+        const ownerOptions = availablePeople.map((person) => ({
+          value: person.id,
+          label: `${person.name} - ${person.role === "Coordinador" ? "Coordinador" : person.zone || "Sin zona"}`
+        }));
+        fillSelect(els.taskOwner, ownerOptions.length ? ownerOptions : [{ value: "", label: "Sin colaboradores disponibles" }], previousOwner);
+        if (!isCoordinator() && ownerOptions.length) els.taskOwner.value = state.activeUserId;
+        const ready = Boolean(dateValue && startTime && endTime && availablePeople.length);
+        els.taskStartTime.disabled = !startOptions.length;
+        els.taskEndTime.disabled = !endOptions.length;
+        els.taskOwner.disabled = !isCoordinator() || !ownerOptions.length;
+        els.taskSubmitButton.disabled = !ready;
+        els.taskDurationSummary.classList.toggle("is-blocked", !ready);
+        els.taskDurationSummary.textContent = ready
+          ? `Duracion calculada: ${formatDuration(durationMinutes(startTime, endTime))} (${startTime}-${endTime}).`
+          : "Selecciona una fecha laboral con un bloque libre.";
+        els.taskAvailabilityHint.classList.toggle("is-blocked", !ready);
+        els.taskAvailabilityHint.textContent = ready
+          ? `${availablePeople.length} colaborador${availablePeople.length === 1 ? "" : "es"} disponible${availablePeople.length === 1 ? "" : "s"}: ${availablePeople.map((person) => person.name).join(", ")}. Los cruces y breaks estan bloqueados.`
+          : isSunday(dateValue)
+            ? "El domingo no forma parte de la jornada laboral."
+            : "No hay un horario continuo disponible para esta fecha.";
       }
 
-      function renderScheduleAvailability(preferredValue = "") {
+      function renderScheduleAvailability(preferredStart = "", preferredEnd = "") {
         const task = state.tasks.find((item) => item.id === els.scheduleForm.dataset.taskId);
         if (!task) return;
-        const selectedDuration = Math.max(15, Number(els.scheduleDuration.value || durationMinutes(task.startTime, task.endTime)));
-        const previous = preferredValue || els.scheduleAvailableSlot.value || slotValue(els.scheduleStartTime.value, els.scheduleEndTime.value);
-        const slots = availableTaskSlots(task.ownerId, els.scheduleDate.value, selectedDuration, task.id);
-        const selected = slots.some((slot) => slot.value === previous) ? previous : slots[0]?.value || "";
-        fillSelect(els.scheduleAvailableSlot, slots.length ? slots : [{ value: "", label: "Sin horarios disponibles" }], selected);
-        els.scheduleAvailableSlot.disabled = !slots.length;
-        els.scheduleForm.querySelector('[type="submit"]').disabled = !slots.length;
-        setScheduleInputs(els.scheduleAvailableSlot, els.scheduleStartTime, els.scheduleEndTime);
-        const schedule = workScheduleForDate(els.scheduleDate.value || todayIso, task.ownerId);
-        els.scheduleAvailabilityHint.classList.toggle("is-blocked", !slots.length);
-        els.scheduleAvailabilityHint.textContent = slots.length
-          ? `${slots.length} espacios libres. Jornada ${schedule.start}-${schedule.end}; no se muestran cruces con break ni otras actividades.`
-          : availabilityBlockedReason(els.scheduleDate.value, task.ownerId, selectedDuration);
+        const people = [state.users.find((user) => user.id === task.ownerId)].filter(Boolean);
+        const dateValue = els.scheduleDate.value;
+        const startOptions = availableStartTimes(people, dateValue, task.id);
+        const startTime = preferredTime(startOptions, preferredStart || els.scheduleStartTime.value, task.startTime);
+        fillSelect(els.scheduleStartTime, startOptions.length ? startOptions : [{ value: "", label: "Sin inicios disponibles" }], startTime);
+        const endOptions = availableEndTimes(people, dateValue, startTime, task.id);
+        const defaultEnd = startTime ? minutesToTime(timeToMinutes(startTime) + durationMinutes(task.startTime, task.endTime)) : "";
+        const endTime = preferredTime(endOptions, preferredEnd || els.scheduleEndTime.value, defaultEnd);
+        fillSelect(els.scheduleEndTime, endOptions.length ? endOptions : [{ value: "", label: "Sin cierres disponibles" }], endTime);
+        const ready = personAvailableForInterval(task.ownerId, dateValue, startTime, endTime, task.id);
+        els.scheduleStartTime.disabled = !startOptions.length;
+        els.scheduleEndTime.disabled = !endOptions.length;
+        els.scheduleForm.querySelector('[type="submit"]').disabled = !ready;
+        els.scheduleDurationSummary.classList.toggle("is-blocked", !ready);
+        els.scheduleDurationSummary.textContent = ready
+          ? `Duracion calculada: ${formatDuration(durationMinutes(startTime, endTime))} (${startTime}-${endTime}).`
+          : "No hay un bloque disponible para mover esta tarea.";
+        els.scheduleAvailabilityHint.classList.toggle("is-blocked", !ready);
+        els.scheduleAvailabilityHint.textContent = ready
+          ? `Horario libre para ${userName(task.ownerId)}. Break, reuniones, capacitaciones y otras tareas ya fueron excluidos.`
+          : isSunday(dateValue)
+            ? "El domingo no forma parte de la jornada laboral."
+            : "El horario esta ocupado o fuera de la jornada del responsable.";
       }
 
       function formatShortDate(dateValue) {
@@ -3127,6 +3312,9 @@
       }
 
       function historyEntryText(entry) {
+        if (entry.type === "CorreccionNombre") {
+          return `${userName(entry.byId)} corrigio el nombre de "${entry.fromTitle || "Sin nombre"}" a "${entry.toTitle || "Sin nombre"}". Motivo: ${entry.reason || "Sin detalle"}`;
+        }
         if (entry.type === "Reasignacion") {
           return `${userName(entry.byId || entry.fromId)} reasigno de ${userName(entry.fromId)} a ${userName(entry.toId)}. Motivo: ${entry.reason || "Sin detalle"}`;
         }
@@ -3139,6 +3327,11 @@
         if (entry.type === "Recordatorio") {
           return `${userName(entry.byId)} programo un recordatorio para ${formatDateTime(entry.reminderAt)}`;
         }
+        if (entry.type === "Inicio") return `${userName(entry.byId)} inicio la tarea.`;
+        if (entry.type === "Asignacion") return `${userName(entry.byId)} asigno la tarea a ${userName(entry.toId)}.`;
+        if (entry.type === "Sustento") return `${userName(entry.byId)} envio un sustento para revision.`;
+        if (entry.type === "Aprobacion") return `${userName(entry.byId)} aprobo la tarea.`;
+        if (entry.type === "Rechazo") return `${userName(entry.byId)} rechazo el sustento. Motivo: ${entry.reason || "Requiere correccion"}`;
         return `${entry.type || "Actualizacion"}${entry.reason ? `: ${entry.reason}` : ""}`;
       }
 
@@ -3157,6 +3350,103 @@
             </ol>
           </details>
         `;
+      }
+
+      function taskEvidenceSummaryMarkup(task) {
+        const evidenceItems = task.evidence || [];
+        if (!evidenceItems.length) return `<div class="note"><strong>Evidencias</strong><p class="muted">Todavia no hay evidencias registradas.</p></div>`;
+        const latest = evidenceItems.at(-1);
+        const files = evidenceFilesForEntry(latest);
+        return `
+          <div class="note">
+            <strong>Evidencias (${evidenceItems.length})</strong>
+            <p class="muted">Ultimo envio: ${formatDateTime(latest.submittedAt)} | ${escapeHtml(evidenceReviewLabel(latest.review))}</p>
+            ${latest.trainingTopic ? `<p><strong>Tema de la capacitacion:</strong> ${escapeHtml(latest.trainingTopic)}</p>` : ""}
+            ${latest.notes ? `<p>${escapeHtml(latest.notes)}</p>` : ""}
+            ${files.length ? `<div class="actions">${files.map((file, index) => `<button class="small preview-task-file" type="button" data-file-index="${index}">Ver ${escapeHtml(file.name)}</button>`).join("")}</div>` : ""}
+          </div>
+        `;
+      }
+
+      function taskPreviewMarkup(task, compact = false) {
+        const duration = durationMinutes(task.startTime || WORKDAY_START, task.endTime || "09:30");
+        return `
+          <div class="meta">
+            <span>${formatDate(task.dueDate)}</span>
+            <span>${escapeHtml(taskTimeLabel(task))}</span>
+            <span>${escapeHtml(formatDuration(duration))}</span>
+            <span>${escapeHtml(taskStatusLabel(task.status))}</span>
+            <span>${escapeHtml(userName(task.ownerId))}</span>
+          </div>
+          ${task.description ? `<p>${escapeHtml(task.description)}</p>` : `<p class="muted">Sin indicaciones adicionales.</p>`}
+          ${compact ? "" : taskEvidenceSummaryMarkup(task)}
+        `;
+      }
+
+      function hideTaskPreviewPopover() {
+        els.taskPreviewPopover.classList.add("hidden");
+      }
+
+      function showTaskPreviewPopover(task, anchor) {
+        els.taskPreviewPopover.innerHTML = `<strong>${escapeHtml(task.title)}</strong>${taskPreviewMarkup(task, true)}`;
+        els.taskPreviewPopover.classList.remove("hidden");
+        const anchorRect = anchor.getBoundingClientRect();
+        const popoverRect = els.taskPreviewPopover.getBoundingClientRect();
+        const left = Math.min(window.innerWidth - popoverRect.width - 12, Math.max(12, anchorRect.left));
+        const below = anchorRect.bottom + 8;
+        const top = below + popoverRect.height <= window.innerHeight - 12
+          ? below
+          : Math.max(12, anchorRect.top - popoverRect.height - 8);
+        els.taskPreviewPopover.style.left = `${left}px`;
+        els.taskPreviewPopover.style.top = `${top}px`;
+      }
+
+      function attachTaskPreview(anchor, task) {
+        anchor.title = `${task.title} | ${taskTimeLabel(task)} | ${taskStatusLabel(task.status)}`;
+        anchor.addEventListener("pointerenter", () => showTaskPreviewPopover(task, anchor));
+        anchor.addEventListener("pointerleave", hideTaskPreviewPopover);
+        anchor.addEventListener("focus", () => showTaskPreviewPopover(task, anchor));
+        anchor.addEventListener("blur", hideTaskPreviewPopover);
+        anchor.addEventListener("click", () => openTaskPreviewDialog(task.id));
+      }
+
+      function openTaskPreviewDialog(taskId) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        if (!task) return;
+        previewedTaskId = task.id;
+        hideTaskPreviewPopover();
+        els.taskPreviewTitle.textContent = task.title;
+        els.taskPreviewSubtitle.textContent = `${userName(task.ownerId)} | ${formatDate(task.dueDate)} | ${taskTimeLabel(task)}`;
+        els.taskPreviewContent.innerHTML = taskPreviewMarkup(task);
+        const latestFiles = evidenceFilesForEntry(task.evidence?.at(-1));
+        els.taskPreviewContent.querySelectorAll(".preview-task-file").forEach((button) => {
+          button.addEventListener("click", () => {
+            const file = latestFiles[Number(button.dataset.fileIndex)];
+            if (!file) return;
+            els.taskPreviewDialog.close();
+            openEvidenceFilePreview(file).catch(() => {});
+          });
+        });
+        els.taskPreviewDialog.showModal();
+      }
+
+      function openTaskHistoryDialog(taskId) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        if (!task) return;
+        historyTaskId = task.id;
+        els.taskHistoryTitle.textContent = `Historial: ${task.title}`;
+        els.taskHistorySubtitle.textContent = `${userName(task.ownerId)} | ${formatDate(task.dueDate)} | Registro de solo lectura`;
+        const entries = (task.history || []).slice().reverse();
+        els.taskHistoryList.innerHTML = entries.length
+          ? entries.map((entry) => `
+              <li class="audit-entry">
+                <strong>${escapeHtml(entry.type || "Actualizacion")}</strong>
+                <span>${escapeHtml(historyEntryText(entry))}</span>
+                <small>${formatDateTime(entry.at)} | Registrado por ${escapeHtml(userName(entry.byId || entry.fromId || task.createdById))}</small>
+              </li>
+            `).join("")
+          : `<li class="audit-entry"><span>No hay modificaciones registradas.</span></li>`;
+        els.taskHistoryDialog.showModal();
       }
 
       function folderSafe(value) {
@@ -3367,6 +3657,7 @@
               task: task.title,
               line: task.product || "",
               category: task.category || "",
+              trainingTopic: evidence?.trainingTopic || "",
               taskStatus: taskStatusLabel(task.status || ""),
               evidenceDate: evidence?.submittedAt ? dateIsoInLima(evidence.submittedAt) : "",
               evidenceTime: evidence?.submittedAt
@@ -3409,6 +3700,7 @@
         { header: "Tarea", width: 34 },
         { header: "Linea", width: 11 },
         { header: "Categoria", width: 17 },
+        { header: "Tema de la capacitacion", width: 32 },
         { header: "Estado de tarea", width: 18 },
         { header: "Fecha de sustento", width: 16 },
         { header: "Hora de sustento", width: 14 },
@@ -3560,6 +3852,7 @@
           row.task,
           row.line,
           row.category,
+          row.trainingTopic,
           row.taskStatus,
           row.evidenceDate,
           row.evidenceTime,
@@ -3661,15 +3954,15 @@
             }
           });
           const statusStyle = statusCellStyle(reportRow.taskStatus);
-          dataRow.getCell(8).fill = { type: "pattern", pattern: "solid", fgColor: { argb: statusStyle.fill } };
-          dataRow.getCell(8).font = { name: "Aptos", size: 10, bold: true, color: { argb: statusStyle.font } };
-          dataRow.getCell(15).font = {
+          dataRow.getCell(9).fill = { type: "pattern", pattern: "solid", fgColor: { argb: statusStyle.fill } };
+          dataRow.getCell(9).font = { name: "Aptos", size: 10, bold: true, color: { argb: statusStyle.font } };
+          dataRow.getCell(16).font = {
             name: "Aptos",
             size: 10,
             bold: true,
             color: { argb: reportRow.review === "Aprobado" ? "FF166534" : "FFA50034" }
           };
-          [19, 20].forEach((columnNumber) => {
+          [20, 21].forEach((columnNumber) => {
             const cell = dataRow.getCell(columnNumber);
             if (cell.value && typeof cell.value === "object") {
               cell.font = { name: "Aptos", size: 10, bold: true, color: { argb: "FF175CD3" }, underline: true };
@@ -3680,7 +3973,7 @@
           const imageId = imageIds.get(key);
           if (imageId !== undefined && attachment?.displaySize) {
             worksheet.addImage(imageId, {
-              tl: { col: 17.08, row: dataRow.number - 1 + 0.08 },
+              tl: { col: 18.08, row: dataRow.number - 1 + 0.08 },
               ext: { width: attachment.displaySize.width, height: attachment.displaySize.height },
               editAs: "oneCell"
             });
@@ -4087,7 +4380,6 @@
         const trainerOptions = trainers().map((trainer) => ({ value: trainer.id, label: `${trainer.name} - ${trainer.zone}` }));
         const taskPeople = isCoordinator() ? assignableUsers() : [activeUser()].filter(Boolean);
         const assignableOptions = taskPeople.map((user) => ({ value: user.id, label: `${user.name} - ${user.role === "Coordinador" ? "Coordinador" : user.zone}` }));
-        fillSelect(els.taskOwner, assignableOptions, els.taskOwner.value);
         fillSelect(els.taskTrainerFilter, [{ value: "all", label: "Todo el equipo y coordinador" }, ...assignableOptions], els.taskTrainerFilter.value || "all");
         fillSelect(els.announcementTarget, trainerOptions, els.announcementTarget.value);
         fillSelect(
@@ -4105,11 +4397,10 @@
           )
           .map((task) => ({ value: task.id, label: `${task.title} (${formatDate(task.dueDate)} | ${taskTimeLabel(task)})` }));
         fillSelect(els.evidenceTask, availableTasks, els.evidenceTask.value);
-        els.taskDueDate.min = todayIso;
+        els.taskDueDate.removeAttribute("min");
         els.taskDueDate.value = els.taskDueDate.value || nearestWorkingDay(todayIso);
-        if (!isCoordinator()) els.taskOwner.value = state.activeUserId;
-        if (!els.taskDuration.value) els.taskDuration.value = "60";
-        renderTaskAvailability(els.taskAvailableSlot.value);
+        renderTaskAvailability(els.taskStartTime.value, els.taskEndTime.value);
+        renderEvidenceTrainingTopic();
       }
 
       function relevantTasks() {
@@ -4135,7 +4426,11 @@
 
       function availableTrainersForTask(task) {
         return trainers()
-          .filter((trainer) => trainer.id !== task.ownerId)
+          .filter(
+            (trainer) =>
+              trainer.id !== task.ownerId &&
+              personAvailableForInterval(trainer.id, task.dueDate, task.startTime, task.endTime, task.id)
+          )
           .map((trainer) => ({
             ...trainer,
             workload: trainerWorkloadOnDate(trainer.id, task.dueDate, task.id)
@@ -4162,6 +4457,7 @@
         els.reassignTaskLabel.textContent = `${task.title} | ${formatDate(task.dueDate)} | ${taskTimeLabel(task)}`;
         fillSelect(els.reassignOwner, options, options[0].value);
         els.reassignReason.value = task.blockedReason || "";
+        els.reassignConfirm.checked = false;
         setMessage(els.reassignMessage, "", "");
         els.reassignDialog.showModal();
       }
@@ -4169,6 +4465,10 @@
       function reassignTask(taskId, newOwnerId, reason) {
         const task = state.tasks.find((item) => item.id === taskId);
         const nextOwner = state.users.find((user) => user.id === newOwnerId && user.role === "Trainer" && user.status === "Activo");
+        if (!els.reassignConfirm.checked) {
+          setMessage(els.reassignMessage, "Confirma la reasignacion antes de guardarla.", "err");
+          return false;
+        }
         if (!canReassignTask(task) || !nextOwner || !clean(reason)) return false;
         const scheduleError = validateTaskSchedule(task.dueDate, task.startTime, task.endTime, newOwnerId);
         if (scheduleError) {
@@ -4208,6 +4508,65 @@
         container.appendChild(button);
       }
 
+      function canRenameTask(task) {
+        return Boolean(task && (isCoordinator() || task.ownerId === state.activeUserId));
+      }
+
+      function openRenameTaskDialog(taskId) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        if (!canRenameTask(task)) return;
+        els.renameTaskForm.dataset.taskId = task.id;
+        els.renameTaskLabel.textContent = `${userName(task.ownerId)} | ${formatDate(task.dueDate)} | ${taskTimeLabel(task)}`;
+        els.renameTaskTitle.value = task.title;
+        els.renameTaskReason.value = "";
+        setMessage(els.renameTaskMessage, "", "");
+        els.renameTaskDialog.showModal();
+      }
+
+      function renameTask(taskId, nextTitle, reason) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        const title = clean(nextTitle).slice(0, 140);
+        const cleanReason = clean(reason);
+        if (!canRenameTask(task) || !title || title === task.title || !cleanReason) {
+          setMessage(els.renameTaskMessage, "Escribe un nombre diferente y el motivo de la correccion.", "err");
+          return false;
+        }
+        const previousTitle = task.title;
+        task.history = task.history || [];
+        task.history.push({
+          type: "CorreccionNombre",
+          fromTitle: previousTitle,
+          toTitle: title,
+          reason: cleanReason,
+          byId: state.activeUserId,
+          at: Date.now()
+        });
+        task.title = title;
+        saveState();
+        render();
+        return true;
+      }
+
+      function renderRenameControl(container, task) {
+        if (!canRenameTask(task)) return;
+        const button = document.createElement("button");
+        button.className = "small";
+        button.type = "button";
+        button.textContent = "Corregir nombre";
+        button.addEventListener("click", () => openRenameTaskDialog(task.id));
+        container.appendChild(button);
+      }
+
+      function renderHistoryControl(container, task) {
+        if (!isCoordinator()) return;
+        const button = document.createElement("button");
+        button.className = "small";
+        button.type = "button";
+        button.textContent = "Historial";
+        button.addEventListener("click", () => openTaskHistoryDialog(task.id));
+        container.appendChild(button);
+      }
+
       function canRescheduleTask(task) {
         return Boolean(task && task.status !== "Cumplida" && (isCoordinator() || task.ownerId === state.activeUserId));
       }
@@ -4217,13 +4576,9 @@
         if (!canRescheduleTask(task)) return;
         els.scheduleForm.dataset.taskId = task.id;
         els.scheduleTaskLabel.textContent = `${task.title} | Horario actual: ${formatDate(task.dueDate)} ${taskTimeLabel(task)}`;
-        els.scheduleDate.min = todayIso;
-        els.scheduleDate.value = task.dueDate >= todayIso ? task.dueDate : nearestWorkingDay(todayIso);
-        els.scheduleStartTime.value = task.startTime || WORKDAY_START;
-        els.scheduleEndTime.value = task.endTime || "09:30";
-        const taskDuration = durationMinutes(task.startTime || WORKDAY_START, task.endTime || "09:30");
-        ensureDurationOptions(els.scheduleDuration, taskDuration);
-        renderScheduleAvailability(task.dueDate >= todayIso ? slotValue(task.startTime || WORKDAY_START, task.endTime || "09:30") : "");
+        els.scheduleDate.removeAttribute("min");
+        els.scheduleDate.value = task.dueDate;
+        renderScheduleAvailability(task.startTime || WORKDAY_START, task.endTime || "09:30");
         els.scheduleReason.value = "";
         setMessage(els.scheduleMessage, "", "");
         els.scheduleDialog.showModal();
@@ -4356,9 +4711,14 @@
 
       function focusTaskFormForDate(dateValue, ownerId = state.activeUserId) {
         els.taskDueDate.value = dateValue;
-        if (ownerId) els.taskOwner.value = ownerId;
+        const person = state.users.find((user) => user.id === (ownerId || state.activeUserId)) || activeUser();
+        const personStarts = person ? availableStartTimes([person], dateValue) : [];
+        const suggestedStart = personStarts[0]?.value || workScheduleForDate(dateValue, person?.id).start;
+        const personEnds = person ? availableEndTimes([person], dateValue, suggestedStart) : [];
+        const suggestedEnd = preferredTime(personEnds, minutesToTime(timeToMinutes(suggestedStart) + 30));
+        renderTaskAvailability(suggestedStart, suggestedEnd);
+        if (ownerId && Array.from(els.taskOwner.options).some((option) => option.value === ownerId)) els.taskOwner.value = ownerId;
         if (!isCoordinator()) els.taskOwner.value = state.activeUserId;
-        renderTaskAvailability();
         els.taskTitle.focus();
         setMessage(
           els.taskMessage,
@@ -4373,17 +4733,17 @@
       function scheduleAxisMarkup(dateValue) {
         const start = timeToMinutes(WORKDAY_START);
         return Array.from({ length: scheduleSlotsForDate(dateValue) }, (_, index) => {
-          const total = start + index * 30;
+          const total = start + index * 15;
           const label = `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
-          return `<span>${index % 2 === 0 ? label : ""}</span>`;
+          return `<span>${index % 4 === 0 ? label : ""}</span>`;
         }).join("");
       }
 
       function scheduleBreakMarkup(dateValue, userId = state.activeUserId) {
         const schedule = workScheduleForDate(dateValue, userId);
         if (!schedule.hasBreak) return "";
-        const startColumn = Math.floor((timeToMinutes(schedule.breakStart) - timeToMinutes(schedule.start)) / 30) + 1;
-        const span = Math.ceil((timeToMinutes(schedule.breakEnd) - timeToMinutes(schedule.breakStart)) / 30);
+        const startColumn = Math.floor((timeToMinutes(schedule.breakStart) - timeToMinutes(WORKDAY_START)) / 15) + 1;
+        const span = Math.ceil((timeToMinutes(schedule.breakEnd) - timeToMinutes(schedule.breakStart)) / 15);
         return `<span class="schedule-break" style="grid-column: ${startColumn} / span ${span}">BREAK<br>${schedule.breakStart}-${schedule.breakEnd}</span>`;
       }
 
@@ -4436,19 +4796,14 @@
             tasks.forEach((task) => {
               const start = Math.max(timeToMinutes(personSchedule.start), timeToMinutes(task.startTime || personSchedule.start));
               const end = Math.min(timeToMinutes(personSchedule.end), timeToMinutes(task.endTime || "09:30"));
-              const startColumn = Math.max(1, Math.floor((start - timeToMinutes(WORKDAY_START)) / 30) + 1);
-              const span = Math.max(1, Math.ceil((end - start) / 30));
+              const startColumn = Math.max(1, Math.floor((start - timeToMinutes(WORKDAY_START)) / 15) + 1);
+              const span = Math.max(1, Math.ceil((end - start) / 15));
               const block = document.createElement("button");
               block.className = `schedule-task ${taskStatusClass(task.status)}`;
               block.type = "button";
               block.style.gridColumn = `${startColumn} / span ${Math.min(span, scheduleSlots + 1 - startColumn)}`;
               block.innerHTML = `<strong>${escapeHtml(task.title)}</strong><span>${escapeHtml(taskTimeLabel(task))} | ${escapeHtml(taskStatusLabel(task.status))}</span>`;
-              block.addEventListener("click", () => {
-                els.taskStatusFilter.value = "all";
-                els.taskTrainerFilter.value = task.ownerId;
-                renderTasks();
-                els.taskList.scrollIntoView({ behavior: "smooth", block: "start" });
-              });
+              attachTaskPreview(block, task);
               track.appendChild(block);
             });
           }
@@ -4460,7 +4815,20 @@
         activateView("evidenceView", { updateUrl: true, historyMode: "push", scroll: true });
         render();
         els.evidenceTask.value = task.id;
+        renderEvidenceTrainingTopic();
         els.evidenceStore.focus();
+      }
+
+      function selectedEvidenceTask() {
+        return state.tasks.find((task) => task.id === els.evidenceTask.value);
+      }
+
+      function renderEvidenceTrainingTopic() {
+        const task = selectedEvidenceTask();
+        const isTraining = clean(task?.category).toLowerCase() === "entrenamiento";
+        els.evidenceTrainingTopicWrap.classList.toggle("hidden", !isTraining);
+        els.evidenceTrainingTopic.required = isTraining;
+        if (!isTraining) els.evidenceTrainingTopic.value = "";
       }
 
       function renderTrainerTaskActions(container, task) {
@@ -4470,6 +4838,7 @@
           check.setAttribute("aria-label", "Tarea aprobada");
           check.innerHTML = "&#10003;";
           container.appendChild(check);
+          renderRenameControl(container, task);
           return;
         }
         if (task.status === "En revision") {
@@ -4477,6 +4846,7 @@
           note.className = "workflow-status";
           note.textContent = "Sustento enviado | pendiente de aprobacion de Pablo";
           container.appendChild(note);
+          renderRenameControl(container, task);
           return;
         }
         if (task.status === "Pendiente") {
@@ -4485,6 +4855,8 @@
           startButton.type = "button";
           startButton.textContent = "Iniciar";
           startButton.addEventListener("click", () => {
+            task.history = task.history || [];
+            task.history.push({ type: "Inicio", byId: state.activeUserId, at: Date.now() });
             task.status = "En proceso";
             saveState();
             render();
@@ -4501,6 +4873,7 @@
         renderScheduleControl(container, task);
         renderReassignControl(container, task);
         renderReminderControl(container, task);
+        renderRenameControl(container, task);
       }
 
       function renderTrainerWeek() {
@@ -4735,6 +5108,8 @@
             renderScheduleControl(actions, task);
             renderReassignControl(actions, task);
             renderReminderControl(actions, task);
+            renderRenameControl(actions, task);
+            renderHistoryControl(actions, task);
             const deleteButton = document.createElement("button");
             deleteButton.className = "danger";
             deleteButton.type = "button";
@@ -4839,6 +5214,7 @@
               <span>${formatDateTime(entry.submittedAt)}</span>
             </div>
             ${entry.product ? `<p><strong>Producto:</strong> ${escapeHtml(entry.product)}</p>` : ""}
+            ${entry.trainingTopic ? `<p><strong>Tema de la capacitacion:</strong> ${escapeHtml(entry.trainingTopic)}</p>` : ""}
             ${entry.notes ? `<p>${escapeHtml(entry.notes)}</p>` : ""}
             <div class="cloud-path">${escapeHtml(cloudFolderForEvidence(entry, entry.task))}</div>
             ${files.length ? `<div class="evidence-cloud-badge">${files.length} archivo${files.length === 1 ? "" : "s"} protegido${files.length === 1 ? "" : "s"} en la nube LGTASK</div>` : ""}
@@ -5452,19 +5828,18 @@
 
         els.taskDueDate.addEventListener("change", () => {
           if (!els.taskDueDate.value) return;
-          renderTaskAvailability();
+          renderTaskAvailability(els.taskStartTime.value, els.taskEndTime.value);
           setMessage(els.taskMessage, "", "");
         });
         els.taskOwner.addEventListener("change", () => {
-          renderTaskAvailability();
           setMessage(els.taskMessage, "", "");
         });
-        els.taskDuration.addEventListener("change", () => {
-          renderTaskAvailability();
+        els.taskStartTime.addEventListener("change", () => {
+          renderTaskAvailability(els.taskStartTime.value, "");
           setMessage(els.taskMessage, "", "");
         });
-        els.taskAvailableSlot.addEventListener("change", () => {
-          setScheduleInputs(els.taskAvailableSlot, els.taskStartTime, els.taskEndTime);
+        els.taskEndTime.addEventListener("change", () => {
+          renderTaskAvailability(els.taskStartTime.value, els.taskEndTime.value);
           setMessage(els.taskMessage, "", "");
         });
 
@@ -5472,22 +5847,54 @@
 
         els.reassignForm.addEventListener("submit", (event) => {
           event.preventDefault();
+          const task = state.tasks.find((item) => item.id === els.reassignForm.dataset.taskId);
+          const nextOwner = state.users.find((user) => user.id === els.reassignOwner.value);
+          if (!window.confirm(`Confirmar reasignacion de "${task?.title || "esta tarea"}" a ${nextOwner?.name || "el trainer seleccionado"}?`)) return;
           const success = reassignTask(els.reassignForm.dataset.taskId, els.reassignOwner.value, els.reassignReason.value);
           if (success) els.reassignDialog.close();
         });
 
+        els.cancelRenameTask.addEventListener("click", () => els.renameTaskDialog.close());
+        els.renameTaskForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const success = renameTask(
+            els.renameTaskForm.dataset.taskId,
+            els.renameTaskTitle.value,
+            els.renameTaskReason.value
+          );
+          if (success) els.renameTaskDialog.close();
+        });
+        els.closeTaskPreview.addEventListener("click", () => els.taskPreviewDialog.close());
+        els.closeTaskHistory.addEventListener("click", () => els.taskHistoryDialog.close());
+        els.taskPreviewTracking.addEventListener("click", () => {
+          const task = state.tasks.find((item) => item.id === previewedTaskId);
+          if (!task) return;
+          els.taskPreviewDialog.close();
+          els.taskStatusFilter.value = "all";
+          if (isCoordinator()) els.taskTrainerFilter.value = task.ownerId;
+          renderTasks();
+          els.taskList.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+        els.taskPreviewHistory.addEventListener("click", () => {
+          const taskId = previewedTaskId;
+          els.taskPreviewDialog.close();
+          openTaskHistoryDialog(taskId);
+        });
+        window.addEventListener("scroll", hideTaskPreviewPopover, { passive: true });
+        window.addEventListener("resize", hideTaskPreviewPopover);
+
         els.cancelSchedule.addEventListener("click", () => els.scheduleDialog.close());
         els.scheduleDate.addEventListener("change", () => {
           if (!els.scheduleDate.value) return;
-          renderScheduleAvailability();
+          renderScheduleAvailability(els.scheduleStartTime.value, els.scheduleEndTime.value);
           setMessage(els.scheduleMessage, "", "");
         });
-        els.scheduleDuration.addEventListener("change", () => {
-          renderScheduleAvailability();
+        els.scheduleStartTime.addEventListener("change", () => {
+          renderScheduleAvailability(els.scheduleStartTime.value, "");
           setMessage(els.scheduleMessage, "", "");
         });
-        els.scheduleAvailableSlot.addEventListener("change", () => {
-          setScheduleInputs(els.scheduleAvailableSlot, els.scheduleStartTime, els.scheduleEndTime);
+        els.scheduleEndTime.addEventListener("change", () => {
+          renderScheduleAvailability(els.scheduleStartTime.value, els.scheduleEndTime.value);
           setMessage(els.scheduleMessage, "", "");
         });
 
@@ -5627,7 +6034,6 @@
           saveState();
           els.taskForm.reset();
           els.taskDueDate.value = nearestWorkingDay(todayIso);
-          els.taskDuration.value = "60";
           setMessage(els.taskMessage, isCoordinator() ? "Tarea asignada correctamente." : "Tu tarea se agrego a la semana.", "ok");
           render();
         });
@@ -5685,6 +6091,13 @@
           els.evidenceFiles.setCustomValidity("Debes adjuntar al menos una foto o archivo de sustento.");
           setMessage(els.evidenceMessage, "Debes adjuntar al menos una foto o archivo antes de enviar el sustento.", "err");
         });
+        els.evidenceTask.addEventListener("change", () => {
+          renderEvidenceTrainingTopic();
+          setMessage(els.evidenceMessage, "", "");
+        });
+        els.evidenceTrainingTopic.addEventListener("input", () => {
+          els.evidenceTrainingTopic.setCustomValidity("");
+        });
 
         els.evidenceForm.addEventListener("submit", async (event) => {
           event.preventDefault();
@@ -5695,6 +6108,14 @@
             return;
           }
           const notes = clean(els.evidenceNotes.value);
+          const trainingTopic = clean(els.evidenceTrainingTopic.value);
+          if (clean(task.category).toLowerCase() === "entrenamiento" && !trainingTopic) {
+            els.evidenceTrainingTopic.setCustomValidity("Indica el tema de la capacitacion.");
+            els.evidenceTrainingTopic.reportValidity();
+            setMessage(els.evidenceMessage, "El tema de la capacitacion es obligatorio para esta tarea.", "err");
+            return;
+          }
+          els.evidenceTrainingTopic.setCustomValidity("");
           const selectedFiles = Array.from(els.evidenceFiles.files || []);
           if (!selectedFiles.length) {
             els.evidenceFiles.setCustomValidity("Debes adjuntar al menos una foto o archivo de sustento.");
@@ -5753,6 +6174,7 @@
               clean(els.evidenceStore.value) ||
               (["PDP", "PDV"].includes(clean(task.category).toUpperCase()) ? "No especificada" : "No aplica"),
             product: clean(els.evidenceProduct.value),
+            trainingTopic,
             result: "Realizado",
             notes,
             files: uploadedFiles,
@@ -5773,6 +6195,7 @@
           }
           els.evidenceForm.reset();
           els.evidenceResult.value = "Realizado";
+          renderEvidenceTrainingTopic();
           els.evidenceSubmitButton.disabled = false;
           els.evidenceSubmitButton.textContent = "Enviar sustento";
           const successMessage = `Sustento guardado con ${uploadedFiles.length} archivo${uploadedFiles.length === 1 ? "" : "s"}. Pablo debe aprobarlo para completar la tarea.`;
