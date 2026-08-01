@@ -3,7 +3,7 @@ const SESSION_DAYS = 14;
 const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb9775180ea780b71";
 
 const EMPTY_DATA = {
-  version: 10,
+  version: 11,
   workSettings: {
     breakStart: "12:30",
     breakEnd: "14:00"
@@ -415,8 +415,10 @@ function isoWeekNumber(dateValue) {
   return Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
 }
 
-function isCurrentOrFutureDate(dateValue) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(String(dateValue || "")) && dateValue >= dateIsoInLima(Date.now());
+function historyIsAppendOnly(previousHistory, nextHistory) {
+  const previous = Array.isArray(previousHistory) ? previousHistory : [];
+  const next = Array.isArray(nextHistory) ? nextHistory : [];
+  return next.length >= previous.length && previous.every((entry, index) => JSON.stringify(entry) === JSON.stringify(next[index]));
 }
 
 async function uploadEvidence(request, db, user) {
@@ -604,6 +606,10 @@ async function submitTaskEvidence(request, db, user, context) {
     clean(submittedEvidence.store).slice(0, 180) ||
     (["PDP", "PDV"].includes(category) ? "No especificada" : "No aplica");
   const product = clean(submittedEvidence.product).slice(0, 180);
+  const trainingTopic = clean(submittedEvidence.trainingTopic).slice(0, 300);
+  if (normalizeTaskCategory(task.category) === "Entrenamiento" && !trainingTopic) {
+    return json({ ok: false, message: "Completa el tema de la capacitacion." }, 400);
+  }
 
   const submittedFiles = Array.isArray(submittedEvidence.files) ? submittedEvidence.files.slice(0, 8) : [];
   if (!submittedFiles.length) {
@@ -640,6 +646,7 @@ async function submitTaskEvidence(request, db, user, context) {
     submittedAt,
     store,
     product,
+    trainingTopic: normalizeTaskCategory(task.category) === "Entrenamiento" ? trainingTopic : "",
     result,
     notes,
     files,
@@ -652,7 +659,8 @@ async function submitTaskEvidence(request, db, user, context) {
   task.blockedReason = "";
   task.blockedAt = 0;
   task.history.push({
-    type: "Sustento enviado",
+    type: "Sustento",
+    byId: user.id,
     fromId: user.id,
     reason: `${files.length} archivo${files.length === 1 ? "" : "s"} enviado${files.length === 1 ? "" : "s"}`,
     at: submittedAt
@@ -826,6 +834,7 @@ async function putState(request, db, user, context) {
   const notifications = [];
   const activeUserRows = await db.prepare("SELECT id, name, role FROM users WHERE status = 'Activo'").all();
   const activeUsers = activeUserRows.results || [];
+  const activeUserIds = new Set(activeUsers.map((row) => clean(row.id)));
   const userNamesById = new Map(activeUsers.map((row) => [row.id, row.name]));
   const personalBreak = submitted.breakSettingsByUser?.[user.id];
   if (validWorkSettings(personalBreak)) {
@@ -867,6 +876,53 @@ async function putState(request, db, user, context) {
             category: normalizeTaskCategory(task.category)
           };
           const previous = previousTasks.get(clean(normalizedTask.id));
+          if (!previous && (!activeUserIds.has(clean(normalizedTask.ownerId)) || clean(normalizedTask.title).length < 2)) return null;
+          const previousHistory = Array.isArray(previous?.history) ? previous.history : [];
+          const submittedHistory = Array.isArray(normalizedTask.history) ? normalizedTask.history : previousHistory;
+          const appendOnlyHistory = historyIsAppendOnly(previousHistory, submittedHistory);
+          const lastHistory = submittedHistory.at(-1);
+          if (previous) {
+            const ownerChanged = clean(previous.ownerId) !== clean(normalizedTask.ownerId);
+            const scheduleChanged =
+              previous.dueDate !== normalizedTask.dueDate ||
+              previous.startTime !== normalizedTask.startTime ||
+              previous.endTime !== normalizedTask.endTime;
+            const titleChanged = clean(previous.title) !== clean(normalizedTask.title);
+            const validReassignmentAudit =
+              !ownerChanged ||
+              (appendOnlyHistory &&
+                lastHistory?.type === "Reasignacion" &&
+                clean(lastHistory.fromId) === clean(previous.ownerId) &&
+                clean(lastHistory.toId) === clean(normalizedTask.ownerId) &&
+                clean(lastHistory.byId) === user.id &&
+                Boolean(clean(lastHistory.reason)));
+            const validScheduleAudit =
+              !scheduleChanged ||
+              (appendOnlyHistory &&
+                lastHistory?.type === "Reprogramacion" &&
+                clean(lastHistory.byId) === user.id &&
+                clean(lastHistory.fromDate) === clean(previous.dueDate) &&
+                clean(lastHistory.toDate) === clean(normalizedTask.dueDate) &&
+                clean(lastHistory.fromStartTime) === clean(previous.startTime || WORKDAY_START) &&
+                clean(lastHistory.fromEndTime) === clean(previous.endTime || "09:30") &&
+                clean(lastHistory.toStartTime) === clean(normalizedTask.startTime) &&
+                clean(lastHistory.toEndTime) === clean(normalizedTask.endTime) &&
+                Boolean(clean(lastHistory.reason)));
+            const validTitleAudit =
+              !titleChanged ||
+              (appendOnlyHistory &&
+                !ownerChanged &&
+                !scheduleChanged &&
+                clean(normalizedTask.title).length >= 2 &&
+                lastHistory?.type === "CorreccionNombre" &&
+                clean(lastHistory.byId) === user.id &&
+                clean(lastHistory.fromTitle) === clean(previous.title) &&
+                clean(lastHistory.toTitle) === clean(normalizedTask.title) &&
+                Boolean(clean(lastHistory.reason)));
+            if (!appendOnlyHistory || !validReassignmentAudit || !validScheduleAudit || !validTitleAudit) return previous;
+            normalizedTask.title = titleChanged ? clean(normalizedTask.title).slice(0, 140) : previous.title;
+            normalizedTask.history = submittedHistory;
+          }
           const ownerOrScheduleChanged =
             !previous ||
             clean(previous.ownerId) !== clean(normalizedTask.ownerId) ||
@@ -876,7 +932,6 @@ async function putState(request, db, user, context) {
           if (
             ownerOrScheduleChanged &&
             (
-              !isCurrentOrFutureDate(clean(normalizedTask.dueDate)) ||
               !validWorkSchedule(
                 clean(normalizedTask.dueDate),
                 clean(normalizedTask.startTime),
@@ -933,15 +988,16 @@ async function putState(request, db, user, context) {
       const requestedOwnerId = clean(next.ownerId);
       const ownerChanged = requestedOwnerId && requestedOwnerId !== task.ownerId && activeTrainerIds.has(requestedOwnerId);
       const nextHistory = Array.isArray(next.history) ? next.history : task.history;
+      const appendOnlyHistory = historyIsAppendOnly(task.history, nextHistory);
       const lastHistory = nextHistory?.at(-1);
       const validReassignment =
         ownerChanged &&
+        appendOnlyHistory &&
         lastHistory?.type === "Reasignacion" &&
         lastHistory.fromId === user.id &&
         lastHistory.toId === requestedOwnerId &&
         lastHistory.byId === user.id &&
         clean(lastHistory.reason) &&
-        isCurrentOrFutureDate(clean(task.dueDate)) &&
         validWorkSchedule(
           clean(task.dueDate),
           clean(task.startTime),
@@ -967,6 +1023,7 @@ async function putState(request, db, user, context) {
       const validReschedule =
         !ownerChanged &&
         scheduleChanged &&
+        appendOnlyHistory &&
         task.status !== "Cumplida" &&
         lastHistory?.type === "Reprogramacion" &&
         lastHistory.byId === user.id &&
@@ -977,7 +1034,6 @@ async function putState(request, db, user, context) {
         lastHistory.toStartTime === requestedStart &&
         lastHistory.toEndTime === requestedEnd &&
         clean(lastHistory.reason) &&
-        isCurrentOrFutureDate(requestedDate) &&
         validWorkSchedule(requestedDate, requestedStart, requestedEnd, breakSettingsForUser(current, user.id, requestedDate), user.name) &&
         !hasTaskConflict(current.tasks, user.id, requestedDate, requestedStart, requestedEnd, task.id);
       if (validReassignment) {
@@ -990,9 +1046,34 @@ async function putState(request, db, user, context) {
         });
       }
       const requestedStatus = clean(next.status);
-      const validStart = task.status === "Pendiente" && requestedStatus === "En proceso";
+      const requestedTitle = clean(next.title).slice(0, 140);
+      const titleChanged = requestedTitle && requestedTitle !== clean(task.title);
+      const validRename =
+        !ownerChanged &&
+        !scheduleChanged &&
+        titleChanged &&
+        appendOnlyHistory &&
+        lastHistory?.type === "CorreccionNombre" &&
+        clean(lastHistory.byId) === user.id &&
+        clean(lastHistory.fromTitle) === clean(task.title) &&
+        clean(lastHistory.toTitle) === requestedTitle &&
+        Boolean(clean(lastHistory.reason));
+      const validStart =
+        task.status === "Pendiente" &&
+        requestedStatus === "En proceso" &&
+        appendOnlyHistory &&
+        lastHistory?.type === "Inicio" &&
+        clean(lastHistory.byId) === user.id;
+      const remindersChanged = JSON.stringify(next.reminders || []) !== JSON.stringify(task.reminders || []);
+      const validReminderUpdate =
+        remindersChanged &&
+        appendOnlyHistory &&
+        lastHistory?.type === "Recordatorio" &&
+        clean(lastHistory.byId) === user.id &&
+        validReminderList(next.reminders, user.id, task.ownerId);
       return {
         ...task,
+        title: validRename ? requestedTitle : task.title,
         ownerId: validReassignment ? requestedOwnerId : task.ownerId,
         dueDate: validReschedule ? requestedDate : task.dueDate,
         startTime: validReschedule ? requestedStart : task.startTime,
@@ -1005,7 +1086,7 @@ async function putState(request, db, user, context) {
             ? next.reminders
             : task.reminders || [],
         history:
-          validReassignment || validReschedule
+          validReassignment || validReschedule || validRename || validStart || validReminderUpdate
             ? nextHistory
             : task.history,
         blockedReason: validReassignment ? "" : task.blockedReason,
@@ -1024,7 +1105,6 @@ async function putState(request, db, user, context) {
         task.ownerId !== user.id ||
         task.createdById !== user.id ||
         clean(task.title).length < 2 ||
-        !isCurrentOrFutureDate(dueDate) ||
         !validWorkSchedule(dueDate, startTime, endTime, breakSettingsForUser(current, user.id, dueDate), user.name) ||
         hasTaskConflict(current.tasks, user.id, dueDate, startTime, endTime)
       ) {
@@ -1396,7 +1476,7 @@ async function loadData(db) {
 
 async function saveData(db, data) {
   const payload = {
-    version: 10,
+    version: 11,
     workSettings: normalizeWorkSettings(data.workSettings),
     breakSettingsByUser: normalizeBreakSettingsByUser(data.breakSettingsByUser),
     breakSettingsByUserDate: normalizeBreakSettingsByUserDate(data.breakSettingsByUserDate),
