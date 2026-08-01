@@ -3,12 +3,13 @@ const SESSION_DAYS = 14;
 const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb9775180ea780b71";
 
 const EMPTY_DATA = {
-  version: 9,
+  version: 10,
   workSettings: {
     breakStart: "12:30",
     breakEnd: "14:00"
   },
   breakSettingsByUser: {},
+  breakSettingsByUserDate: {},
   registrationRequests: [],
   passwordRecoveryRequests: [],
   tasks: [],
@@ -342,6 +343,7 @@ async function unsubscribeNotifications(request, db, user) {
 }
 
 async function pendingNotifications(db, user) {
+  await queueWeeklyPlanningReminder(db, user);
   const rows = await db
     .prepare(
       `SELECT id, title, body, target_url, created_at
@@ -365,6 +367,56 @@ async function pendingNotifications(db, user) {
     );
   }
   return json({ ok: true, notifications });
+}
+
+async function queueWeeklyPlanningReminder(db, user) {
+  const today = dateIsoInLima(Date.now());
+  const day = new Date(`${today}T12:00:00Z`).getUTCDay();
+  if (day !== 5 && day !== 6) return;
+  const currentMonday = addDaysIso(today, -(day - 1));
+  const nextMonday = addDaysIso(currentMonday, 7);
+  await queueNotifications(db, [
+    {
+      userId: user.id,
+      title: `Prepara la Week ${isoWeekNumber(nextMonday)}`,
+      body: "Completa el cronograma de lunes a sabado para la siguiente semana.",
+      url: "/?view=tasksView",
+      sourceKey: `weekly-planning:${clean(user.id)}:${nextMonday}`
+    }
+  ]);
+}
+
+function dateIsoInLima(value) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en", {
+      timeZone: "America/Lima",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    })
+      .formatToParts(new Date(value))
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  );
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function addDaysIso(dateValue, days) {
+  const date = new Date(`${dateValue}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function isoWeekNumber(dateValue) {
+  const date = new Date(`${dateValue}T12:00:00Z`);
+  const day = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
+}
+
+function isCurrentOrFutureDate(dateValue) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(dateValue || "")) && dateValue >= dateIsoInLima(Date.now());
 }
 
 async function uploadEvidence(request, db, user) {
@@ -782,6 +834,23 @@ async function putState(request, db, user, context) {
       [user.id]: normalizeWorkSettings(personalBreak)
     };
   }
+  const personalBreakDates = submitted.breakSettingsByUserDate?.[user.id];
+  if (personalBreakDates && typeof personalBreakDates === "object" && !Array.isArray(personalBreakDates)) {
+    const normalizedDates = normalizeBreakSettingsByUserDate({ [user.id]: personalBreakDates });
+    const conflictFreeDates = Object.fromEntries(
+      Object.entries(normalizedDates[user.id] || {}).filter(
+        ([dateValue, settings]) =>
+          !hasTaskConflict(current.tasks, user.id, dateValue, settings.breakStart, settings.breakEnd)
+      )
+    );
+    current.breakSettingsByUserDate = {
+      ...(current.breakSettingsByUserDate || {}),
+      [user.id]: {
+        ...(current.breakSettingsByUserDate?.[user.id] || {}),
+        ...conflictFreeDates
+      }
+    };
+  }
 
   if (user.role === "Coordinador") {
     for (const key of ["registrationRequests", "passwordRecoveryRequests", "announcements", "supportRequests", "dailyMotivations"]) {
@@ -806,12 +875,23 @@ async function putState(request, db, user, context) {
             previous.endTime !== normalizedTask.endTime;
           if (
             ownerOrScheduleChanged &&
-            !validWorkSchedule(
-              clean(normalizedTask.dueDate),
-              clean(normalizedTask.startTime),
-              clean(normalizedTask.endTime),
-              breakSettingsForUser(current, normalizedTask.ownerId),
-              userNamesById.get(clean(normalizedTask.ownerId))
+            (
+              !isCurrentOrFutureDate(clean(normalizedTask.dueDate)) ||
+              !validWorkSchedule(
+                clean(normalizedTask.dueDate),
+                clean(normalizedTask.startTime),
+                clean(normalizedTask.endTime),
+                breakSettingsForUser(current, normalizedTask.ownerId, clean(normalizedTask.dueDate)),
+                userNamesById.get(clean(normalizedTask.ownerId))
+              ) ||
+              hasTaskConflict(
+                current.tasks,
+                clean(normalizedTask.ownerId),
+                clean(normalizedTask.dueDate),
+                clean(normalizedTask.startTime),
+                clean(normalizedTask.endTime),
+                clean(normalizedTask.id)
+              )
             )
           ) {
             return previous || null;
@@ -861,11 +941,12 @@ async function putState(request, db, user, context) {
         lastHistory.toId === requestedOwnerId &&
         lastHistory.byId === user.id &&
         clean(lastHistory.reason) &&
+        isCurrentOrFutureDate(clean(task.dueDate)) &&
         validWorkSchedule(
           clean(task.dueDate),
           clean(task.startTime),
           clean(task.endTime),
-          breakSettingsForUser(current, requestedOwnerId),
+          breakSettingsForUser(current, requestedOwnerId, clean(task.dueDate)),
           userNamesById.get(requestedOwnerId)
         ) &&
         !hasTaskConflict(
@@ -896,7 +977,8 @@ async function putState(request, db, user, context) {
         lastHistory.toStartTime === requestedStart &&
         lastHistory.toEndTime === requestedEnd &&
         clean(lastHistory.reason) &&
-        validWorkSchedule(requestedDate, requestedStart, requestedEnd, breakSettingsForUser(current, user.id), user.name) &&
+        isCurrentOrFutureDate(requestedDate) &&
+        validWorkSchedule(requestedDate, requestedStart, requestedEnd, breakSettingsForUser(current, user.id, requestedDate), user.name) &&
         !hasTaskConflict(current.tasks, user.id, requestedDate, requestedStart, requestedEnd, task.id);
       if (validReassignment) {
         notifications.push({
@@ -942,7 +1024,8 @@ async function putState(request, db, user, context) {
         task.ownerId !== user.id ||
         task.createdById !== user.id ||
         clean(task.title).length < 2 ||
-        !validWorkSchedule(dueDate, startTime, endTime, breakSettingsForUser(current, user.id), user.name) ||
+        !isCurrentOrFutureDate(dueDate) ||
+        !validWorkSchedule(dueDate, startTime, endTime, breakSettingsForUser(current, user.id, dueDate), user.name) ||
         hasTaskConflict(current.tasks, user.id, dueDate, startTime, endTime)
       ) {
         continue;
@@ -1225,7 +1308,25 @@ function normalizeBreakSettingsByUser(settingsByUser) {
   );
 }
 
-function breakSettingsForUser(data, userId) {
+function normalizeBreakSettingsByUserDate(settingsByUserDate) {
+  if (!settingsByUserDate || typeof settingsByUserDate !== "object" || Array.isArray(settingsByUserDate)) return {};
+  return Object.fromEntries(
+    Object.entries(settingsByUserDate)
+      .filter(([userId, dates]) => clean(userId) && dates && typeof dates === "object" && !Array.isArray(dates))
+      .map(([userId, dates]) => [
+        clean(userId),
+        Object.fromEntries(
+          Object.entries(dates)
+            .filter(([dateValue, settings]) => /^\d{4}-\d{2}-\d{2}$/.test(dateValue) && validWorkSettings(settings))
+            .map(([dateValue, settings]) => [dateValue, normalizeWorkSettings(settings)])
+        )
+      ])
+  );
+}
+
+function breakSettingsForUser(data, userId, dateValue = "") {
+  const daily = dateValue ? data.breakSettingsByUserDate?.[clean(userId)]?.[dateValue] : null;
+  if (validWorkSettings(daily)) return normalizeWorkSettings(daily);
   const personal = data.breakSettingsByUser?.[clean(userId)];
   return validWorkSettings(personal) ? normalizeWorkSettings(personal) : normalizeWorkSettings(data.workSettings);
 }
@@ -1284,6 +1385,7 @@ async function loadData(db) {
       ...parsed,
       workSettings: normalizeWorkSettings(parsed.workSettings),
       breakSettingsByUser: normalizeBreakSettingsByUser(parsed.breakSettingsByUser),
+      breakSettingsByUserDate: normalizeBreakSettingsByUserDate(parsed.breakSettingsByUserDate),
       tasks: (parsed.tasks || []).map((task) => ({ ...task, category: normalizeTaskCategory(task.category) })),
       deletedTasks: (parsed.deletedTasks || []).map((task) => ({ ...task, category: normalizeTaskCategory(task.category) }))
     };
@@ -1294,9 +1396,10 @@ async function loadData(db) {
 
 async function saveData(db, data) {
   const payload = {
-    version: 9,
+    version: 10,
     workSettings: normalizeWorkSettings(data.workSettings),
     breakSettingsByUser: normalizeBreakSettingsByUser(data.breakSettingsByUser),
+    breakSettingsByUserDate: normalizeBreakSettingsByUserDate(data.breakSettingsByUserDate),
     registrationRequests: data.registrationRequests || [],
     passwordRecoveryRequests: data.passwordRecoveryRequests || [],
     tasks: data.tasks || [],
