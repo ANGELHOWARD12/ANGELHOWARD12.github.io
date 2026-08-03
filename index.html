@@ -580,7 +580,12 @@
       }
 
       .trainer-week-grid {
-        min-width: 1120px;
+        grid-template-columns: 1fr;
+        min-width: 0;
+      }
+
+      .trainer-week-scroll {
+        overflow-x: visible;
       }
 
       .daily-roster {
@@ -743,10 +748,45 @@
 
       .trainer-day-card {
         border-top: 4px solid var(--cyan);
+        min-height: 0;
+        padding: 0;
       }
 
       .trainer-day-card.today {
         border-top-color: var(--red);
+      }
+
+      .trainer-day-card > summary {
+        align-items: center;
+        cursor: pointer;
+        display: flex;
+        gap: 10px;
+        justify-content: space-between;
+        list-style: none;
+        min-height: 52px;
+        padding: 10px 12px;
+      }
+
+      .trainer-day-card > summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .trainer-day-card > summary::after {
+        color: var(--cyan);
+        content: "+";
+        font-size: 22px;
+        font-weight: 900;
+      }
+
+      .trainer-day-card[open] > summary::after {
+        content: "-";
+      }
+
+      .trainer-day-body {
+        border-top: 1px solid var(--line);
+        display: grid;
+        gap: 9px;
+        padding: 10px;
       }
 
       .trainer-task-card {
@@ -859,6 +899,93 @@
         padding: 10px;
       }
 
+      .task-day-group {
+        background: #f8fbff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .task-day-group > summary {
+        align-items: center;
+        cursor: pointer;
+        display: flex;
+        gap: 10px;
+        justify-content: space-between;
+        list-style: none;
+        min-height: 44px;
+        padding: 9px 11px;
+      }
+
+      .task-day-group > summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .task-day-group > summary::after {
+        color: var(--blue);
+        content: "+";
+        font-size: 18px;
+        font-weight: 900;
+      }
+
+      .task-day-group[open] > summary::after {
+        content: "-";
+      }
+
+      .task-day-group-body {
+        border-top: 1px solid var(--line);
+        display: grid;
+        gap: 8px;
+        padding: 8px;
+      }
+
+      .collapsible-panel {
+        display: block;
+      }
+
+      .collapsible-panel > summary {
+        align-items: center;
+        cursor: pointer;
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+        list-style: none;
+      }
+
+      .collapsible-panel > summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .collapsible-panel > summary h2,
+      .collapsible-panel > summary p {
+        margin: 0;
+      }
+
+      .collapsible-panel > summary p {
+        margin-top: 4px;
+      }
+
+      .collapsible-symbol {
+        color: var(--blue);
+        font-size: 24px;
+        font-weight: 900;
+      }
+
+      .collapsible-panel[open] .collapsible-symbol {
+        font-size: 0;
+      }
+
+      .collapsible-panel[open] .collapsible-symbol::after {
+        content: "-";
+        font-size: 24px;
+      }
+
+      .collapsible-panel-body {
+        border-top: 1px solid var(--line);
+        margin-top: 12px;
+        padding-top: 12px;
+      }
+
       .task-status-group-empty {
         color: var(--muted);
         font-size: 13px;
@@ -944,6 +1071,20 @@
       .task-preview-dialog {
         max-height: min(88vh, 860px);
         overflow: auto;
+      }
+
+      .task-preview-actions-wrap {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-left: 5px solid var(--blue);
+        border-radius: 8px;
+        box-shadow: 0 8px 18px rgba(23, 32, 51, 0.08);
+        display: grid;
+        gap: 8px;
+        padding: 10px;
+        position: sticky;
+        top: 0;
+        z-index: 3;
       }
 
       .task-preview-popover {
@@ -1683,10 +1824,10 @@
       <section class="dashboard">
         <div class="date-card">
           <span id="todayLabel" class="muted"></span>
-          <strong>Tablero diario</strong>
+          <strong id="dashboardTitle">Tablero diario</strong>
         </div>
         <div class="metric">
-          <span class="muted">Avance</span>
+          <span id="progressLabel" class="muted">Avance</span>
           <strong id="progressPercent">0%</strong>
           <div class="meter"><span id="progressBar"></span></div>
         </div>
@@ -1703,7 +1844,7 @@
           <strong id="doneCount">0</strong>
         </div>
         <div class="metric">
-          <span class="muted">Trainers</span>
+          <span id="trainerMetricLabel" class="muted">Trainers</span>
           <strong id="trainerCount">0</strong>
         </div>
       </section>
@@ -1912,13 +2053,18 @@
           </aside>
         </div>
 
-        <section id="deletedTasksPanel" class="panel stack">
-          <div>
+        <details id="deletedTasksPanel" class="panel collapsible-panel">
+          <summary>
+            <div>
             <h2>Historial de tareas eliminadas</h2>
             <p class="muted">Pablo ve todo el historial. Cada trainer ve solamente las tareas eliminadas de su agenda.</p>
+            </div>
+            <span class="collapsible-symbol" aria-hidden="true">+</span>
+          </summary>
+          <div class="collapsible-panel-body">
+            <div id="deletedTasksList" class="list"></div>
           </div>
-          <div id="deletedTasksList" class="list"></div>
-        </section>
+        </details>
       </section>
 
       <section id="evidenceView" class="view">
@@ -2265,6 +2411,10 @@
           <h2 id="taskPreviewTitle">Detalle de tarea</h2>
           <p id="taskPreviewSubtitle" class="muted"></p>
         </div>
+        <section id="taskPreviewActionsWrap" class="task-preview-actions-wrap">
+          <strong>Acciones de la tarea</strong>
+          <div id="taskPreviewActions" class="actions"></div>
+        </section>
         <div id="taskPreviewContent" class="stack"></div>
         <div class="actions">
           <button id="taskPreviewHistory" class="small" type="button">Historial completo</button>
@@ -2515,6 +2665,9 @@
       let historyTaskId = "";
       let lateEvidenceTaskId = "";
       const openTaskGroups = new Set();
+      const openTaskDays = new Set();
+      const openTrainerWeekDays = new Set();
+      const openDeletedTaskDays = new Set();
       let activeViewId = ALLOWED_VIEW_IDS.includes(new URLSearchParams(window.location.search).get("view"))
         ? new URLSearchParams(window.location.search).get("view")
         : "tasksView";
@@ -2548,11 +2701,14 @@
         logoutButton: document.querySelector("#logoutButton"),
         mainTabs: document.querySelector("#mainTabs"),
         todayLabel: document.querySelector("#todayLabel"),
+        dashboardTitle: document.querySelector("#dashboardTitle"),
+        progressLabel: document.querySelector("#progressLabel"),
         progressPercent: document.querySelector("#progressPercent"),
         progressBar: document.querySelector("#progressBar"),
         pendingCount: document.querySelector("#pendingCount"),
         reviewCount: document.querySelector("#reviewCount"),
         doneCount: document.querySelector("#doneCount"),
+        trainerMetricLabel: document.querySelector("#trainerMetricLabel"),
         trainerCount: document.querySelector("#trainerCount"),
         weeklyPlanningReminder: document.querySelector("#weeklyPlanningReminder"),
         weeklyPlanningTitle: document.querySelector("#weeklyPlanningTitle"),
@@ -2700,6 +2856,8 @@
         taskPreviewDialog: document.querySelector("#taskPreviewDialog"),
         taskPreviewTitle: document.querySelector("#taskPreviewTitle"),
         taskPreviewSubtitle: document.querySelector("#taskPreviewSubtitle"),
+        taskPreviewActionsWrap: document.querySelector("#taskPreviewActionsWrap"),
+        taskPreviewActions: document.querySelector("#taskPreviewActions"),
         taskPreviewContent: document.querySelector("#taskPreviewContent"),
         taskPreviewHistory: document.querySelector("#taskPreviewHistory"),
         closeTaskPreview: document.querySelector("#closeTaskPreview"),
@@ -3722,13 +3880,70 @@
         anchor.addEventListener("click", () => openTaskPreviewDialog(task.id));
       }
 
-      function openTaskPreviewDialog(taskId) {
-        const task = state.tasks.find((item) => item.id === taskId);
-        if (!task) return;
-        previewedTaskId = task.id;
+      function renderTaskPreviewActions(task) {
+        els.taskPreviewActions.innerHTML = "";
+        if (isCoordinator()) {
+          if (task.status === "En revision") {
+            const approveButton = document.createElement("button");
+            approveButton.type = "button";
+            approveButton.className = "primary";
+            approveButton.textContent = "Aprobar y completar";
+            approveButton.addEventListener("click", () => reviewTask(task.id, "Cumplida"));
+            const rejectButton = document.createElement("button");
+            rejectButton.type = "button";
+            rejectButton.className = "danger";
+            rejectButton.textContent = "Rechazar";
+            rejectButton.addEventListener("click", () => reviewTask(task.id, "Observada"));
+            els.taskPreviewActions.append(approveButton, rejectButton);
+          }
+          if (task.status === "Cumplida") {
+            const check = document.createElement("span");
+            check.className = "approval-check";
+            check.setAttribute("aria-label", "Tarea aprobada");
+            check.innerHTML = "&#10003;";
+            els.taskPreviewActions.appendChild(check);
+          }
+          if (task.dueDate < dateIsoInLima(Date.now()) && task.status !== "Cumplida") {
+            if (lateEvidenceAuthorizationActive(task)) {
+              const authorized = document.createElement("span");
+              authorized.className = "workflow-status";
+              authorized.textContent = "Carga tardia habilitada hoy";
+              els.taskPreviewActions.appendChild(authorized);
+            } else {
+              const authorizeButton = document.createElement("button");
+              authorizeButton.className = "small";
+              authorizeButton.type = "button";
+              authorizeButton.textContent = "Habilitar sustento tardio";
+              authorizeButton.addEventListener("click", () => openLateEvidenceDialog(task));
+              els.taskPreviewActions.appendChild(authorizeButton);
+            }
+          }
+          renderScheduleControl(els.taskPreviewActions, task);
+          renderReassignControl(els.taskPreviewActions, task);
+          renderReminderControl(els.taskPreviewActions, task);
+          renderRenameControl(els.taskPreviewActions, task);
+          const deleteButton = document.createElement("button");
+          deleteButton.className = "danger";
+          deleteButton.type = "button";
+          deleteButton.textContent = "Eliminar";
+          deleteButton.addEventListener("click", () => openDeleteTaskDialog(task));
+          els.taskPreviewActions.appendChild(deleteButton);
+        } else {
+          renderTrainerTaskActions(els.taskPreviewActions, task);
+        }
+        els.taskPreviewActionsWrap.classList.toggle("hidden", !els.taskPreviewActions.children.length);
+      }
+
+      function refreshTaskPreviewDialog() {
+        const task = state.tasks.find((item) => item.id === previewedTaskId);
+        if (!task) {
+          if (els.taskPreviewDialog.open) els.taskPreviewDialog.close();
+          return;
+        }
         hideTaskPreviewPopover();
         els.taskPreviewTitle.textContent = task.title;
         els.taskPreviewSubtitle.textContent = `${userName(task.ownerId)} | ${formatDate(task.dueDate)} | ${taskTimeLabel(task)}`;
+        renderTaskPreviewActions(task);
         els.taskPreviewContent.innerHTML = taskPreviewMarkup(task);
         els.taskPreviewContent.querySelectorAll(".preview-task-file").forEach((button) => {
           button.addEventListener("click", () => {
@@ -3738,6 +3953,13 @@
             openEvidenceFilePreview(file, { syncUrl: false }).catch(() => {});
           });
         });
+      }
+
+      function openTaskPreviewDialog(taskId) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        if (!task) return;
+        previewedTaskId = task.id;
+        refreshTaskPreviewDialog();
         els.taskPreviewDialog.showModal();
       }
 
@@ -4640,6 +4862,7 @@
         } else if (activeViewId === "infoView") {
           renderProducts();
         }
+        if (els.taskPreviewDialog.open) refreshTaskPreviewDialog();
       }
 
       function renderMotivation() {
@@ -5167,6 +5390,15 @@
         els.evidenceSubmitButton.disabled = !task || !allowed;
       }
 
+      function startTask(task) {
+        if (!task || task.status !== "Pendiente" || task.ownerId !== state.activeUserId) return;
+        task.history = task.history || [];
+        task.history.push({ type: "Inicio", byId: state.activeUserId, at: Date.now() });
+        task.status = "En proceso";
+        saveState();
+        render();
+      }
+
       function renderTrainerTaskActions(container, task) {
         if (task.status === "Cumplida") {
           const check = document.createElement("span");
@@ -5190,13 +5422,7 @@
           startButton.className = "primary";
           startButton.type = "button";
           startButton.textContent = "Iniciar";
-          startButton.addEventListener("click", () => {
-            task.history = task.history || [];
-            task.history.push({ type: "Inicio", byId: state.activeUserId, at: Date.now() });
-            task.status = "En proceso";
-            saveState();
-            render();
-          });
+          startButton.addEventListener("click", () => startTask(task));
           container.appendChild(startButton);
         } else if (task.status === "En proceso" || task.status === "Observada") {
           const evidenceButton = document.createElement("button");
@@ -5214,6 +5440,15 @@
         renderRenameControl(container, task);
       }
 
+      function renderViewTaskControl(container, task) {
+        const viewButton = document.createElement("button");
+        viewButton.className = "small";
+        viewButton.type = "button";
+        viewButton.textContent = "Ver";
+        viewButton.addEventListener("click", () => openTaskPreviewDialog(task.id));
+        container.appendChild(viewButton);
+      }
+
       function renderTrainerWeek() {
         if (isCoordinator()) return;
         const days = selectedWeekDates();
@@ -5224,19 +5459,28 @@
           const tasks = state.tasks
             .filter((task) => task.ownerId === state.activeUserId && task.dueDate === day)
             .sort((a, b) => (a.startTime || WORKDAY_START).localeCompare(b.startTime || WORKDAY_START));
-          const column = document.createElement("article");
+          const done = tasks.filter((task) => task.status === "Cumplida").length;
+          const percent = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+          const column = document.createElement("details");
           column.className = `day-column trainer-day-card ${day === todayIso ? "today" : ""}`;
+          column.open = openTrainerWeekDays.has(day);
           column.innerHTML = `
-            <div class="day-head">
-              <strong>${formatShortDate(day)}</strong>
+            <summary>
+              <span><strong>${formatShortDate(day)}</strong><br><span class="muted">${schedule.start}-${schedule.end}${schedule.hasBreak ? ` | Break ${schedule.breakStart}-${schedule.breakEnd}` : " | Sin break"}</span></span>
               <div class="day-stats">
                 <span class="pill">${tasks.length} tareas</span>
-                <button class="small add-personal-task" type="button">+ Mi tarea</button>
+                <span class="pill ${percent === 100 && tasks.length ? "approved" : ""}">${percent}%</span>
               </div>
+            </summary>
+            <div class="trainer-day-body">
+              <div class="actions"><button class="small add-personal-task" type="button">+ Mi tarea</button></div>
+              <div class="day-tasks"></div>
             </div>
-            <div class="workday-note">${schedule.start}-${schedule.end}${schedule.hasBreak ? ` | Break ${schedule.breakStart}-${schedule.breakEnd}` : " | Sin break"}</div>
-            <div class="day-tasks"></div>
           `;
+          column.addEventListener("toggle", () => {
+            if (column.open) openTrainerWeekDays.add(day);
+            else openTrainerWeekDays.delete(day);
+          });
           column.querySelector(".add-personal-task").addEventListener("click", () => focusTaskFormForDate(day, state.activeUserId));
           const wrap = column.querySelector(".day-tasks");
           if (!tasks.length) {
@@ -5247,11 +5491,11 @@
               card.className = `trainer-task-card ${task.status === "Cumplida" ? "approved" : ""}`;
               card.innerHTML = `
                 <span class="trainer-task-time">${escapeHtml(taskTimeLabel(task))}</span>
-                <strong>${escapeHtml(task.title)}</strong>
+                <div class="title-row"><strong>${escapeHtml(task.title)}</strong><span class="pill ${taskStatusClass(task.status)}">${escapeHtml(taskStatusLabel(task.status))}</span></div>
                 <span class="muted">${escapeHtml(task.category)}${task.product ? ` | ${escapeHtml(task.product)}` : ""}</span>
                 <div class="actions"></div>
               `;
-              renderTrainerTaskActions(card.querySelector(".actions"), task);
+              renderViewTaskControl(card.querySelector(".actions"), task);
               wrap.appendChild(card);
             });
           }
@@ -5260,17 +5504,30 @@
       }
 
       function renderDashboard() {
-        const tasks = relevantTasks();
+        const allTasks = relevantTasks();
+        const platformToday = dateIsoInLima(Date.now());
+        const currentWeekStart = weekStartIso(platformToday);
+        const currentWeekEnd = addDaysIso(currentWeekStart, 5);
+        const tasks = isCoordinator()
+          ? allTasks
+          : allTasks.filter((task) => task.dueDate >= currentWeekStart && task.dueDate <= currentWeekEnd);
         const done = tasks.filter((task) => task.status === "Cumplida").length;
         const review = tasks.filter((task) => task.status === "En revision").length;
         const pending = tasks.filter((task) => task.status === "Pendiente" || task.status === "En proceso" || task.status === "Observada" || task.status === "No disponible").length;
         const percent = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+        const todayTasks = allTasks.filter((task) => task.dueDate === platformToday);
+        const todayDone = todayTasks.filter((task) => task.status === "Cumplida").length;
+        const todayPercent = todayTasks.length ? Math.round((todayDone / todayTasks.length) * 100) : 0;
+        els.dashboardTitle.textContent = isCoordinator() ? "Tablero general" : `Tablero Week ${isoWeekNumber(currentWeekStart)}`;
+        els.progressLabel.textContent = isCoordinator() ? "Avance general" : "Avance semanal";
         els.progressPercent.textContent = `${percent}%`;
         els.progressBar.style.width = `${percent}%`;
         els.pendingCount.textContent = pending;
         els.reviewCount.textContent = review;
         els.doneCount.textContent = done;
-        els.trainerCount.textContent = trainers().length;
+        els.trainerMetricLabel.textContent = isCoordinator() ? "Trainers" : "Avance hoy";
+        els.trainerCount.textContent = isCoordinator() ? trainers().length : `${todayPercent}%`;
+        els.trainerCount.title = isCoordinator() ? "Equipo activo" : `${todayDone} de ${todayTasks.length} tareas aprobadas hoy`;
       }
 
       function openEvidenceForReview(task) {
@@ -5296,7 +5553,7 @@
       function renderDeletedTasks() {
         const deleted = (state.deletedTasks || [])
           .filter((task) => isCoordinator() || task.ownerId === state.activeUserId)
-          .sort((a, b) => Number(b.deletedAt || 0) - Number(a.deletedAt || 0));
+          .sort((a, b) => b.dueDate.localeCompare(a.dueDate) || Number(b.deletedAt || 0) - Number(a.deletedAt || 0));
         els.deletedTasksList.innerHTML = "";
         if (!deleted.length) {
           els.deletedTasksList.innerHTML = emptyState(
@@ -5307,28 +5564,31 @@
           );
           return;
         }
-        deleted.forEach((task) => {
-          const card = document.createElement("article");
-          card.className = "item deleted-task-item";
-          card.innerHTML = `
-            <div class="title-row">
-              <h3>${escapeHtml(task.title || "Tarea eliminada")}</h3>
-              <span class="pill observed">Eliminada</span>
-            </div>
-            <div class="meta">
-              <span>Trainer: ${escapeHtml(userName(task.ownerId))}</span>
-              <span>Fecha original: ${formatDate(task.dueDate)}</span>
-              <span>Horario: ${escapeHtml(taskTimeLabel(task))}</span>
-              <span>Categoria: ${escapeHtml(normalizedTaskCategory(task.category))}</span>
-              ${task.product ? `<span>Linea: ${escapeHtml(task.product)}</span>` : ""}
-            </div>
-            ${task.description ? `<p>${escapeHtml(task.description)}</p>` : ""}
-            <div class="note">
-              <strong>Eliminada por ${escapeHtml(task.deletedByName || userName(task.deletedById) || "Pablo")}</strong>
-              <p class="muted">${escapeHtml(task.reason || "Tarea retirada de la agenda.")} | ${formatDateTime(task.deletedAt)}</p>
-            </div>
-          `;
-          els.deletedTasksList.appendChild(card);
+        groupItemsByDate(deleted).forEach(([date, tasks]) => {
+          const day = createTaskDayGroup(date, tasks.length, `deleted|${date}`, openDeletedTaskDays);
+          const body = day.querySelector(".task-day-group-body");
+          tasks.forEach((task) => {
+            const card = document.createElement("article");
+            card.className = "item deleted-task-item";
+            card.innerHTML = `
+              <div class="title-row">
+                <h3>${escapeHtml(task.title || "Tarea eliminada")}</h3>
+                <span class="pill observed">Eliminada</span>
+              </div>
+              <div class="meta">
+                <span>Trainer: ${escapeHtml(userName(task.ownerId))}</span>
+                <span>${escapeHtml(taskTimeLabel(task))}</span>
+                <span>${escapeHtml(normalizedTaskCategory(task.category))}</span>
+                ${task.product ? `<span>Linea: ${escapeHtml(task.product)}</span>` : ""}
+              </div>
+              <div class="note">
+                <strong>Eliminada por ${escapeHtml(task.deletedByName || userName(task.deletedById) || "Pablo")}</strong>
+                <p class="muted">${escapeHtml(task.reason || "Tarea retirada de la agenda.")} | ${formatDateTime(task.deletedAt)}</p>
+              </div>
+            `;
+            body.appendChild(card);
+          });
+          els.deletedTasksList.appendChild(day);
         });
       }
 
@@ -5400,101 +5660,60 @@
       }
 
       function createTaskTrackingCard(task) {
-          const archived = task.status === "Cumplida" && task.dueDate < addDaysIso(todayIso, -30);
-          const card = document.createElement("article");
-          card.className = `item task-item ${task.status === "Cumplida" ? "is-approved" : ""} ${archived ? "is-archived" : ""}`;
-          card.dataset.taskId = task.id;
-          const latestEvidence = task.evidence?.at(-1);
-          card.innerHTML = `
-            <div class="stack">
-              <div class="title-row">
-                <h3>${escapeHtml(task.title)}</h3>
-                ${!isCoordinator() && task.status === "Cumplida" ? "" : `<span class="pill ${taskStatusClass(task.status)}">${escapeHtml(taskStatusLabel(task.status))}</span>`}
-                <span class="pill ${priorityClass(task.priority)}">${escapeHtml(task.priority)}</span>
-                ${taskMissingEvidence(task) ? `<span class="pill observed">Sustento no presentado</span>` : ""}
-                ${archived ? `<span class="pill">Archivada</span>` : ""}
-              </div>
-              <div class="meta">
-                <span>Trainer: ${escapeHtml(userName(task.ownerId))}</span>
-                <span>Fecha: ${formatDate(task.dueDate)}</span>
-                <span>Horario: ${escapeHtml(taskTimeLabel(task))}</span>
-                <span>${escapeHtml(task.category)}</span>
-                ${task.product ? `<span>Linea: ${escapeHtml(task.product)}</span>` : ""}
-              </div>
-              ${task.description ? `<p>${escapeHtml(task.description)}</p>` : ""}
-              ${task.blockedReason ? `<div class="note"><strong>No puede cumplir:</strong><p class="muted">${escapeHtml(task.blockedReason)}${task.blockedAt ? ` | ${formatDateTime(task.blockedAt)}` : ""}</p></div>` : ""}
-              ${
-                latestEvidence
-                  ? `<div class="note"><strong>Ultimo sustento:</strong><p class="muted">${escapeHtml(evidenceResultLabel(latestEvidence.result))} | ${escapeHtml(latestEvidence.store)} | ${formatDateTime(latestEvidence.submittedAt)}</p></div>`
-                  : ""
-              }
+        const archived = task.status === "Cumplida" && task.dueDate < addDaysIso(todayIso, -30);
+        const evidenceCount = (task.evidence || []).length;
+        const card = document.createElement("article");
+        card.className = `item task-item ${task.status === "Cumplida" ? "is-approved" : ""} ${archived ? "is-archived" : ""}`;
+        card.dataset.taskId = task.id;
+        card.innerHTML = `
+          <div class="stack">
+            <div class="title-row">
+              <h3>${escapeHtml(task.title)}</h3>
+              <span class="pill ${taskStatusClass(task.status)}">${escapeHtml(taskStatusLabel(task.status))}</span>
+              <span class="pill ${priorityClass(task.priority)}">${escapeHtml(task.priority)}</span>
+              ${taskMissingEvidence(task) ? `<span class="pill observed">Sin sustento</span>` : ""}
+              ${archived ? `<span class="pill">Archivada</span>` : ""}
             </div>
-            <div class="actions"></div>
-          `;
+            <div class="meta">
+              <span>Trainer: ${escapeHtml(userName(task.ownerId))}</span>
+              <span>Horario: ${escapeHtml(taskTimeLabel(task))}</span>
+              <span>${escapeHtml(normalizedTaskCategory(task.category))}</span>
+              ${task.product ? `<span>Linea: ${escapeHtml(task.product)}</span>` : ""}
+              <span>Sustentos: ${evidenceCount}</span>
+            </div>
+          </div>
+          <div class="actions"></div>
+        `;
+        renderViewTaskControl(card.querySelector(".actions"), task);
+        return card;
+      }
 
-          const actions = card.querySelector(".actions");
-          if (!isCoordinator()) renderTrainerTaskActions(actions, task);
+      function groupItemsByDate(items) {
+        const grouped = new Map();
+        items.forEach((item) => {
+          const date = item.dueDate || "Sin fecha";
+          if (!grouped.has(date)) grouped.set(date, []);
+          grouped.get(date).push(item);
+        });
+        return [...grouped.entries()].sort(([dateA], [dateB]) => dateB.localeCompare(dateA));
+      }
 
-          if (isCoordinator()) {
-            const viewButton = document.createElement("button");
-            viewButton.className = "small";
-            viewButton.type = "button";
-            viewButton.textContent = "Ver";
-            viewButton.addEventListener("click", () => openTaskPreviewDialog(task.id));
-            actions.appendChild(viewButton);
-          }
-
-          if (isCoordinator() && task.status === "En revision") {
-            const approveButton = document.createElement("button");
-            approveButton.type = "button";
-            approveButton.className = "primary";
-            approveButton.textContent = "Aprobar y completar";
-            approveButton.addEventListener("click", () => reviewTask(task.id, "Cumplida"));
-
-            const rejectButton = document.createElement("button");
-            rejectButton.className = "danger";
-            rejectButton.type = "button";
-            rejectButton.textContent = "Rechazar";
-            rejectButton.addEventListener("click", () => reviewTask(task.id, "Observada"));
-            actions.append(approveButton, rejectButton);
-          }
-
-          if (isCoordinator()) {
-            if (task.status === "Cumplida") {
-              const check = document.createElement("span");
-              check.className = "approval-check";
-              check.setAttribute("aria-label", "Tarea aprobada");
-              check.innerHTML = "&#10003;";
-              actions.appendChild(check);
-            }
-            if (task.dueDate < dateIsoInLima(Date.now()) && task.status !== "Cumplida") {
-              if (lateEvidenceAuthorizationActive(task)) {
-                const authorized = document.createElement("span");
-                authorized.className = "workflow-status";
-                authorized.textContent = "Carga tardia habilitada hoy";
-                actions.appendChild(authorized);
-              } else {
-                const authorizeButton = document.createElement("button");
-                authorizeButton.className = "small";
-                authorizeButton.type = "button";
-                authorizeButton.textContent = "Habilitar sustento tardio";
-                authorizeButton.addEventListener("click", () => openLateEvidenceDialog(task));
-                actions.appendChild(authorizeButton);
-              }
-            }
-            renderScheduleControl(actions, task);
-            renderReassignControl(actions, task);
-            renderReminderControl(actions, task);
-            renderRenameControl(actions, task);
-            renderHistoryControl(actions, task);
-            const deleteButton = document.createElement("button");
-            deleteButton.className = "danger";
-            deleteButton.type = "button";
-            deleteButton.textContent = "Eliminar";
-            deleteButton.addEventListener("click", () => openDeleteTaskDialog(task));
-            actions.appendChild(deleteButton);
-          }
-          return card;
+      function createTaskDayGroup(date, count, key, openSet = openTaskDays) {
+        const section = document.createElement("details");
+        section.className = "task-day-group";
+        section.open = openSet.has(key);
+        section.innerHTML = `
+          <summary>
+            <span><strong>${date === "Sin fecha" ? "Sin fecha" : formatShortDate(date)}</strong></span>
+            <span class="pill">${count} ${count === 1 ? "tarea" : "tareas"}</span>
+          </summary>
+          <div class="task-day-group-body"></div>
+        `;
+        section.addEventListener("toggle", () => {
+          if (section.open) openSet.add(key);
+          else openSet.delete(key);
+        });
+        return section;
       }
 
       function taskTrackingGroups() {
@@ -5536,8 +5755,17 @@
             else openTaskGroups.delete(group.key);
           });
           const body = section.querySelector(".task-status-group-body");
-          if (groupTasks.length) groupTasks.forEach((task) => body.appendChild(createTaskTrackingCard(task)));
-          else body.innerHTML = `<p class="task-status-group-empty">No hay tareas en esta seccion.</p>`;
+          if (groupTasks.length) {
+            groupItemsByDate(groupTasks).forEach(([date, dayTasks]) => {
+              const key = `${group.key}|${date}`;
+              const day = createTaskDayGroup(date, dayTasks.length, key);
+              const dayBody = day.querySelector(".task-day-group-body");
+              dayTasks.forEach((task) => dayBody.appendChild(createTaskTrackingCard(task)));
+              body.appendChild(day);
+            });
+          } else {
+            body.innerHTML = `<p class="task-status-group-empty">No hay tareas en esta seccion.</p>`;
+          }
           els.taskList.appendChild(section);
         });
       }
@@ -6164,6 +6392,9 @@
           state.users = [];
           state.tasks = [];
           openTaskGroups.clear();
+          openTaskDays.clear();
+          openTrainerWeekDays.clear();
+          openDeletedTaskDays.clear();
           activeViewId = "tasksView";
           activateView("tasksView", { updateUrl: true });
           els.loginEmail.value = "";
