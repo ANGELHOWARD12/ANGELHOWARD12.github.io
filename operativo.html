@@ -813,6 +813,102 @@
         font-weight: 900;
       }
 
+      .task-filter-grid {
+        background: #f8fbff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+      }
+
+      .task-status-group {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .task-status-group > summary {
+        align-items: center;
+        cursor: pointer;
+        display: flex;
+        font-weight: 900;
+        justify-content: space-between;
+        list-style: none;
+        min-height: 52px;
+        padding: 12px 14px;
+      }
+
+      .task-status-group > summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .task-status-group > summary::after {
+        color: var(--blue);
+        content: "+";
+        font-size: 22px;
+      }
+
+      .task-status-group[open] > summary::after {
+        content: "-";
+      }
+
+      .task-status-group-body {
+        border-top: 1px solid var(--line);
+        display: grid;
+        gap: 10px;
+        padding: 10px;
+      }
+
+      .task-status-group-empty {
+        color: var(--muted);
+        font-size: 13px;
+        margin: 0;
+        padding: 3px;
+      }
+
+      .task-item.is-archived {
+        background: #f8fafc;
+        opacity: 0.82;
+      }
+
+      .task-expedient-section {
+        display: grid;
+        gap: 10px;
+      }
+
+      .task-expedient-section > h3 {
+        font-size: 15px;
+      }
+
+      .evidence-entry-preview {
+        background: #f8fbff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        display: grid;
+        gap: 9px;
+        padding: 12px;
+      }
+
+      .evidence-entry-preview .evidence-file-list {
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      }
+
+      .deadline-alert {
+        background: var(--red-soft);
+        border: 1px solid #f3b5bc;
+        border-radius: 8px;
+        color: var(--red);
+        font-size: 13px;
+        font-weight: 900;
+        padding: 11px;
+      }
+
+      .deadline-alert.is-authorized {
+        background: var(--green-soft);
+        border-color: #9fd8ba;
+        color: var(--green);
+      }
+
       .history-list {
         display: grid;
         gap: 6px;
@@ -842,7 +938,12 @@
 
       .task-preview-dialog,
       .task-history-dialog {
-        max-width: 700px;
+        max-width: 820px;
+      }
+
+      .task-preview-dialog {
+        max-height: min(88vh, 860px);
+        overflow: auto;
       }
 
       .task-preview-popover {
@@ -1186,6 +1287,7 @@
       }
 
       .file-preview-image,
+      .file-preview-video,
       .file-preview-frame {
         background: #fff;
         border: 0;
@@ -1197,6 +1299,10 @@
         height: auto;
         object-fit: contain;
         width: auto;
+      }
+
+      .file-preview-video {
+        width: min(100%, 900px);
       }
 
       .file-preview-frame {
@@ -1399,6 +1505,10 @@
           flex: 1 1 135px;
           min-width: 0;
           white-space: normal;
+        }
+
+        .task-filter-grid {
+          grid-template-columns: 1fr;
         }
 
         .title-row {
@@ -1755,11 +1865,12 @@
               <h2>Mis tareas / Seguimiento</h2>
               <p class="muted">El coordinador ve todas; cada trainer ve solo las suyas.</p>
             </div>
-            <div class="form-grid">
+            <div class="form-grid task-filter-grid">
               <label>
                 Estado
                 <select id="taskStatusFilter">
                   <option value="all">Todas</option>
+                  <option value="missing_evidence">Sin sustento</option>
                   <option value="Pendiente">Pendientes</option>
                   <option value="En proceso">En proceso</option>
                   <option value="En revision">En revision</option>
@@ -1772,6 +1883,30 @@
                 Trainer
                 <select id="taskTrainerFilter"></select>
               </label>
+              <label>
+                Categoria
+                <select id="taskCategoryFilter">
+                  <option value="all">Todas</option>
+                  <option value="PDP">PDP</option>
+                  <option value="Entrenamiento">Entrenamiento</option>
+                  <option value="ULG">ULG</option>
+                  <option value="Reporte">Reporte</option>
+                  <option value="Coordinacion">Coordinacion</option>
+                </select>
+              </label>
+              <label>
+                Buscar tarea
+                <input id="taskNameFilter" type="search" placeholder="Nombre de la tarea" />
+              </label>
+              <label>
+                Desde
+                <input id="taskDateFrom" type="date" />
+              </label>
+              <label>
+                Hasta
+                <input id="taskDateTo" type="date" />
+              </label>
+              <button id="clearTaskFilters" class="ghost wide" type="button">Limpiar filtros</button>
             </div>
             <div id="taskList" class="list"></div>
           </aside>
@@ -1821,14 +1956,19 @@
                   type="file"
                   multiple
                   required
-                  accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt"
+                  accept=".jpg,.jpeg,.png,.webp,.mp4,.mov,.webm,.m4v,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt"
                 />
               </label>
-              <p class="muted wide">Debes adjuntar al menos un sustento. Puedes cargar hasta 8 archivos de 15 MB cada uno y las fotos conservan su calidad original.</p>
+              <p class="muted wide">Debes adjuntar al menos un sustento. Puedes cargar hasta 8 fotos, videos o documentos de 15 MB cada uno y los originales conservan su calidad.</p>
+              <label class="wide">
+                Enlaces relacionados (opcional)
+                <textarea id="evidenceLinks" placeholder="Un enlace https:// por linea"></textarea>
+              </label>
               <label class="wide">
                 Observaciones
                 <textarea id="evidenceNotes" placeholder="Describe que se realizo, hallazgos, incidencias o acuerdos"></textarea>
               </label>
+              <p id="evidenceDeadlineMessage" class="wide deadline-alert hidden" aria-live="polite"></p>
               <button id="evidenceSubmitButton" class="primary wide" type="submit">Enviar sustento</button>
             </form>
             <p id="evidenceMessage" class="message" aria-live="polite"></p>
@@ -2127,11 +2267,47 @@
         </div>
         <div id="taskPreviewContent" class="stack"></div>
         <div class="actions">
-          <button id="taskPreviewTracking" class="primary" type="button">Ver en seguimiento</button>
           <button id="taskPreviewHistory" class="small" type="button">Historial completo</button>
           <button id="closeTaskPreview" class="ghost" type="button">Cerrar</button>
         </div>
       </div>
+    </dialog>
+
+    <dialog id="reviewEvidenceDialog">
+      <form id="reviewEvidenceForm" class="stack">
+        <div>
+          <h2 id="reviewEvidenceTitle">Revisar sustento</h2>
+          <p id="reviewEvidenceTaskLabel" class="muted"></p>
+        </div>
+        <label>
+          Observacion de Pablo
+          <textarea id="reviewEvidenceNote" maxlength="1500" required></textarea>
+        </label>
+        <div class="actions">
+          <button id="confirmEvidenceReview" class="primary" type="submit">Guardar revision</button>
+          <button id="cancelEvidenceReview" class="ghost" type="button">Cancelar</button>
+        </div>
+        <p id="reviewEvidenceMessage" class="message" aria-live="polite"></p>
+      </form>
+    </dialog>
+
+    <dialog id="lateEvidenceDialog">
+      <form id="lateEvidenceForm" class="stack">
+        <div>
+          <h2>Habilitar sustento tardio</h2>
+          <p id="lateEvidenceTaskLabel" class="muted"></p>
+        </div>
+        <label>
+          Motivo obligatorio de la excepcion
+          <textarea id="lateEvidenceReason" maxlength="1000" placeholder="Explica por que se autoriza la carga fuera de plazo" required></textarea>
+        </label>
+        <p class="helper">La autorizacion permitira un solo envio durante el dia de hoy y quedara registrada en el historial.</p>
+        <div class="actions">
+          <button id="confirmLateEvidence" class="primary" type="submit">Autorizar hoy</button>
+          <button id="cancelLateEvidence" class="ghost" type="button">Cancelar</button>
+        </div>
+        <p id="lateEvidenceMessage" class="message" aria-live="polite"></p>
+      </form>
     </dialog>
 
     <dialog id="taskHistoryDialog" class="task-history-dialog">
@@ -2161,6 +2337,7 @@
         <div id="filePreviewStage" class="file-preview-stage">
           <p id="filePreviewStatus" class="message" aria-live="polite">Cargando archivo original...</p>
           <img id="filePreviewImage" class="file-preview-image hidden" alt="" />
+          <video id="filePreviewVideo" class="file-preview-video hidden" controls playsinline></video>
           <iframe id="filePreviewFrame" class="file-preview-frame hidden" title="Vista previa del archivo"></iframe>
         </div>
         <div class="file-preview-actions">
@@ -2193,6 +2370,10 @@
         "jpeg",
         "png",
         "webp",
+        "mp4",
+        "mov",
+        "webm",
+        "m4v",
         "pdf",
         "doc",
         "docx",
@@ -2229,7 +2410,7 @@
       ];
 
       const initialState = {
-        version: 11,
+        version: 12,
         activeUserId: "",
         selectedProduct: "oled",
         selectedWeekStart: "",
@@ -2332,6 +2513,8 @@
       let breakEditorKey = "";
       let previewedTaskId = "";
       let historyTaskId = "";
+      let lateEvidenceTaskId = "";
+      const openTaskGroups = new Set();
       let activeViewId = ALLOWED_VIEW_IDS.includes(new URLSearchParams(window.location.search).get("view"))
         ? new URLSearchParams(window.location.search).get("view")
         : "tasksView";
@@ -2420,6 +2603,11 @@
         taskStatusFilter: document.querySelector("#taskStatusFilter"),
         trainerFilterWrap: document.querySelector("#trainerFilterWrap"),
         taskTrainerFilter: document.querySelector("#taskTrainerFilter"),
+        taskCategoryFilter: document.querySelector("#taskCategoryFilter"),
+        taskNameFilter: document.querySelector("#taskNameFilter"),
+        taskDateFrom: document.querySelector("#taskDateFrom"),
+        taskDateTo: document.querySelector("#taskDateTo"),
+        clearTaskFilters: document.querySelector("#clearTaskFilters"),
         taskList: document.querySelector("#taskList"),
         deletedTasksPanel: document.querySelector("#deletedTasksPanel"),
         deletedTasksList: document.querySelector("#deletedTasksList"),
@@ -2431,7 +2619,9 @@
         evidenceTrainingTopic: document.querySelector("#evidenceTrainingTopic"),
         evidenceResult: document.querySelector("#evidenceResult"),
         evidenceFiles: document.querySelector("#evidenceFiles"),
+        evidenceLinks: document.querySelector("#evidenceLinks"),
         evidenceNotes: document.querySelector("#evidenceNotes"),
+        evidenceDeadlineMessage: document.querySelector("#evidenceDeadlineMessage"),
         evidenceSubmitButton: document.querySelector("#evidenceSubmitButton"),
         evidenceMessage: document.querySelector("#evidenceMessage"),
         cloudPlanPanel: document.querySelector("#cloudPlanPanel"),
@@ -2511,9 +2701,23 @@
         taskPreviewTitle: document.querySelector("#taskPreviewTitle"),
         taskPreviewSubtitle: document.querySelector("#taskPreviewSubtitle"),
         taskPreviewContent: document.querySelector("#taskPreviewContent"),
-        taskPreviewTracking: document.querySelector("#taskPreviewTracking"),
         taskPreviewHistory: document.querySelector("#taskPreviewHistory"),
         closeTaskPreview: document.querySelector("#closeTaskPreview"),
+        reviewEvidenceDialog: document.querySelector("#reviewEvidenceDialog"),
+        reviewEvidenceForm: document.querySelector("#reviewEvidenceForm"),
+        reviewEvidenceTitle: document.querySelector("#reviewEvidenceTitle"),
+        reviewEvidenceTaskLabel: document.querySelector("#reviewEvidenceTaskLabel"),
+        reviewEvidenceNote: document.querySelector("#reviewEvidenceNote"),
+        confirmEvidenceReview: document.querySelector("#confirmEvidenceReview"),
+        cancelEvidenceReview: document.querySelector("#cancelEvidenceReview"),
+        reviewEvidenceMessage: document.querySelector("#reviewEvidenceMessage"),
+        lateEvidenceDialog: document.querySelector("#lateEvidenceDialog"),
+        lateEvidenceForm: document.querySelector("#lateEvidenceForm"),
+        lateEvidenceTaskLabel: document.querySelector("#lateEvidenceTaskLabel"),
+        lateEvidenceReason: document.querySelector("#lateEvidenceReason"),
+        confirmLateEvidence: document.querySelector("#confirmLateEvidence"),
+        cancelLateEvidence: document.querySelector("#cancelLateEvidence"),
+        lateEvidenceMessage: document.querySelector("#lateEvidenceMessage"),
         taskHistoryDialog: document.querySelector("#taskHistoryDialog"),
         taskHistoryTitle: document.querySelector("#taskHistoryTitle"),
         taskHistorySubtitle: document.querySelector("#taskHistorySubtitle"),
@@ -2526,6 +2730,7 @@
         filePreviewStage: document.querySelector("#filePreviewStage"),
         filePreviewStatus: document.querySelector("#filePreviewStatus"),
         filePreviewImage: document.querySelector("#filePreviewImage"),
+        filePreviewVideo: document.querySelector("#filePreviewVideo"),
         filePreviewFrame: document.querySelector("#filePreviewFrame"),
         downloadFilePreview: document.querySelector("#downloadFilePreview"),
         closeFilePreview: document.querySelector("#closeFilePreview"),
@@ -2608,7 +2813,12 @@
           startTime: task.startTime || "08:30",
           endTime: task.endTime || "09:30",
           history: Array.isArray(task.history) ? task.history : [],
-          reminders: Array.isArray(task.reminders) ? task.reminders : []
+          reminders: Array.isArray(task.reminders) ? task.reminders : [],
+          evidence: (task.evidence || []).map((entry) => ({
+            ...entry,
+            files: Array.isArray(entry.files) ? entry.files : [],
+            links: Array.isArray(entry.links) ? entry.links : []
+          }))
         }));
         nextState.deletedTasks = (nextState.deletedTasks || []).map((task) => ({
           ...task,
@@ -3330,6 +3540,10 @@
         if (entry.type === "Inicio") return `${userName(entry.byId)} inicio la tarea.`;
         if (entry.type === "Asignacion") return `${userName(entry.byId)} asigno la tarea a ${userName(entry.toId)}.`;
         if (entry.type === "Sustento") return `${userName(entry.byId)} envio un sustento para revision.`;
+        if (entry.type === "AutorizacionSustentoTardio") {
+          return `${userName(entry.byId)} habilito una carga tardia. Motivo: ${entry.reason || "Sin detalle"}`;
+        }
+        if (entry.type === "SustentoTardio") return `${userName(entry.byId)} utilizo la autorizacion de carga tardia.`;
         if (entry.type === "Aprobacion") return `${userName(entry.byId)} aprobo la tarea.`;
         if (entry.type === "Rechazo") return `${userName(entry.byId)} rechazo el sustento. Motivo: ${entry.reason || "Requiere correccion"}`;
         return `${entry.type || "Actualizacion"}${entry.reason ? `: ${entry.reason}` : ""}`;
@@ -3352,34 +3566,132 @@
         `;
       }
 
+      function lateEvidenceAuthorizationActive(task) {
+        const authorization = task?.lateEvidenceAuthorization;
+        return Boolean(authorization?.enabled && authorization.validDate === dateIsoInLima(Date.now()));
+      }
+
+      function taskAllowsEvidenceToday(task) {
+        return Boolean(task && (task.dueDate === dateIsoInLima(Date.now()) || lateEvidenceAuthorizationActive(task)));
+      }
+
+      function taskMissingEvidence(task) {
+        return Boolean(task && task.dueDate < dateIsoInLima(Date.now()) && !(task.evidence || []).length);
+      }
+
+      function taskEvidenceDeadlineText(task) {
+        if (!task) return "Selecciona una tarea para revisar el plazo de carga.";
+        if (lateEvidenceAuthorizationActive(task)) {
+          return "Pablo autorizo excepcionalmente un envio tardio durante el dia de hoy.";
+        }
+        const platformToday = dateIsoInLima(Date.now());
+        if (task.dueDate < platformToday) {
+          return "El plazo para subir sustentos de esta tarea ha finalizado. Las evidencias deben registrarse el mismo dia de la ejecucion.";
+        }
+        if (task.dueDate > platformToday) {
+          return `El sustento podra cargarse el ${formatDate(task.dueDate)}, fecha programada para la tarea.`;
+        }
+        return "Carga disponible hoy. La fecha y hora se registraran automaticamente con la hora oficial de la plataforma.";
+      }
+
+      function parseEvidenceLinks(value) {
+        const links = String(value || "")
+          .split(/\r?\n/)
+          .map((item) => item.trim())
+          .filter(Boolean);
+        if (links.length > 10) throw new Error("Puedes registrar un maximo de 10 enlaces por sustento.");
+        for (const link of links) {
+          let parsed;
+          try {
+            parsed = new URL(link);
+          } catch {
+            throw new Error(`El enlace no es valido: ${link}`);
+          }
+          if (!["http:", "https:"].includes(parsed.protocol)) throw new Error(`El enlace debe comenzar con http:// o https://: ${link}`);
+        }
+        return links;
+      }
+
+      function taskAuditPreviewMarkup(task) {
+        const entries = (task.history || []).slice().reverse();
+        return `
+          <section class="task-expedient-section">
+            <h3>Historial de modificaciones (${entries.length})</h3>
+            <ol class="audit-list">
+              ${entries.length
+                ? entries.map((entry) => `
+                    <li class="audit-entry">
+                      <strong>${escapeHtml(entry.type || "Actualizacion")}</strong>
+                      <span>${escapeHtml(historyEntryText(entry))}</span>
+                      <small>${formatDateTime(entry.at)} | ${escapeHtml(userName(entry.byId || entry.fromId || task.createdById))}</small>
+                    </li>
+                  `).join("")
+                : `<li class="audit-entry"><span>No hay modificaciones registradas.</span></li>`}
+            </ol>
+          </section>
+        `;
+      }
+
       function taskEvidenceSummaryMarkup(task) {
         const evidenceItems = task.evidence || [];
-        if (!evidenceItems.length) return `<div class="note"><strong>Evidencias</strong><p class="muted">Todavia no hay evidencias registradas.</p></div>`;
-        const latest = evidenceItems.at(-1);
-        const files = evidenceFilesForEntry(latest);
+        if (!evidenceItems.length) {
+          return `<section class="task-expedient-section"><h3>Sustentos (0)</h3><div class="note"><strong>${taskMissingEvidence(task) ? "Sustento no presentado" : "Sin evidencias registradas"}</strong><p class="muted">${escapeHtml(taskEvidenceDeadlineText(task))}</p></div></section>`;
+        }
         return `
-          <div class="note">
-            <strong>Evidencias (${evidenceItems.length})</strong>
-            <p class="muted">Ultimo envio: ${formatDateTime(latest.submittedAt)} | ${escapeHtml(evidenceReviewLabel(latest.review))}</p>
-            ${latest.trainingTopic ? `<p><strong>Tema de la capacitacion:</strong> ${escapeHtml(latest.trainingTopic)}</p>` : ""}
-            ${latest.notes ? `<p>${escapeHtml(latest.notes)}</p>` : ""}
-            ${files.length ? `<div class="actions">${files.map((file, index) => `<button class="small preview-task-file" type="button" data-file-index="${index}">Ver ${escapeHtml(file.name)}</button>`).join("")}</div>` : ""}
-          </div>
+          <section class="task-expedient-section">
+            <h3>Sustentos (${evidenceItems.length})</h3>
+            ${evidenceItems.map((entry, evidenceIndex) => {
+              const files = evidenceFilesForEntry(entry);
+              const links = Array.isArray(entry.links) ? entry.links : [];
+              return `
+                <article class="evidence-entry-preview">
+                  <div class="title-row">
+                    <strong>Envio ${evidenceIndex + 1}</strong>
+                    <span class="pill ${entry.review === "Aprobado" ? "approved" : entry.review === "Rechazado" || entry.review === "Observado" ? "observed" : "review"}">${escapeHtml(evidenceReviewLabel(entry.review))}</span>
+                  </div>
+                  <div class="meta">
+                    <span>Subido por: ${escapeHtml(userName(entry.submittedById))}</span>
+                    <span>Fecha y hora: ${formatDateTime(entry.submittedAt)}</span>
+                    <span>Resultado: ${escapeHtml(evidenceResultLabel(entry.result))}</span>
+                    <span>Tienda / PDP: ${escapeHtml(entry.store || "No aplica")}</span>
+                  </div>
+                  ${entry.product ? `<p><strong>Producto revisado:</strong> ${escapeHtml(entry.product)}</p>` : ""}
+                  ${entry.trainingTopic ? `<p><strong>Tema de la capacitacion:</strong> ${escapeHtml(entry.trainingTopic)}</p>` : ""}
+                  ${entry.notes ? `<p><strong>Comentario:</strong> ${escapeHtml(entry.notes)}</p>` : `<p class="muted">Sin comentarios.</p>`}
+                  ${entry.reviewNote ? `<div class="note"><strong>Observacion de Pablo:</strong><p>${escapeHtml(entry.reviewNote)}</p><small>${entry.reviewedAt ? formatDateTime(entry.reviewedAt) : ""}</small></div>` : ""}
+                  ${links.length ? `<div class="actions">${links.map((link) => `<a class="small" href="${escapeHtml(link)}" target="_blank" rel="noopener">Abrir enlace</a>`).join("")}</div>` : ""}
+                  ${files.length ? `<div class="evidence-file-list">${files.map((file, fileIndex) => `
+                    <div class="evidence-file-row">
+                      <strong>${escapeHtml(file.name)}</strong>
+                      <span class="muted">${escapeHtml(file.mimeType)}</span>
+                      <button class="small preview-task-file" type="button" data-evidence-index="${evidenceIndex}" data-file-index="${fileIndex}">Abrir original</button>
+                    </div>
+                  `).join("")}</div>` : `<p class="muted">Este envio no tiene archivos disponibles.</p>`}
+                </article>
+              `;
+            }).reverse().join("")}
+          </section>
         `;
       }
 
       function taskPreviewMarkup(task, compact = false) {
         const duration = durationMinutes(task.startTime || WORKDAY_START, task.endTime || "09:30");
+        const latestEvidence = task.evidence?.at(-1);
         return `
           <div class="meta">
-            <span>${formatDate(task.dueDate)}</span>
-            <span>${escapeHtml(taskTimeLabel(task))}</span>
-            <span>${escapeHtml(formatDuration(duration))}</span>
-            <span>${escapeHtml(taskStatusLabel(task.status))}</span>
-            <span>${escapeHtml(userName(task.ownerId))}</span>
+            <span>Responsable: ${escapeHtml(userName(task.ownerId))}</span>
+            <span>Fecha: ${formatDate(task.dueDate)}</span>
+            <span>Horario: ${escapeHtml(taskTimeLabel(task))}</span>
+            <span>Duracion: ${escapeHtml(formatDuration(duration))}</span>
+            <span>Estado: ${escapeHtml(taskStatusLabel(task.status))}</span>
+            <span>Categoria: ${escapeHtml(task.category)}</span>
+            ${task.product ? `<span>Linea: ${escapeHtml(task.product)}</span>` : ""}
           </div>
-          ${task.description ? `<p>${escapeHtml(task.description)}</p>` : `<p class="muted">Sin indicaciones adicionales.</p>`}
-          ${compact ? "" : taskEvidenceSummaryMarkup(task)}
+          ${task.description ? `<div class="note"><strong>Descripcion e indicaciones</strong><p>${escapeHtml(task.description)}</p></div>` : `<p class="muted">Sin indicaciones adicionales.</p>`}
+          ${task.blockedReason ? `<div class="note"><strong>Dificultad reportada</strong><p>${escapeHtml(task.blockedReason)}</p></div>` : ""}
+          ${taskMissingEvidence(task) ? `<div class="deadline-alert">Sustento no presentado</div>` : ""}
+          ${latestEvidence ? `<div class="note"><strong>Ultima realizacion:</strong><p>${formatDateTime(latestEvidence.submittedAt)} por ${escapeHtml(userName(latestEvidence.submittedById))}</p></div>` : ""}
+          ${compact ? "" : `${taskEvidenceSummaryMarkup(task)}${taskAuditPreviewMarkup(task)}`}
         `;
       }
 
@@ -3418,13 +3730,12 @@
         els.taskPreviewTitle.textContent = task.title;
         els.taskPreviewSubtitle.textContent = `${userName(task.ownerId)} | ${formatDate(task.dueDate)} | ${taskTimeLabel(task)}`;
         els.taskPreviewContent.innerHTML = taskPreviewMarkup(task);
-        const latestFiles = evidenceFilesForEntry(task.evidence?.at(-1));
         els.taskPreviewContent.querySelectorAll(".preview-task-file").forEach((button) => {
           button.addEventListener("click", () => {
-            const file = latestFiles[Number(button.dataset.fileIndex)];
+            const evidence = task.evidence?.[Number(button.dataset.evidenceIndex)];
+            const file = evidenceFilesForEntry(evidence)[Number(button.dataset.fileIndex)];
             if (!file) return;
-            els.taskPreviewDialog.close();
-            openEvidenceFilePreview(file).catch(() => {});
+            openEvidenceFilePreview(file, { syncUrl: false }).catch(() => {});
           });
         });
         els.taskPreviewDialog.showModal();
@@ -3512,6 +3823,9 @@
           activePreviewObjectUrl = "";
         }
         els.filePreviewImage.removeAttribute("src");
+        els.filePreviewVideo.pause();
+        els.filePreviewVideo.removeAttribute("src");
+        els.filePreviewVideo.load();
         els.filePreviewFrame.removeAttribute("src");
       }
 
@@ -3536,6 +3850,7 @@
         els.filePreviewStatus.textContent = "Cargando archivo original...";
         els.filePreviewStatus.classList.remove("hidden");
         els.filePreviewImage.classList.add("hidden");
+        els.filePreviewVideo.classList.add("hidden");
         els.filePreviewFrame.classList.add("hidden");
         els.downloadFilePreview.classList.add("hidden");
         els.downloadFilePreview.removeAttribute("href");
@@ -3579,7 +3894,11 @@
             els.filePreviewImage.src = previewUrl;
             els.filePreviewImage.classList.remove("hidden");
             els.filePreviewStatus.classList.add("hidden");
-          } else if (mimeType === "application/pdf") {
+          } else if (mimeType.startsWith("video/")) {
+            els.filePreviewVideo.src = previewUrl;
+            els.filePreviewVideo.classList.remove("hidden");
+            els.filePreviewStatus.classList.add("hidden");
+          } else if (mimeType === "application/pdf" || mimeType.startsWith("text/")) {
             els.filePreviewFrame.src = previewUrl;
             els.filePreviewFrame.classList.remove("hidden");
             els.filePreviewStatus.classList.add("hidden");
@@ -4395,7 +4714,10 @@
               task.ownerId === state.activeUserId &&
               (task.status === "En proceso" || task.status === "Observada")
           )
-          .map((task) => ({ value: task.id, label: `${task.title} (${formatDate(task.dueDate)} | ${taskTimeLabel(task)})` }));
+          .map((task) => ({
+            value: task.id,
+            label: `${task.title} (${formatDate(task.dueDate)} | ${taskTimeLabel(task)})${taskAllowsEvidenceToday(task) ? "" : " | Plazo no disponible"}`
+          }));
         fillSelect(els.evidenceTask, availableTasks, els.evidenceTask.value);
         els.taskDueDate.removeAttribute("min");
         els.taskDueDate.value = els.taskDueDate.value || nearestWorkingDay(todayIso);
@@ -4410,9 +4732,16 @@
       function filteredTasks() {
         const status = els.taskStatusFilter.value;
         const trainer = els.taskTrainerFilter.value || "all";
+        const category = els.taskCategoryFilter.value || "all";
+        const query = clean(els.taskNameFilter.value).toLocaleLowerCase("es");
+        const from = els.taskDateFrom.value;
+        const to = els.taskDateTo.value;
         return relevantTasks()
-          .filter((task) => status === "all" || task.status === status)
+          .filter((task) => status === "all" || (status === "missing_evidence" ? taskMissingEvidence(task) : task.status === status))
           .filter((task) => !isCoordinator() || trainer === "all" || task.ownerId === trainer)
+          .filter((task) => category === "all" || task.category === category)
+          .filter((task) => !query || task.title.toLocaleLowerCase("es").includes(query))
+          .filter((task) => (!from || task.dueDate >= from) && (!to || task.dueDate <= to))
           .sort((a, b) => b.dueDate.localeCompare(a.dueDate) || (a.startTime || WORKDAY_START).localeCompare(b.startTime || WORKDAY_START));
       }
 
@@ -4829,6 +5158,13 @@
         els.evidenceTrainingTopicWrap.classList.toggle("hidden", !isTraining);
         els.evidenceTrainingTopic.required = isTraining;
         if (!isTraining) els.evidenceTrainingTopic.value = "";
+        const allowed = taskAllowsEvidenceToday(task);
+        els.evidenceDeadlineMessage.textContent = taskEvidenceDeadlineText(task);
+        els.evidenceDeadlineMessage.classList.toggle("hidden", !task);
+        els.evidenceDeadlineMessage.classList.toggle("is-authorized", Boolean(task && allowed));
+        els.evidenceFiles.disabled = Boolean(task && !allowed);
+        els.evidenceLinks.disabled = Boolean(task && !allowed);
+        els.evidenceSubmitButton.disabled = !task || !allowed;
       }
 
       function renderTrainerTaskActions(container, task) {
@@ -4866,8 +5202,10 @@
           const evidenceButton = document.createElement("button");
           evidenceButton.className = "primary";
           evidenceButton.type = "button";
-          evidenceButton.textContent = "Enviar sustento";
-          evidenceButton.addEventListener("click", () => openEvidenceForTask(task));
+          evidenceButton.textContent = taskAllowsEvidenceToday(task) ? "Enviar sustento" : "Sustento no disponible";
+          evidenceButton.disabled = !taskAllowsEvidenceToday(task);
+          evidenceButton.title = taskEvidenceDeadlineText(task);
+          if (taskAllowsEvidenceToday(task)) evidenceButton.addEventListener("click", () => openEvidenceForTask(task));
           container.appendChild(evidenceButton);
         }
         renderScheduleControl(container, task);
@@ -5030,21 +5368,41 @@
         }
       }
 
-      function renderTasks() {
-        const tasks = filteredTasks();
-        els.taskList.innerHTML = "";
+      function openLateEvidenceDialog(task) {
+        if (!task || !isCoordinator()) return;
+        lateEvidenceTaskId = task.id;
+        els.lateEvidenceTaskLabel.textContent = `${task.title} | ${userName(task.ownerId)} | ${formatDate(task.dueDate)}`;
+        els.lateEvidenceReason.value = "";
+        setMessage(els.lateEvidenceMessage, "", "");
+        els.lateEvidenceDialog.showModal();
+        els.lateEvidenceReason.focus();
+      }
 
-        if (!tasks.length) {
-          els.taskList.innerHTML = emptyState(
-            "No hay tareas para mostrar",
-            isCoordinator() ? "Asigna una tarea nueva a un trainer." : "Agrega tus tareas desde el calendario semanal o espera una asignacion de Pablo."
-          );
-          return;
+      async function authorizeLateEvidence(taskId, reason) {
+        if (!taskId || !clean(reason) || !isCoordinator()) return;
+        els.confirmLateEvidence.disabled = true;
+        setMessage(els.lateEvidenceMessage, "Guardando autorizacion...", "");
+        try {
+          if (syncInFlight) await syncInFlight;
+          const data = await apiRequest("/tasks/evidence-authorize", {
+            method: "POST",
+            body: JSON.stringify({ taskId, reason: clean(reason) })
+          });
+          applyCloudState(data.state);
+          els.lateEvidenceDialog.close();
+          render();
+          showToast("Carga tardia habilitada por un solo envio durante el dia de hoy.", "success");
+        } catch (error) {
+          setMessage(els.lateEvidenceMessage, error.message || "No se pudo guardar la autorizacion.", "err");
+        } finally {
+          els.confirmLateEvidence.disabled = false;
         }
+      }
 
-        tasks.forEach((task) => {
+      function createTaskTrackingCard(task) {
+          const archived = task.status === "Cumplida" && task.dueDate < addDaysIso(todayIso, -30);
           const card = document.createElement("article");
-          card.className = `item task-item ${task.status === "Cumplida" ? "is-approved" : ""}`;
+          card.className = `item task-item ${task.status === "Cumplida" ? "is-approved" : ""} ${archived ? "is-archived" : ""}`;
           card.dataset.taskId = task.id;
           const latestEvidence = task.evidence?.at(-1);
           card.innerHTML = `
@@ -5053,17 +5411,18 @@
                 <h3>${escapeHtml(task.title)}</h3>
                 ${!isCoordinator() && task.status === "Cumplida" ? "" : `<span class="pill ${taskStatusClass(task.status)}">${escapeHtml(taskStatusLabel(task.status))}</span>`}
                 <span class="pill ${priorityClass(task.priority)}">${escapeHtml(task.priority)}</span>
+                ${taskMissingEvidence(task) ? `<span class="pill observed">Sustento no presentado</span>` : ""}
+                ${archived ? `<span class="pill">Archivada</span>` : ""}
               </div>
               <div class="meta">
                 <span>Trainer: ${escapeHtml(userName(task.ownerId))}</span>
-                <span>Fecha limite: ${formatDate(task.dueDate)}</span>
+                <span>Fecha: ${formatDate(task.dueDate)}</span>
                 <span>Horario: ${escapeHtml(taskTimeLabel(task))}</span>
                 <span>${escapeHtml(task.category)}</span>
                 ${task.product ? `<span>Linea: ${escapeHtml(task.product)}</span>` : ""}
               </div>
               ${task.description ? `<p>${escapeHtml(task.description)}</p>` : ""}
               ${task.blockedReason ? `<div class="note"><strong>No puede cumplir:</strong><p class="muted">${escapeHtml(task.blockedReason)}${task.blockedAt ? ` | ${formatDateTime(task.blockedAt)}` : ""}</p></div>` : ""}
-              ${taskHistoryMarkup(task)}
               ${
                 latestEvidence
                   ? `<div class="note"><strong>Ultimo sustento:</strong><p class="muted">${escapeHtml(evidenceResultLabel(latestEvidence.result))} | ${escapeHtml(latestEvidence.store)} | ${formatDateTime(latestEvidence.submittedAt)}</p></div>`
@@ -5076,13 +5435,16 @@
           const actions = card.querySelector(".actions");
           if (!isCoordinator()) renderTrainerTaskActions(actions, task);
 
-          if (isCoordinator() && task.status === "En revision") {
-            const viewEvidenceButton = document.createElement("button");
-            viewEvidenceButton.className = "small";
-            viewEvidenceButton.type = "button";
-            viewEvidenceButton.textContent = "Ver evidencia";
-            viewEvidenceButton.addEventListener("click", () => openEvidenceForReview(task));
+          if (isCoordinator()) {
+            const viewButton = document.createElement("button");
+            viewButton.className = "small";
+            viewButton.type = "button";
+            viewButton.textContent = "Ver";
+            viewButton.addEventListener("click", () => openTaskPreviewDialog(task.id));
+            actions.appendChild(viewButton);
+          }
 
+          if (isCoordinator() && task.status === "En revision") {
             const approveButton = document.createElement("button");
             approveButton.type = "button";
             approveButton.className = "primary";
@@ -5094,7 +5456,7 @@
             rejectButton.type = "button";
             rejectButton.textContent = "Rechazar";
             rejectButton.addEventListener("click", () => reviewTask(task.id, "Observada"));
-            actions.append(viewEvidenceButton, approveButton, rejectButton);
+            actions.append(approveButton, rejectButton);
           }
 
           if (isCoordinator()) {
@@ -5104,6 +5466,21 @@
               check.setAttribute("aria-label", "Tarea aprobada");
               check.innerHTML = "&#10003;";
               actions.appendChild(check);
+            }
+            if (task.dueDate < dateIsoInLima(Date.now()) && task.status !== "Cumplida") {
+              if (lateEvidenceAuthorizationActive(task)) {
+                const authorized = document.createElement("span");
+                authorized.className = "workflow-status";
+                authorized.textContent = "Carga tardia habilitada hoy";
+                actions.appendChild(authorized);
+              } else {
+                const authorizeButton = document.createElement("button");
+                authorizeButton.className = "small";
+                authorizeButton.type = "button";
+                authorizeButton.textContent = "Habilitar sustento tardio";
+                authorizeButton.addEventListener("click", () => openLateEvidenceDialog(task));
+                actions.appendChild(authorizeButton);
+              }
             }
             renderScheduleControl(actions, task);
             renderReassignControl(actions, task);
@@ -5117,21 +5494,86 @@
             deleteButton.addEventListener("click", () => openDeleteTaskDialog(task));
             actions.appendChild(deleteButton);
           }
+          return card;
+      }
 
-          els.taskList.appendChild(card);
+      function taskTrackingGroups() {
+        return [
+          { key: "missing", label: "Sin sustento", match: taskMissingEvidence },
+          { key: "pending", label: "Pendientes", match: (task) => task.status === "Pendiente" && !taskMissingEvidence(task) },
+          { key: "process", label: "En proceso", match: (task) => task.status === "En proceso" && !taskMissingEvidence(task) },
+          { key: "review", label: "En revision", match: (task) => task.status === "En revision" },
+          { key: "observed", label: "Observadas", match: (task) => task.status === "No disponible" },
+          { key: "approved", label: "Aprobadas", match: (task) => task.status === "Cumplida" },
+          { key: "rejected", label: "Rechazadas", match: (task) => task.status === "Observada" && !taskMissingEvidence(task) }
+        ];
+      }
+
+      function renderTasks() {
+        const tasks = filteredTasks();
+        els.taskList.innerHTML = "";
+
+        if (!tasks.length) {
+          els.taskList.innerHTML = emptyState(
+            "No hay tareas para mostrar",
+            "Cambia los filtros o agrega una tarea nueva."
+          );
+          return;
+        }
+
+        taskTrackingGroups().forEach((group) => {
+          const groupTasks = tasks.filter(group.match);
+          const section = document.createElement("details");
+          section.className = "task-status-group";
+          section.dataset.group = group.key;
+          section.open = openTaskGroups.has(group.key);
+          section.innerHTML = `
+            <summary><span>${escapeHtml(group.label)}</span><span class="pill">${groupTasks.length}</span></summary>
+            <div class="task-status-group-body"></div>
+          `;
+          section.addEventListener("toggle", () => {
+            if (section.open) openTaskGroups.add(group.key);
+            else openTaskGroups.delete(group.key);
+          });
+          const body = section.querySelector(".task-status-group-body");
+          if (groupTasks.length) groupTasks.forEach((task) => body.appendChild(createTaskTrackingCard(task)));
+          else body.innerHTML = `<p class="task-status-group-empty">No hay tareas en esta seccion.</p>`;
+          els.taskList.appendChild(section);
         });
       }
 
-      async function reviewTask(taskId, status) {
+      function reviewTask(taskId, status) {
         const task = state.tasks.find((item) => item.id === taskId);
         if (!task || !isCoordinator()) return;
+        els.reviewEvidenceForm.dataset.taskId = taskId;
+        els.reviewEvidenceForm.dataset.status = status;
+        els.reviewEvidenceTitle.textContent = status === "Cumplida" ? "Aprobar sustento" : "Rechazar sustento";
+        els.reviewEvidenceTaskLabel.textContent = `${task.title} | ${userName(task.ownerId)} | ${formatDate(task.dueDate)}`;
+        els.reviewEvidenceNote.value = status === "Cumplida" ? "Sustento aprobado" : "";
+        els.confirmEvidenceReview.className = status === "Cumplida" ? "primary" : "danger";
+        els.confirmEvidenceReview.textContent = status === "Cumplida" ? "Aprobar y completar" : "Rechazar sustento";
+        setMessage(els.reviewEvidenceMessage, "", "");
+        els.reviewEvidenceDialog.showModal();
+        els.reviewEvidenceNote.focus();
+      }
+
+      async function saveTaskReview(taskId, status, reviewNote) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        if (!task || !isCoordinator()) return;
+        if (!clean(reviewNote)) {
+          setMessage(els.reviewEvidenceMessage, "Escribe una observacion para guardar la revision.", "err");
+          return;
+        }
+        els.confirmEvidenceReview.disabled = true;
+        setMessage(els.reviewEvidenceMessage, "Guardando revision...", "");
         try {
           if (syncInFlight) await syncInFlight;
           const data = await apiRequest("/tasks/review", {
             method: "POST",
-            body: JSON.stringify({ taskId, status })
+            body: JSON.stringify({ taskId, status, reviewNote: clean(reviewNote) })
           });
           applyCloudState(data.state);
+          els.reviewEvidenceDialog.close();
           render();
           showToast(
             status === "Cumplida"
@@ -5140,7 +5582,9 @@
             "success"
           );
         } catch (error) {
-          showToast(error.message || "No se pudo guardar la revision.", "error");
+          setMessage(els.reviewEvidenceMessage, error.message || "No se pudo guardar la revision.", "err");
+        } finally {
+          els.confirmEvidenceReview.disabled = false;
         }
       }
 
@@ -5185,6 +5629,7 @@
           const card = document.createElement("article");
           card.className = "item";
           const files = evidenceFilesForEntry(entry);
+          const links = Array.isArray(entry.links) ? entry.links : [];
           const filesMarkup = files
             .map((file, fileIndex) => {
               const fileUrl = originalEvidenceFileUrl(file);
@@ -5216,6 +5661,8 @@
             ${entry.product ? `<p><strong>Producto:</strong> ${escapeHtml(entry.product)}</p>` : ""}
             ${entry.trainingTopic ? `<p><strong>Tema de la capacitacion:</strong> ${escapeHtml(entry.trainingTopic)}</p>` : ""}
             ${entry.notes ? `<p>${escapeHtml(entry.notes)}</p>` : ""}
+            ${entry.reviewNote ? `<div class="note"><strong>Observacion de Pablo:</strong><p>${escapeHtml(entry.reviewNote)}</p></div>` : ""}
+            ${links.length ? `<div class="actions">${links.map((link) => `<a class="small" href="${escapeHtml(link)}" target="_blank" rel="noopener">Abrir enlace</a>`).join("")}</div>` : ""}
             <div class="cloud-path">${escapeHtml(cloudFolderForEvidence(entry, entry.task))}</div>
             ${files.length ? `<div class="evidence-cloud-badge">${files.length} archivo${files.length === 1 ? "" : "s"} protegido${files.length === 1 ? "" : "s"} en la nube LGTASK</div>` : ""}
             ${files.length ? `<div class="evidence-file-list">${filesMarkup}</div>` : `<p class="muted">Sustento sin archivo adjunto.</p>`}
@@ -5540,6 +5987,10 @@
           jpeg: "image/jpeg",
           png: "image/png",
           webp: "image/webp",
+          mp4: "video/mp4",
+          mov: "video/quicktime",
+          webm: "video/webm",
+          m4v: "video/x-m4v",
           pdf: "application/pdf",
           doc: "application/msword",
           docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -5712,6 +6163,7 @@
           state.activeUserId = "";
           state.users = [];
           state.tasks = [];
+          openTaskGroups.clear();
           activeViewId = "tasksView";
           activateView("tasksView", { updateUrl: true });
           els.loginEmail.value = "";
@@ -5866,19 +6318,29 @@
         });
         els.closeTaskPreview.addEventListener("click", () => els.taskPreviewDialog.close());
         els.closeTaskHistory.addEventListener("click", () => els.taskHistoryDialog.close());
-        els.taskPreviewTracking.addEventListener("click", () => {
-          const task = state.tasks.find((item) => item.id === previewedTaskId);
-          if (!task) return;
-          els.taskPreviewDialog.close();
-          els.taskStatusFilter.value = "all";
-          if (isCoordinator()) els.taskTrainerFilter.value = task.ownerId;
-          renderTasks();
-          els.taskList.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
         els.taskPreviewHistory.addEventListener("click", () => {
           const taskId = previewedTaskId;
           els.taskPreviewDialog.close();
           openTaskHistoryDialog(taskId);
+        });
+        els.cancelEvidenceReview.addEventListener("click", () => els.reviewEvidenceDialog.close());
+        els.reviewEvidenceForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          await saveTaskReview(
+            els.reviewEvidenceForm.dataset.taskId,
+            els.reviewEvidenceForm.dataset.status,
+            els.reviewEvidenceNote.value
+          );
+        });
+        els.cancelLateEvidence.addEventListener("click", () => els.lateEvidenceDialog.close());
+        els.lateEvidenceForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const reason = clean(els.lateEvidenceReason.value);
+          if (!reason) {
+            setMessage(els.lateEvidenceMessage, "Indica el motivo de la excepcion.", "err");
+            return;
+          }
+          await authorizeLateEvidence(lateEvidenceTaskId, reason);
         });
         window.addEventListener("scroll", hideTaskPreviewPopover, { passive: true });
         window.addEventListener("resize", hideTaskPreviewPopover);
@@ -6040,6 +6502,19 @@
 
         els.taskStatusFilter.addEventListener("change", renderTasks);
         els.taskTrainerFilter.addEventListener("change", renderTasks);
+        els.taskCategoryFilter.addEventListener("change", renderTasks);
+        els.taskNameFilter.addEventListener("input", renderTasks);
+        els.taskDateFrom.addEventListener("change", renderTasks);
+        els.taskDateTo.addEventListener("change", renderTasks);
+        els.clearTaskFilters.addEventListener("click", () => {
+          els.taskStatusFilter.value = "all";
+          els.taskTrainerFilter.value = "all";
+          els.taskCategoryFilter.value = "all";
+          els.taskNameFilter.value = "";
+          els.taskDateFrom.value = "";
+          els.taskDateTo.value = "";
+          renderTasks();
+        });
         els.openCloudHistory.addEventListener("click", () => {
           els.evidenceTrainerFilter.value = "all";
           els.evidenceDateFrom.value = "";
@@ -6107,7 +6582,20 @@
             setMessage(els.evidenceMessage, "No hay tarea seleccionada.", "err");
             return;
           }
+          if (!taskAllowsEvidenceToday(task)) {
+            setMessage(els.evidenceMessage, taskEvidenceDeadlineText(task), "err");
+            renderEvidenceTrainingTopic();
+            return;
+          }
           const notes = clean(els.evidenceNotes.value);
+          let links = [];
+          try {
+            links = parseEvidenceLinks(els.evidenceLinks.value);
+          } catch (error) {
+            setMessage(els.evidenceMessage, error.message, "err");
+            els.evidenceLinks.focus();
+            return;
+          }
           const trainingTopic = clean(els.evidenceTrainingTopic.value);
           if (clean(task.category).toLowerCase() === "entrenamiento" && !trainingTopic) {
             els.evidenceTrainingTopic.setCustomValidity("Indica el tema de la capacitacion.");
@@ -6177,6 +6665,7 @@
             trainingTopic,
             result: "Realizado",
             notes,
+            links,
             files: uploadedFiles,
             review: "Pendiente"
           };
