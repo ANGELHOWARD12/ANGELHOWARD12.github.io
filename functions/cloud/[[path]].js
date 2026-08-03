@@ -3,7 +3,7 @@ const SESSION_DAYS = 14;
 const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb9775180ea780b71";
 
 const EMPTY_DATA = {
-  version: 13,
+  version: 14,
   workSettings: {
     breakStart: "12:30",
     breakEnd: "14:00"
@@ -11,6 +11,7 @@ const EMPTY_DATA = {
   breakSettingsByUser: {},
   breakSettingsByUserDate: {},
   workScheduleByUserDate: {},
+  overtimeRequests: [],
   registrationRequests: [],
   passwordRecoveryRequests: [],
   tasks: [],
@@ -90,7 +91,7 @@ export async function onRequest(context) {
       return json({ ok: false, message: "Solicitud no permitida." }, 403);
     }
 
-    if (route === "health" && request.method === "GET") return json({ ok: true, version: 13 });
+    if (route === "health" && request.method === "GET") return json({ ok: true, version: 14 });
     if (route === "auth/register" && request.method === "POST") return register(request, env.DB);
     if (route === "auth/login" && request.method === "POST") return login(request, env.DB);
     if (route === "auth/logout" && request.method === "POST") return logout(request, env.DB);
@@ -120,6 +121,8 @@ export async function onRequest(context) {
     if (route === "tasks/review" && request.method === "POST") return reviewTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/delete" && request.method === "POST") return deleteTaskAndArchive(request, env.DB, session.user, context);
     if (route === "schedule/overtime" && request.method === "POST") return saveOvertimeSchedule(request, env.DB, session.user, context);
+    if (route === "schedule/overtime-request" && request.method === "POST") return requestOvertimeSchedule(request, env.DB, session.user, context);
+    if (route === "schedule/overtime-review" && request.method === "POST") return reviewOvertimeSchedule(request, env.DB, session.user, context);
     if (route === "state" && request.method === "GET") return getState(env.DB, session.user, context);
     if (route === "state" && request.method === "PUT") return putState(request, env.DB, session.user, context);
     if (route === "admin/users" && request.method === "POST") return createUser(request, env.DB, session.user);
@@ -958,8 +961,11 @@ async function deleteTaskAndArchive(request, db, user, context) {
 }
 
 async function saveOvertimeSchedule(request, db, user, context) {
+  if (user.role !== "Coordinador") {
+    return json({ ok: false, message: "Los trainers deben solicitar autorizacion a Pablo." }, 403);
+  }
   const body = await readJson(request, 20_000);
-  const targetUserId = user.role === "Coordinador" ? clean(body.userId) : user.id;
+  const targetUserId = clean(body.userId);
   const dateValue = clean(body.date);
   const endTime = clean(body.endTime);
   const reason = clean(body.reason).slice(0, 300);
@@ -999,24 +1005,160 @@ async function saveOvertimeSchedule(request, db, user, context) {
       }
     }
   };
+  data.overtimeRequests = (data.overtimeRequests || []).map((item) =>
+    item.status === "Pendiente" && item.userId === target.id && item.date === dateValue
+      ? {
+          ...item,
+          status: item.endTime === endTime ? "Aprobada" : "Rechazada",
+          reviewedAt: updatedAt,
+          reviewedById: user.id,
+          reviewedByName: user.name,
+          reviewNote:
+            item.endTime === endTime
+              ? "Aprobada al configurar la jornada directamente."
+              : "Resuelta al configurar un horario diferente."
+        }
+      : item
+  );
   await saveData(db, data);
 
   const restored = endTime === baseEnd;
-  const notificationTargets = [];
-  if (user.role === "Coordinador" && target.id !== user.id) {
-    notificationTargets.push(target.id);
-  } else if (user.role === "Trainer") {
-    const coordinators = await db.prepare("SELECT id FROM users WHERE role = 'Coordinador' AND status = 'Activo'").all();
-    notificationTargets.push(...(coordinators.results || []).map((row) => row.id));
-  }
-  const notifications = notificationTargets.map((userId) => ({
-    userId,
+  const notifications = [{
+    userId: target.id,
     title: restored ? "Jornada normal restablecida" : "Jornada ampliada",
     body: `${target.name} | ${dateValue} | salida ${endTime} | ${reason}`,
     url: `/?view=tasksView`,
     sourceKey: `overtime:${target.id}:${dateValue}:${endTime}:${updatedAt}`
+  }];
+  const notifiedUsers = await queueNotifications(db, notifications);
+  if (notifiedUsers.length) context.waitUntil(pushNotificationsForUsers(db, notifiedUsers));
+  return stateResponse(db, user, data);
+}
+
+async function requestOvertimeSchedule(request, db, user, context) {
+  if (user.role !== "Trainer") return json({ ok: false, message: "Solo los trainers pueden enviar esta solicitud." }, 403);
+  const body = await readJson(request, 20_000);
+  const dateValue = clean(body.date);
+  const endTime = clean(body.endTime);
+  const reason = clean(body.reason).slice(0, 300);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue) || new Date(`${dateValue}T12:00:00Z`).getUTCDay() === 0) {
+    return json({ ok: false, message: "Selecciona un dia laborable de lunes a sabado." }, 400);
+  }
+  const baseEnd = baseWorkdayEnd(dateValue, user.name);
+  if (
+    !/^\d{2}:\d{2}$/.test(endTime) ||
+    timeToMinutes(endTime) < timeToMinutes(baseEnd) ||
+    timeToMinutes(endTime) > timeToMinutes("23:45")
+  ) {
+    return json({ ok: false, message: `La salida debe estar entre ${baseEnd} y 23:45.` }, 400);
+  }
+  if (!reason) return json({ ok: false, message: "Escribe el motivo de la solicitud." }, 400);
+
+  const data = await loadData(db);
+  const currentEnd = workScheduleEndForUser(data, user.id, dateValue, user.name);
+  if (endTime === currentEnd) return json({ ok: false, message: `Tu jornada ya termina a las ${endTime}.` }, 400);
+  const requestedAt = Date.now();
+  const existingIndex = (data.overtimeRequests || []).findIndex(
+    (item) => item.userId === user.id && item.date === dateValue && item.status === "Pendiente"
+  );
+  const previous = existingIndex >= 0 ? data.overtimeRequests[existingIndex] : null;
+  const overtimeRequest = {
+    id: previous?.id || crypto.randomUUID(),
+    userId: user.id,
+    userName: user.name,
+    date: dateValue,
+    endTime,
+    reason,
+    status: "Pendiente",
+    requestedAt,
+    reviewedAt: 0,
+    reviewedById: "",
+    reviewedByName: "",
+    reviewNote: ""
+  };
+  if (existingIndex >= 0) data.overtimeRequests.splice(existingIndex, 1, overtimeRequest);
+  else data.overtimeRequests.unshift(overtimeRequest);
+  await saveData(db, data);
+
+  const coordinators = await db.prepare("SELECT id FROM users WHERE role = 'Coordinador' AND status = 'Activo'").all();
+  const notifications = (coordinators.results || []).map((coordinator) => ({
+    userId: coordinator.id,
+    title: "Solicitud de horas extra",
+    body: `${user.name} solicita salida ${endTime} para ${dateValue}. ${reason}`,
+    url: "/?view=tasksView",
+    sourceKey: `overtime-request:${overtimeRequest.id}:${requestedAt}`
   }));
   const notifiedUsers = await queueNotifications(db, notifications);
+  if (notifiedUsers.length) context.waitUntil(pushNotificationsForUsers(db, notifiedUsers));
+  return stateResponse(db, user, data);
+}
+
+async function reviewOvertimeSchedule(request, db, user, context) {
+  if (user.role !== "Coordinador") return json({ ok: false, message: "Solo el coordinador puede autorizar horas extra." }, 403);
+  const body = await readJson(request, 20_000);
+  const requestId = clean(body.requestId);
+  const decision = clean(body.decision);
+  const note = clean(body.note).slice(0, 300);
+  if (!["Aprobar", "Rechazar"].includes(decision)) return json({ ok: false, message: "Selecciona una decision valida." }, 400);
+  if (decision === "Rechazar" && !note) return json({ ok: false, message: "Escribe el motivo del rechazo." }, 400);
+
+  const data = await loadData(db);
+  const requestIndex = (data.overtimeRequests || []).findIndex((item) => item.id === requestId && item.status === "Pendiente");
+  if (requestIndex < 0) return json({ ok: false, message: "La solicitud ya fue revisada o no existe." }, 404);
+  const overtimeRequest = data.overtimeRequests[requestIndex];
+  const target = await db
+    .prepare("SELECT id, name, email, zone, role, status, created_at FROM users WHERE id = ? AND status = 'Activo'")
+    .bind(overtimeRequest.userId)
+    .first();
+  if (!target || target.role !== "Trainer") return json({ ok: false, message: "El trainer ya no esta activo." }, 400);
+  const baseEnd = baseWorkdayEnd(overtimeRequest.date, target.name);
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(overtimeRequest.date) ||
+    new Date(`${overtimeRequest.date}T12:00:00Z`).getUTCDay() === 0 ||
+    !/^\d{2}:\d{2}$/.test(overtimeRequest.endTime) ||
+    timeToMinutes(overtimeRequest.endTime) < timeToMinutes(baseEnd) ||
+    timeToMinutes(overtimeRequest.endTime) > timeToMinutes("23:45")
+  ) {
+    return json({ ok: false, message: "El horario solicitado ya no es valido." }, 400);
+  }
+
+  const reviewedAt = Date.now();
+  if (decision === "Aprobar") {
+    data.workScheduleByUserDate = {
+      ...(data.workScheduleByUserDate || {}),
+      [target.id]: {
+        ...(data.workScheduleByUserDate?.[target.id] || {}),
+        [overtimeRequest.date]: {
+          endTime: overtimeRequest.endTime,
+          reason: overtimeRequest.reason,
+          updatedById: user.id,
+          updatedByName: user.name,
+          updatedAt: reviewedAt
+        }
+      }
+    };
+  }
+  data.overtimeRequests[requestIndex] = {
+    ...overtimeRequest,
+    status: decision === "Aprobar" ? "Aprobada" : "Rechazada",
+    reviewedAt,
+    reviewedById: user.id,
+    reviewedByName: user.name,
+    reviewNote: note
+  };
+  await saveData(db, data);
+
+  const notification = {
+    userId: target.id,
+    title: decision === "Aprobar" ? "Horas extra aprobadas" : "Solicitud de horas extra rechazada",
+    body:
+      decision === "Aprobar"
+        ? `${overtimeRequest.date} | jornada autorizada hasta ${overtimeRequest.endTime}${note ? ` | ${note}` : ""}`
+        : `${overtimeRequest.date} | ${note}`,
+    url: "/?view=tasksView",
+    sourceKey: `overtime-review:${overtimeRequest.id}:${decision}:${reviewedAt}`
+  };
+  const notifiedUsers = await queueNotifications(db, [notification]);
   if (notifiedUsers.length) context.waitUntil(pushNotificationsForUsers(db, notifiedUsers));
   return stateResponse(db, user, data);
 }
@@ -1042,6 +1184,9 @@ async function stateResponse(db, user, loadedData = null) {
     workScheduleByUserDate: coordinator
       ? data.workScheduleByUserDate
       : { [user.id]: data.workScheduleByUserDate?.[user.id] || {} },
+    overtimeRequests: coordinator
+      ? data.overtimeRequests
+      : (data.overtimeRequests || []).filter((request) => request.userId === user.id),
     announcements: coordinator
       ? data.announcements
       : data.announcements.filter((item) => item.audience === "all" || item.targetId === user.id),
@@ -1696,6 +1841,33 @@ function normalizeWorkScheduleByUserDate(settingsByUserDate) {
   );
 }
 
+function normalizeOvertimeRequests(requests) {
+  if (!Array.isArray(requests)) return [];
+  return requests
+    .filter(
+      (request) =>
+        request &&
+        clean(request.id) &&
+        clean(request.userId) &&
+        /^\d{4}-\d{2}-\d{2}$/.test(clean(request.date)) &&
+        /^\d{2}:\d{2}$/.test(clean(request.endTime))
+    )
+    .map((request) => ({
+      id: clean(request.id),
+      userId: clean(request.userId),
+      userName: clean(request.userName),
+      date: clean(request.date),
+      endTime: clean(request.endTime),
+      reason: clean(request.reason).slice(0, 300),
+      status: ["Pendiente", "Aprobada", "Rechazada"].includes(request.status) ? request.status : "Pendiente",
+      requestedAt: Number(request.requestedAt || 0),
+      reviewedAt: Number(request.reviewedAt || 0),
+      reviewedById: clean(request.reviewedById),
+      reviewedByName: clean(request.reviewedByName),
+      reviewNote: clean(request.reviewNote).slice(0, 300)
+    }));
+}
+
 function breakSettingsForUser(data, userId, dateValue = "") {
   const daily = dateValue ? data.breakSettingsByUserDate?.[clean(userId)]?.[dateValue] : null;
   if (validWorkSettings(daily)) return normalizeWorkSettings(daily);
@@ -1776,10 +1948,12 @@ async function loadData(db) {
     return {
       ...structuredClone(EMPTY_DATA),
       ...parsed,
+      version: 14,
       workSettings: normalizeWorkSettings(parsed.workSettings),
       breakSettingsByUser: normalizeBreakSettingsByUser(parsed.breakSettingsByUser),
       breakSettingsByUserDate: normalizeBreakSettingsByUserDate(parsed.breakSettingsByUserDate),
       workScheduleByUserDate: normalizeWorkScheduleByUserDate(parsed.workScheduleByUserDate),
+      overtimeRequests: normalizeOvertimeRequests(parsed.overtimeRequests),
       tasks: (parsed.tasks || []).map((task) => ({ ...task, category: normalizeTaskCategory(task.category) })),
       deletedTasks: (parsed.deletedTasks || []).map((task) => ({ ...task, category: normalizeTaskCategory(task.category) }))
     };
@@ -1790,11 +1964,12 @@ async function loadData(db) {
 
 async function saveData(db, data) {
   const payload = {
-    version: 13,
+    version: 14,
     workSettings: normalizeWorkSettings(data.workSettings),
     breakSettingsByUser: normalizeBreakSettingsByUser(data.breakSettingsByUser),
     breakSettingsByUserDate: normalizeBreakSettingsByUserDate(data.breakSettingsByUserDate),
     workScheduleByUserDate: normalizeWorkScheduleByUserDate(data.workScheduleByUserDate),
+    overtimeRequests: normalizeOvertimeRequests(data.overtimeRequests),
     registrationRequests: data.registrationRequests || [],
     passwordRecoveryRequests: data.passwordRecoveryRequests || [],
     tasks: data.tasks || [],
