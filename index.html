@@ -1898,6 +1898,34 @@
           </form>
         </section>
 
+        <section id="overtimePanel" class="panel stack">
+          <div>
+            <h2>Ampliar jornada por dia</h2>
+            <p id="overtimeHelp" class="muted">Habilita horas extra solamente para la persona y fecha seleccionadas.</p>
+          </div>
+          <form id="overtimeForm" class="break-settings">
+            <label id="overtimeUserWrap">
+              Trainer
+              <select id="overtimeUser" required></select>
+            </label>
+            <label>
+              Fecha
+              <input id="overtimeDate" type="date" required />
+            </label>
+            <label>
+              Nueva hora de salida (24 h)
+              <select id="overtimeEnd" required></select>
+            </label>
+            <label class="wide">
+              Motivo
+              <input id="overtimeReason" type="text" maxlength="300" placeholder="Ej. Capacitación o cierre de reporte" required />
+            </label>
+            <button id="saveOvertimeButton" class="primary" type="submit">Guardar jornada</button>
+            <p id="overtimeCurrent" class="availability-note wide"></p>
+            <p id="overtimeMessage" class="message wide" aria-live="polite"></p>
+          </form>
+        </section>
+
         <section id="coordinatorDayPanel" class="panel stack">
           <div class="week-toolbar">
             <div>
@@ -2559,7 +2587,7 @@
       ];
 
       const initialState = {
-        version: 12,
+        version: 13,
         activeUserId: "",
         selectedProduct: "oled",
         selectedWeekStart: "",
@@ -2570,6 +2598,7 @@
         },
         breakSettingsByUser: {},
         breakSettingsByUserDate: {},
+        workScheduleByUserDate: {},
         users: [],
         registrationRequests: [],
         passwordRecoveryRequests: [],
@@ -2660,6 +2689,7 @@
       let lastAutoOpenedFileId = "";
       let breakSettingsUserId = "";
       let breakEditorKey = "";
+      let overtimeEditorKey = "";
       let previewedTaskId = "";
       let historyTaskId = "";
       let lateEvidenceTaskId = "";
@@ -2733,6 +2763,17 @@
         breakAvailabilityHint: document.querySelector("#breakAvailabilityHint"),
         saveBreakButton: document.querySelector("#saveBreakButton"),
         breakSettingsMessage: document.querySelector("#breakSettingsMessage"),
+        overtimePanel: document.querySelector("#overtimePanel"),
+        overtimeHelp: document.querySelector("#overtimeHelp"),
+        overtimeForm: document.querySelector("#overtimeForm"),
+        overtimeUserWrap: document.querySelector("#overtimeUserWrap"),
+        overtimeUser: document.querySelector("#overtimeUser"),
+        overtimeDate: document.querySelector("#overtimeDate"),
+        overtimeEnd: document.querySelector("#overtimeEnd"),
+        overtimeReason: document.querySelector("#overtimeReason"),
+        saveOvertimeButton: document.querySelector("#saveOvertimeButton"),
+        overtimeCurrent: document.querySelector("#overtimeCurrent"),
+        overtimeMessage: document.querySelector("#overtimeMessage"),
         prevWeek: document.querySelector("#prevWeek"),
         todayWeek: document.querySelector("#todayWeek"),
         nextWeek: document.querySelector("#nextWeek"),
@@ -2944,6 +2985,37 @@
         );
       }
 
+      function normalizeWorkScheduleByUserDate(settingsByUserDate) {
+        if (!settingsByUserDate || typeof settingsByUserDate !== "object" || Array.isArray(settingsByUserDate)) return {};
+        return Object.fromEntries(
+          Object.entries(settingsByUserDate)
+            .filter(([userId, dates]) => clean(userId) && dates && typeof dates === "object" && !Array.isArray(dates))
+            .map(([userId, dates]) => [
+              clean(userId),
+              Object.fromEntries(
+                Object.entries(dates)
+                  .filter(
+                    ([dateValue, settings]) =>
+                      /^\d{4}-\d{2}-\d{2}$/.test(dateValue) &&
+                      settings &&
+                      /^\d{2}:\d{2}$/.test(clean(settings.endTime)) &&
+                      timeToMinutes(settings.endTime) <= timeToMinutes("23:45")
+                  )
+                  .map(([dateValue, settings]) => [
+                    dateValue,
+                    {
+                      endTime: clean(settings.endTime),
+                      reason: clean(settings.reason).slice(0, 300),
+                      updatedById: clean(settings.updatedById),
+                      updatedByName: clean(settings.updatedByName),
+                      updatedAt: Number(settings.updatedAt || 0)
+                    }
+                  ])
+              )
+            ])
+        );
+      }
+
       function normalizedTaskCategory(category) {
         if (category === "PDV") return "PDP";
         if (category === "Producto") return "ULG";
@@ -2964,6 +3036,7 @@
               )
             : {};
         nextState.breakSettingsByUserDate = normalizeBreakSettingsByUserDate(nextState.breakSettingsByUserDate);
+        nextState.workScheduleByUserDate = normalizeWorkScheduleByUserDate(nextState.workScheduleByUserDate);
         nextState.tasks = (nextState.tasks || []).map((task) => ({
           ...task,
           category: normalizedTaskCategory(task.category),
@@ -3347,14 +3420,33 @@
         return normalizedUserName(person?.name) === "DANNY DIOS";
       }
 
-      function workScheduleForDate(dateValue, userId = state.activeUserId) {
+      function baseWorkScheduleForDate(dateValue, userId = state.activeUserId) {
         const saturday = isSaturday(dateValue);
         const dannySaturday = saturday && isDannyDiosUser(userId);
-        const settings = breakSettingsForUser(userId, dateValue);
         return {
           start: dannySaturday ? DANNY_SATURDAY_START : WORKDAY_START,
           end: saturday ? (dannySaturday ? DANNY_SATURDAY_END : SATURDAY_END) : WEEKDAY_END,
-          hasBreak: !saturday,
+          hasBreak: !saturday
+        };
+      }
+
+      function workScheduleForDate(dateValue, userId = state.activeUserId) {
+        const base = baseWorkScheduleForDate(dateValue, userId);
+        const settings = breakSettingsForUser(userId, dateValue);
+        const override = state.workScheduleByUserDate?.[userId]?.[dateValue];
+        const requestedEnd = clean(override?.endTime);
+        const extendedEnd =
+          /^\d{2}:\d{2}$/.test(requestedEnd) &&
+          timeToMinutes(requestedEnd) >= timeToMinutes(base.end) &&
+          timeToMinutes(requestedEnd) <= timeToMinutes("23:45")
+            ? requestedEnd
+            : base.end;
+        return {
+          start: base.start,
+          end: extendedEnd,
+          baseEnd: base.end,
+          overtime: timeToMinutes(extendedEnd) > timeToMinutes(base.end),
+          hasBreak: base.hasBreak,
           breakStart: settings.breakStart,
           breakEnd: settings.breakEnd
         };
@@ -4848,6 +4940,7 @@
         if (activeViewId === "tasksView") {
           renderWeeklyPlanningReminder();
           renderPersonalBreakSettings();
+          renderOvertimeSettings();
           renderCoordinatorDay();
           renderTrainerWeek();
           renderTasks();
@@ -4915,6 +5008,66 @@
           renderBreakAvailability(els.breakAvailableSlot.value);
         }
         breakEditorKey = editorKey;
+      }
+
+      function overtimeEndOptions(dateValue, userId, selectedEnd = "") {
+        if (!dateValue || !userId || isSunday(dateValue)) return [];
+        const base = baseWorkScheduleForDate(dateValue, userId);
+        const values = [base.end];
+        for (let value = timeToMinutes(base.end) + 30; value <= timeToMinutes("23:30"); value += 30) {
+          values.push(minutesToTime(value));
+        }
+        if (/^\d{2}:\d{2}$/.test(selectedEnd) && !values.includes(selectedEnd)) values.push(selectedEnd);
+        return values
+          .sort((left, right) => timeToMinutes(left) - timeToMinutes(right))
+          .map((endTime) => ({
+            value: endTime,
+            label: endTime === base.end ? `Horario normal (${endTime})` : `Horas extra hasta ${endTime}`
+          }));
+      }
+
+      function renderOvertimeSettings(forceSaved = false) {
+        const availablePeople = isCoordinator() ? trainers() : [activeUser()].filter(Boolean);
+        const selectedUserId = availablePeople.some((person) => person.id === els.overtimeUser.value)
+          ? els.overtimeUser.value
+          : availablePeople[0]?.id || "";
+        fillSelect(
+          els.overtimeUser,
+          availablePeople.map((person) => ({ value: person.id, label: `${person.name}${person.zone ? ` - ${person.zone}` : ""}` })),
+          selectedUserId
+        );
+        els.overtimeUserWrap.classList.toggle("hidden", !isCoordinator());
+        els.overtimeHelp.textContent = isCoordinator()
+          ? "Pablo puede ampliar la jornada de cualquier trainer para una fecha especifica."
+          : "Puedes habilitar horas extra solamente para tu propia jornada y la fecha seleccionada.";
+        if (!els.overtimeDate.value) els.overtimeDate.value = nearestWorkingDay(todayIso);
+        const dateValue = els.overtimeDate.value;
+        const userId = els.overtimeUser.value || state.activeUserId;
+        const editorKey = `${userId}|${dateValue}`;
+        const saved = state.workScheduleByUserDate?.[userId]?.[dateValue] || null;
+        const base = dateValue && userId ? baseWorkScheduleForDate(dateValue, userId) : null;
+        const selectedEnd = clean(saved?.endTime) || base?.end || "";
+        const options = overtimeEndOptions(dateValue, userId, selectedEnd);
+        fillSelect(els.overtimeEnd, options.length ? options : [{ value: "", label: "Dia no laborable" }], selectedEnd);
+        const blocked = !userId || !dateValue || isSunday(dateValue) || !options.length;
+        els.overtimeEnd.disabled = blocked;
+        els.overtimeReason.disabled = blocked;
+        els.saveOvertimeButton.disabled = blocked;
+        if (forceSaved || editorKey !== overtimeEditorKey) {
+          els.overtimeReason.value = saved?.reason || "";
+        }
+        els.overtimeCurrent.classList.toggle("is-blocked", blocked);
+        if (blocked) {
+          els.overtimeCurrent.textContent = isSunday(dateValue)
+            ? "Los domingos no forman parte de la jornada laboral."
+            : "Selecciona un trainer y una fecha valida.";
+        } else if (saved && timeToMinutes(saved.endTime) > timeToMinutes(base.end)) {
+          const author = saved.updatedByName || userName(saved.updatedById);
+          els.overtimeCurrent.textContent = `Jornada base ${base.start}-${base.end}. Ampliada hasta ${saved.endTime} por ${author}${saved.updatedAt ? ` el ${formatDateTime(saved.updatedAt)}` : ""}. Motivo: ${saved.reason || "Sin detalle"}.`;
+        } else {
+          els.overtimeCurrent.textContent = `Jornada normal para ${formatDate(dateValue)}: ${base.start}-${base.end}.`;
+        }
+        overtimeEditorKey = editorKey;
       }
 
       function refreshSelects() {
@@ -5305,10 +5458,11 @@
         const bounds = coordinatorScheduleBounds(dateValue);
         const scheduleSlots = scheduleSlotsForDate(dateValue);
         const dannySaturday = isSaturday(dateValue) && state.users.some((user) => user.status === "Activo" && isDannyDiosUser(user.id));
+        const saturdayOvertime = dannySaturday && timeToMinutes(bounds.end) > timeToMinutes(DANNY_SATURDAY_END);
         state.selectedCoordinatorDate = dateValue;
         els.coordinatorDate.value = dateValue;
         els.coordinatorDayLabel.textContent = dannySaturday
-          ? `${formatShortDate(dateValue)} | Week ${isoWeekNumber(dateValue)} | Danny 09:00-14:30 | Demas 08:30-14:00 | Sin break`
+          ? `${formatShortDate(dateValue)} | Week ${isoWeekNumber(dateValue)} | Danny 09:00-14:30 | Demas 08:30-14:00 | Sin break${saturdayOvertime ? ` | Horas extra hasta ${bounds.end}` : ""}`
           : `${formatShortDate(dateValue)} | Week ${isoWeekNumber(dateValue)} | ${bounds.start} - ${bounds.end}${schedule.hasBreak ? " | Break personalizado por usuario" : " | Sin break"}`;
         els.coordinatorDayRoster.innerHTML = `
           <div class="roster-head">
@@ -5330,7 +5484,7 @@
           row.innerHTML = `
             <div class="roster-person">
               <strong>${escapeHtml(person.name)}</strong>
-              <span>${escapeHtml(person.role === "Coordinador" ? "Coordinador" : person.zone || "Sin zona")} | ${personSchedule.start}-${personSchedule.end}</span>
+              <span>${escapeHtml(person.role === "Coordinador" ? "Coordinador" : person.zone || "Sin zona")} | ${personSchedule.start}-${personSchedule.end}${personSchedule.overtime ? " | Horas extra" : ""}</span>
               <button class="small" type="button">+ Tarea</button>
             </div>
             <div class="schedule-track" style="--schedule-slots: ${scheduleSlots}">${scheduleBreakMarkup(dateValue, person.id)}</div>
@@ -5465,7 +5619,7 @@
           column.innerHTML = `
             <div class="day-head">
               <strong>${formatShortDate(day)}</strong>
-              <span class="muted">${schedule.start}-${schedule.end}${schedule.hasBreak ? ` | Break ${schedule.breakStart}-${schedule.breakEnd}` : " | Sin break"}</span>
+              <span class="muted">${schedule.start}-${schedule.end}${schedule.overtime ? " | Horas extra" : ""}${schedule.hasBreak ? ` | Break ${schedule.breakStart}-${schedule.breakEnd}` : " | Sin break"}</span>
               <div class="day-stats">
                 <span class="pill">${tasks.length} tareas</span>
                 <span class="pill ${percent === 100 && tasks.length ? "approved" : ""}">${percent}%</span>
@@ -6666,6 +6820,70 @@
             `Break guardado solo para ${formatDate(dateValue)}: ${normalized.breakStart}-${normalized.breakEnd}.`,
             "ok"
           );
+        });
+
+        els.overtimeUser.addEventListener("change", () => {
+          overtimeEditorKey = "";
+          setMessage(els.overtimeMessage, "", "");
+          renderOvertimeSettings(true);
+        });
+        els.overtimeDate.addEventListener("change", () => {
+          overtimeEditorKey = "";
+          setMessage(els.overtimeMessage, "", "");
+          renderOvertimeSettings(true);
+        });
+        els.overtimeEnd.addEventListener("change", () => setMessage(els.overtimeMessage, "", ""));
+        els.overtimeReason.addEventListener("input", () => setMessage(els.overtimeMessage, "", ""));
+        els.overtimeForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const userId = isCoordinator() ? els.overtimeUser.value : state.activeUserId;
+          const dateValue = els.overtimeDate.value;
+          const endTime = els.overtimeEnd.value;
+          const reason = clean(els.overtimeReason.value);
+          const base = baseWorkScheduleForDate(dateValue, userId);
+          if (!userId || !dateValue || isSunday(dateValue)) {
+            setMessage(els.overtimeMessage, "Selecciona una persona y un dia laborable de lunes a sabado.", "err");
+            return;
+          }
+          if (
+            !/^\d{2}:\d{2}$/.test(endTime) ||
+            timeToMinutes(endTime) < timeToMinutes(base.end) ||
+            timeToMinutes(endTime) > timeToMinutes("23:45")
+          ) {
+            setMessage(els.overtimeMessage, `La salida debe estar entre ${base.end} y 23:45.`, "err");
+            return;
+          }
+          if (!reason) {
+            setMessage(els.overtimeMessage, "Escribe el motivo de la ampliacion o del restablecimiento.", "err");
+            return;
+          }
+          els.saveOvertimeButton.disabled = true;
+          setMessage(els.overtimeMessage, "Guardando jornada en la nube...", "");
+          try {
+            window.clearTimeout(syncTimer);
+            syncTimer = 0;
+            if (syncInFlight) await syncInFlight;
+            await syncState();
+            const data = await apiRequest("/schedule/overtime", {
+              method: "POST",
+              body: JSON.stringify({ userId, date: dateValue, endTime, reason })
+            });
+            applyCloudState(data.state);
+            overtimeEditorKey = "";
+            render();
+            const restored = endTime === base.end;
+            setMessage(
+              els.overtimeMessage,
+              restored
+                ? `Horario normal restablecido para ${formatDate(dateValue)}.`
+                : `Horas extra habilitadas para ${userName(userId)} el ${formatDate(dateValue)} hasta las ${endTime}.`,
+              "ok"
+            );
+          } catch (error) {
+            setMessage(els.overtimeMessage, error.message || "No se pudo guardar la jornada ampliada.", "err");
+          } finally {
+            els.saveOvertimeButton.disabled = false;
+          }
         });
 
         els.taskForm.addEventListener("submit", (event) => {
