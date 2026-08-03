@@ -1924,6 +1924,16 @@
             <p id="overtimeCurrent" class="availability-note wide"></p>
             <p id="overtimeMessage" class="message wide" aria-live="polite"></p>
           </form>
+          <div id="overtimeRequestsWrap" class="stack hidden">
+            <div class="panel-header">
+              <div>
+                <h3>Solicitudes de horas extra</h3>
+                <p class="muted">La jornada del trainer cambia solamente despues de la aprobacion.</p>
+              </div>
+              <span id="overtimeRequestCount" class="pill review">0 pendientes</span>
+            </div>
+            <div id="overtimeRequests" class="list"></div>
+          </div>
         </section>
 
         <section id="coordinatorDayPanel" class="panel stack">
@@ -2587,7 +2597,7 @@
       ];
 
       const initialState = {
-        version: 13,
+        version: 14,
         activeUserId: "",
         selectedProduct: "oled",
         selectedWeekStart: "",
@@ -2599,6 +2609,7 @@
         breakSettingsByUser: {},
         breakSettingsByUserDate: {},
         workScheduleByUserDate: {},
+        overtimeRequests: [],
         users: [],
         registrationRequests: [],
         passwordRecoveryRequests: [],
@@ -2774,6 +2785,9 @@
         saveOvertimeButton: document.querySelector("#saveOvertimeButton"),
         overtimeCurrent: document.querySelector("#overtimeCurrent"),
         overtimeMessage: document.querySelector("#overtimeMessage"),
+        overtimeRequestsWrap: document.querySelector("#overtimeRequestsWrap"),
+        overtimeRequestCount: document.querySelector("#overtimeRequestCount"),
+        overtimeRequests: document.querySelector("#overtimeRequests"),
         prevWeek: document.querySelector("#prevWeek"),
         todayWeek: document.querySelector("#todayWeek"),
         nextWeek: document.querySelector("#nextWeek"),
@@ -3023,6 +3037,7 @@
       }
 
       function normalizeState(nextState) {
+        nextState.version = 14;
         nextState.users = nextState.users?.length ? nextState.users : structuredClone(initialState.users);
         nextState.registrationRequests = nextState.registrationRequests || [];
         nextState.passwordRecoveryRequests = nextState.passwordRecoveryRequests || [];
@@ -3037,6 +3052,10 @@
             : {};
         nextState.breakSettingsByUserDate = normalizeBreakSettingsByUserDate(nextState.breakSettingsByUserDate);
         nextState.workScheduleByUserDate = normalizeWorkScheduleByUserDate(nextState.workScheduleByUserDate);
+        nextState.overtimeRequests = (nextState.overtimeRequests || []).map((request) => ({
+          ...request,
+          status: ["Pendiente", "Aprobada", "Rechazada"].includes(request.status) ? request.status : "Pendiente"
+        }));
         nextState.tasks = (nextState.tasks || []).map((task) => ({
           ...task,
           category: normalizedTaskCategory(task.category),
@@ -5026,6 +5045,44 @@
           }));
       }
 
+      function renderOvertimeRequests() {
+        els.overtimeRequestsWrap.classList.toggle("hidden", !isCoordinator());
+        if (!isCoordinator()) {
+          els.overtimeRequests.innerHTML = "";
+          return;
+        }
+        const pending = (state.overtimeRequests || [])
+          .filter((request) => request.status === "Pendiente")
+          .sort((left, right) => Number(right.requestedAt || 0) - Number(left.requestedAt || 0));
+        els.overtimeRequestCount.textContent = `${pending.length} ${pending.length === 1 ? "pendiente" : "pendientes"}`;
+        els.overtimeRequests.innerHTML = pending.length
+          ? pending
+              .map(
+                (request) => `
+                  <article class="item task-item">
+                    <div class="stack">
+                      <div class="actions">
+                        <strong>${escapeHtml(request.userName || userName(request.userId))}</strong>
+                        <span class="pill review">Pendiente</span>
+                      </div>
+                      <div class="meta">
+                        <span>${escapeHtml(formatDate(request.date))}</span>
+                        <span>Salida solicitada: ${escapeHtml(request.endTime)}</span>
+                        <span>${escapeHtml(formatDateTime(request.requestedAt))}</span>
+                      </div>
+                      <p>${escapeHtml(request.reason || "Sin motivo")}</p>
+                    </div>
+                    <div class="actions">
+                      <input type="text" maxlength="300" placeholder="Nota para el trainer" aria-label="Nota para ${escapeHtml(request.userName || userName(request.userId))}" data-overtime-note="${escapeHtml(request.id)}" />
+                      <button class="primary small" type="button" data-overtime-request="${escapeHtml(request.id)}" data-overtime-decision="Aprobar">Aprobar</button>
+                      <button class="danger small" type="button" data-overtime-request="${escapeHtml(request.id)}" data-overtime-decision="Rechazar">Rechazar</button>
+                    </div>
+                  </article>`
+              )
+              .join("")
+          : `<div class="empty"><strong>No hay solicitudes pendientes</strong><p>Las solicitudes de los trainers apareceran aqui.</p></div>`;
+      }
+
       function renderOvertimeSettings(forceSaved = false) {
         const availablePeople = isCoordinator() ? trainers() : [activeUser()].filter(Boolean);
         const selectedUserId = availablePeople.some((person) => person.id === els.overtimeUser.value)
@@ -5038,36 +5095,50 @@
         );
         els.overtimeUserWrap.classList.toggle("hidden", !isCoordinator());
         els.overtimeHelp.textContent = isCoordinator()
-          ? "Pablo puede ampliar la jornada de cualquier trainer para una fecha especifica."
-          : "Puedes habilitar horas extra solamente para tu propia jornada y la fecha seleccionada.";
+          ? "Pablo puede ampliar directamente la jornada y aprobar o rechazar las solicitudes de los trainers."
+          : "Solicita horas extra para una fecha. El horario se habilitara solamente cuando Pablo lo apruebe.";
         if (!els.overtimeDate.value) els.overtimeDate.value = nearestWorkingDay(todayIso);
         const dateValue = els.overtimeDate.value;
         const userId = els.overtimeUser.value || state.activeUserId;
         const editorKey = `${userId}|${dateValue}`;
         const saved = state.workScheduleByUserDate?.[userId]?.[dateValue] || null;
+        const matchingRequests = (state.overtimeRequests || [])
+          .filter((request) => request.userId === userId && request.date === dateValue)
+          .sort((left, right) => Number(right.requestedAt || 0) - Number(left.requestedAt || 0));
+        const pendingRequest = matchingRequests.find((request) => request.status === "Pendiente") || null;
+        const latestRequest = matchingRequests[0] || null;
         const base = dateValue && userId ? baseWorkScheduleForDate(dateValue, userId) : null;
-        const selectedEnd = clean(saved?.endTime) || base?.end || "";
+        const selectedEnd = clean(!isCoordinator() && pendingRequest ? pendingRequest.endTime : saved?.endTime) || base?.end || "";
         const options = overtimeEndOptions(dateValue, userId, selectedEnd);
         fillSelect(els.overtimeEnd, options.length ? options : [{ value: "", label: "Dia no laborable" }], selectedEnd);
         const blocked = !userId || !dateValue || isSunday(dateValue) || !options.length;
         els.overtimeEnd.disabled = blocked;
         els.overtimeReason.disabled = blocked;
         els.saveOvertimeButton.disabled = blocked;
+        els.saveOvertimeButton.textContent = isCoordinator()
+          ? "Guardar jornada"
+          : pendingRequest
+            ? "Actualizar solicitud"
+            : "Solicitar autorizacion";
         if (forceSaved || editorKey !== overtimeEditorKey) {
-          els.overtimeReason.value = saved?.reason || "";
+          els.overtimeReason.value = (!isCoordinator() && pendingRequest ? pendingRequest.reason : saved?.reason) || "";
         }
         els.overtimeCurrent.classList.toggle("is-blocked", blocked);
         if (blocked) {
           els.overtimeCurrent.textContent = isSunday(dateValue)
             ? "Los domingos no forman parte de la jornada laboral."
             : "Selecciona un trainer y una fecha valida.";
+        } else if (!isCoordinator() && pendingRequest) {
+          const currentSchedule = workScheduleForDate(dateValue, userId);
+          els.overtimeCurrent.textContent = `Solicitud pendiente para salir a las ${pendingRequest.endTime}. Tu jornada continua hasta las ${currentSchedule.end} mientras Pablo revisa la autorizacion.`;
         } else if (saved && timeToMinutes(saved.endTime) > timeToMinutes(base.end)) {
           const author = saved.updatedByName || userName(saved.updatedById);
           els.overtimeCurrent.textContent = `Jornada base ${base.start}-${base.end}. Ampliada hasta ${saved.endTime} por ${author}${saved.updatedAt ? ` el ${formatDateTime(saved.updatedAt)}` : ""}. Motivo: ${saved.reason || "Sin detalle"}.`;
         } else {
-          els.overtimeCurrent.textContent = `Jornada normal para ${formatDate(dateValue)}: ${base.start}-${base.end}.`;
+          els.overtimeCurrent.textContent = `Jornada normal para ${formatDate(dateValue)}: ${base.start}-${base.end}.${!isCoordinator() && latestRequest?.status === "Rechazada" ? ` Ultima solicitud rechazada${latestRequest.reviewNote ? `: ${latestRequest.reviewNote}` : "."}` : ""}`;
         }
         overtimeEditorKey = editorKey;
+        renderOvertimeRequests();
       }
 
       function refreshSelects() {
@@ -6497,6 +6568,7 @@
             applyCloudState(data.state);
             els.loginPassword.value = "";
             setMessage(els.loginMessage, "", "");
+            setMessage(els.overtimeMessage, "", "");
             render();
             syncNotificationSubscription().catch(() => {});
           } catch (error) {
@@ -6546,6 +6618,7 @@
           activateView("tasksView", { updateUrl: true });
           els.loginEmail.value = "";
           els.loginPassword.value = "";
+          setMessage(els.overtimeMessage, "", "");
           render();
         });
 
@@ -6858,19 +6931,27 @@
             return;
           }
           els.saveOvertimeButton.disabled = true;
-          setMessage(els.overtimeMessage, "Guardando jornada en la nube...", "");
+          setMessage(els.overtimeMessage, isCoordinator() ? "Guardando jornada en la nube..." : "Enviando solicitud a Pablo...", "");
           try {
             window.clearTimeout(syncTimer);
             syncTimer = 0;
             if (syncInFlight) await syncInFlight;
             await syncState();
-            const data = await apiRequest("/schedule/overtime", {
+            const data = await apiRequest(isCoordinator() ? "/schedule/overtime" : "/schedule/overtime-request", {
               method: "POST",
               body: JSON.stringify({ userId, date: dateValue, endTime, reason })
             });
             applyCloudState(data.state);
             overtimeEditorKey = "";
             render();
+            if (!isCoordinator()) {
+              setMessage(
+                els.overtimeMessage,
+                `Solicitud enviada a Pablo para ${formatDate(dateValue)} hasta las ${endTime}. El horario aun no ha cambiado.`,
+                "ok"
+              );
+              return;
+            }
             const restored = endTime === base.end;
             setMessage(
               els.overtimeMessage,
@@ -6883,6 +6964,46 @@
             setMessage(els.overtimeMessage, error.message || "No se pudo guardar la jornada ampliada.", "err");
           } finally {
             els.saveOvertimeButton.disabled = false;
+          }
+        });
+
+        els.overtimeRequests.addEventListener("click", async (event) => {
+          const button = event.target.closest("[data-overtime-request]");
+          if (!button || !isCoordinator()) return;
+          const requestId = button.dataset.overtimeRequest;
+          const decision = button.dataset.overtimeDecision;
+          const request = (state.overtimeRequests || []).find((item) => item.id === requestId && item.status === "Pendiente");
+          if (!request || !["Aprobar", "Rechazar"].includes(decision)) return;
+          const noteInput = [...els.overtimeRequests.querySelectorAll("[data-overtime-note]")].find(
+            (input) => input.dataset.overtimeNote === requestId
+          );
+          const note = clean(noteInput?.value);
+          if (decision === "Rechazar" && !note) {
+            setMessage(els.overtimeMessage, "Escribe una nota para explicar el rechazo al trainer.", "err");
+            noteInput?.focus();
+            return;
+          }
+          const reviewButtons = [...els.overtimeRequests.querySelectorAll("[data-overtime-request]")];
+          reviewButtons.forEach((item) => (item.disabled = true));
+          setMessage(els.overtimeMessage, `${decision === "Aprobar" ? "Aprobando" : "Rechazando"} solicitud...`, "");
+          try {
+            const data = await apiRequest("/schedule/overtime-review", {
+              method: "POST",
+              body: JSON.stringify({ requestId, decision, note })
+            });
+            applyCloudState(data.state);
+            overtimeEditorKey = "";
+            render();
+            setMessage(
+              els.overtimeMessage,
+              decision === "Aprobar"
+                ? `Horas extra aprobadas para ${request.userName || userName(request.userId)} el ${formatDate(request.date)}.`
+                : `Solicitud rechazada y notificada al trainer.`,
+              "ok"
+            );
+          } catch (error) {
+            setMessage(els.overtimeMessage, error.message || "No se pudo revisar la solicitud.", "err");
+            reviewButtons.forEach((item) => (item.disabled = false));
           }
         });
 
