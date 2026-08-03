@@ -580,12 +580,11 @@
       }
 
       .trainer-week-grid {
-        grid-template-columns: 1fr;
-        min-width: 0;
+        grid-template-columns: repeat(6, minmax(180px, 1fr));
       }
 
       .trainer-week-scroll {
-        overflow-x: visible;
+        overflow-x: auto;
       }
 
       .daily-roster {
@@ -5461,26 +5460,20 @@
             .sort((a, b) => (a.startTime || WORKDAY_START).localeCompare(b.startTime || WORKDAY_START));
           const done = tasks.filter((task) => task.status === "Cumplida").length;
           const percent = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
-          const column = document.createElement("details");
-          column.className = `day-column trainer-day-card ${day === todayIso ? "today" : ""}`;
-          column.open = openTrainerWeekDays.has(day);
+          const column = document.createElement("article");
+          column.className = `day-column ${day === todayIso ? "today" : ""}`;
           column.innerHTML = `
-            <summary>
-              <span><strong>${formatShortDate(day)}</strong><br><span class="muted">${schedule.start}-${schedule.end}${schedule.hasBreak ? ` | Break ${schedule.breakStart}-${schedule.breakEnd}` : " | Sin break"}</span></span>
+            <div class="day-head">
+              <strong>${formatShortDate(day)}</strong>
+              <span class="muted">${schedule.start}-${schedule.end}${schedule.hasBreak ? ` | Break ${schedule.breakStart}-${schedule.breakEnd}` : " | Sin break"}</span>
               <div class="day-stats">
                 <span class="pill">${tasks.length} tareas</span>
                 <span class="pill ${percent === 100 && tasks.length ? "approved" : ""}">${percent}%</span>
               </div>
-            </summary>
-            <div class="trainer-day-body">
-              <div class="actions"><button class="small add-personal-task" type="button">+ Mi tarea</button></div>
-              <div class="day-tasks"></div>
             </div>
+            <div class="actions"><button class="small add-personal-task" type="button">+ Mi tarea</button></div>
+            <div class="day-tasks"></div>
           `;
-          column.addEventListener("toggle", () => {
-            if (column.open) openTrainerWeekDays.add(day);
-            else openTrainerWeekDays.delete(day);
-          });
           column.querySelector(".add-personal-task").addEventListener("click", () => focusTaskFormForDate(day, state.activeUserId));
           const wrap = column.querySelector(".day-tasks");
           if (!tasks.length) {
