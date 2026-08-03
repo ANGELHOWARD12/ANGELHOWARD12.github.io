@@ -3,13 +3,14 @@ const SESSION_DAYS = 14;
 const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb9775180ea780b71";
 
 const EMPTY_DATA = {
-  version: 12,
+  version: 13,
   workSettings: {
     breakStart: "12:30",
     breakEnd: "14:00"
   },
   breakSettingsByUser: {},
   breakSettingsByUserDate: {},
+  workScheduleByUserDate: {},
   registrationRequests: [],
   passwordRecoveryRequests: [],
   tasks: [],
@@ -89,7 +90,7 @@ export async function onRequest(context) {
       return json({ ok: false, message: "Solicitud no permitida." }, 403);
     }
 
-    if (route === "health" && request.method === "GET") return json({ ok: true, version: 12 });
+    if (route === "health" && request.method === "GET") return json({ ok: true, version: 13 });
     if (route === "auth/register" && request.method === "POST") return register(request, env.DB);
     if (route === "auth/login" && request.method === "POST") return login(request, env.DB);
     if (route === "auth/logout" && request.method === "POST") return logout(request, env.DB);
@@ -118,6 +119,7 @@ export async function onRequest(context) {
     if (route === "tasks/evidence-authorize" && request.method === "POST") return authorizeLateTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/review" && request.method === "POST") return reviewTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/delete" && request.method === "POST") return deleteTaskAndArchive(request, env.DB, session.user, context);
+    if (route === "schedule/overtime" && request.method === "POST") return saveOvertimeSchedule(request, env.DB, session.user, context);
     if (route === "state" && request.method === "GET") return getState(env.DB, session.user, context);
     if (route === "state" && request.method === "PUT") return putState(request, env.DB, session.user, context);
     if (route === "admin/users" && request.method === "POST") return createUser(request, env.DB, session.user);
@@ -955,6 +957,70 @@ async function deleteTaskAndArchive(request, db, user, context) {
   return stateResponse(db, user, data);
 }
 
+async function saveOvertimeSchedule(request, db, user, context) {
+  const body = await readJson(request, 20_000);
+  const targetUserId = user.role === "Coordinador" ? clean(body.userId) : user.id;
+  const dateValue = clean(body.date);
+  const endTime = clean(body.endTime);
+  const reason = clean(body.reason).slice(0, 300);
+  const target = await db
+    .prepare("SELECT id, name, email, zone, role, status, created_at FROM users WHERE id = ? AND status = 'Activo'")
+    .bind(targetUserId)
+    .first();
+  if (!target || target.role !== "Trainer") return json({ ok: false, message: "Selecciona un trainer activo." }, 400);
+  if (user.role !== "Coordinador" && target.id !== user.id) {
+    return json({ ok: false, message: "Solo puedes ampliar tu propia jornada." }, 403);
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue) || new Date(`${dateValue}T12:00:00Z`).getUTCDay() === 0) {
+    return json({ ok: false, message: "Selecciona un dia laborable de lunes a sabado." }, 400);
+  }
+  const baseEnd = baseWorkdayEnd(dateValue, target.name);
+  if (
+    !/^\d{2}:\d{2}$/.test(endTime) ||
+    timeToMinutes(endTime) < timeToMinutes(baseEnd) ||
+    timeToMinutes(endTime) > timeToMinutes("23:45")
+  ) {
+    return json({ ok: false, message: `La salida debe estar entre ${baseEnd} y 23:45.` }, 400);
+  }
+  if (!reason) return json({ ok: false, message: "Escribe el motivo del cambio de jornada." }, 400);
+
+  const data = await loadData(db);
+  const updatedAt = Date.now();
+  data.workScheduleByUserDate = {
+    ...(data.workScheduleByUserDate || {}),
+    [target.id]: {
+      ...(data.workScheduleByUserDate?.[target.id] || {}),
+      [dateValue]: {
+        endTime,
+        reason,
+        updatedById: user.id,
+        updatedByName: user.name,
+        updatedAt
+      }
+    }
+  };
+  await saveData(db, data);
+
+  const restored = endTime === baseEnd;
+  const notificationTargets = [];
+  if (user.role === "Coordinador" && target.id !== user.id) {
+    notificationTargets.push(target.id);
+  } else if (user.role === "Trainer") {
+    const coordinators = await db.prepare("SELECT id FROM users WHERE role = 'Coordinador' AND status = 'Activo'").all();
+    notificationTargets.push(...(coordinators.results || []).map((row) => row.id));
+  }
+  const notifications = notificationTargets.map((userId) => ({
+    userId,
+    title: restored ? "Jornada normal restablecida" : "Jornada ampliada",
+    body: `${target.name} | ${dateValue} | salida ${endTime} | ${reason}`,
+    url: `/?view=tasksView`,
+    sourceKey: `overtime:${target.id}:${dateValue}:${endTime}:${updatedAt}`
+  }));
+  const notifiedUsers = await queueNotifications(db, notifications);
+  if (notifiedUsers.length) context.waitUntil(pushNotificationsForUsers(db, notifiedUsers));
+  return stateResponse(db, user, data);
+}
+
 async function stateResponse(db, user, loadedData = null) {
   const data = loadedData || (await loadData(db));
   const coordinator = user.role === "Coordinador";
@@ -973,6 +1039,9 @@ async function stateResponse(db, user, loadedData = null) {
     deletedTasks: coordinator
       ? data.deletedTasks
       : (data.deletedTasks || []).filter((task) => task.ownerId === user.id),
+    workScheduleByUserDate: coordinator
+      ? data.workScheduleByUserDate
+      : { [user.id]: data.workScheduleByUserDate?.[user.id] || {} },
     announcements: coordinator
       ? data.announcements
       : data.announcements.filter((item) => item.audience === "all" || item.targetId === user.id),
@@ -1095,7 +1164,13 @@ async function putState(request, db, user, context) {
                 clean(normalizedTask.startTime),
                 clean(normalizedTask.endTime),
                 breakSettingsForUser(current, normalizedTask.ownerId, clean(normalizedTask.dueDate)),
-                userNamesById.get(clean(normalizedTask.ownerId))
+                userNamesById.get(clean(normalizedTask.ownerId)),
+                workScheduleEndForUser(
+                  current,
+                  normalizedTask.ownerId,
+                  clean(normalizedTask.dueDate),
+                  userNamesById.get(clean(normalizedTask.ownerId))
+                )
               ) ||
               hasTaskConflict(
                 current.tasks,
@@ -1170,7 +1245,8 @@ async function putState(request, db, user, context) {
           clean(task.startTime),
           clean(task.endTime),
           breakSettingsForUser(current, requestedOwnerId, clean(task.dueDate)),
-          userNamesById.get(requestedOwnerId)
+          userNamesById.get(requestedOwnerId),
+          workScheduleEndForUser(current, requestedOwnerId, clean(task.dueDate), userNamesById.get(requestedOwnerId))
         ) &&
         !hasTaskConflict(
           current.tasks,
@@ -1201,7 +1277,14 @@ async function putState(request, db, user, context) {
         lastHistory.toStartTime === requestedStart &&
         lastHistory.toEndTime === requestedEnd &&
         clean(lastHistory.reason) &&
-        validWorkSchedule(requestedDate, requestedStart, requestedEnd, breakSettingsForUser(current, user.id, requestedDate), user.name) &&
+        validWorkSchedule(
+          requestedDate,
+          requestedStart,
+          requestedEnd,
+          breakSettingsForUser(current, user.id, requestedDate),
+          user.name,
+          workScheduleEndForUser(current, user.id, requestedDate, user.name)
+        ) &&
         !hasTaskConflict(current.tasks, user.id, requestedDate, requestedStart, requestedEnd, task.id);
       if (validReassignment) {
         notifications.push({
@@ -1272,7 +1355,14 @@ async function putState(request, db, user, context) {
         task.ownerId !== user.id ||
         task.createdById !== user.id ||
         clean(task.title).length < 2 ||
-        !validWorkSchedule(dueDate, startTime, endTime, breakSettingsForUser(current, user.id, dueDate), user.name) ||
+        !validWorkSchedule(
+          dueDate,
+          startTime,
+          endTime,
+          breakSettingsForUser(current, user.id, dueDate),
+          user.name,
+          workScheduleEndForUser(current, user.id, dueDate, user.name)
+        ) ||
         hasTaskConflict(current.tasks, user.id, dueDate, startTime, endTime)
       ) {
         continue;
@@ -1575,6 +1665,37 @@ function normalizeBreakSettingsByUserDate(settingsByUserDate) {
   );
 }
 
+function normalizeWorkScheduleByUserDate(settingsByUserDate) {
+  if (!settingsByUserDate || typeof settingsByUserDate !== "object" || Array.isArray(settingsByUserDate)) return {};
+  return Object.fromEntries(
+    Object.entries(settingsByUserDate)
+      .filter(([userId, dates]) => clean(userId) && dates && typeof dates === "object" && !Array.isArray(dates))
+      .map(([userId, dates]) => [
+        clean(userId),
+        Object.fromEntries(
+          Object.entries(dates)
+            .filter(
+              ([dateValue, settings]) =>
+                /^\d{4}-\d{2}-\d{2}$/.test(dateValue) &&
+                settings &&
+                /^\d{2}:\d{2}$/.test(clean(settings.endTime)) &&
+                timeToMinutes(settings.endTime) <= timeToMinutes("23:45")
+            )
+            .map(([dateValue, settings]) => [
+              dateValue,
+              {
+                endTime: clean(settings.endTime),
+                reason: clean(settings.reason).slice(0, 300),
+                updatedById: clean(settings.updatedById),
+                updatedByName: clean(settings.updatedByName),
+                updatedAt: Number(settings.updatedAt || 0)
+              }
+            ])
+        )
+      ])
+  );
+}
+
 function breakSettingsForUser(data, userId, dateValue = "") {
   const daily = dateValue ? data.breakSettingsByUserDate?.[clean(userId)]?.[dateValue] : null;
   if (validWorkSettings(daily)) return normalizeWorkSettings(daily);
@@ -1596,7 +1717,23 @@ function normalizedUserName(value) {
     .toUpperCase();
 }
 
-function validWorkSchedule(dateValue, startTime, endTime, workSettings = null, userName = "") {
+function baseWorkdayEnd(dateValue, userName = "") {
+  const day = new Date(`${dateValue}T12:00:00Z`).getUTCDay();
+  const dannySaturday = day === 6 && normalizedUserName(userName) === "DANNY DIOS";
+  return day === 6 ? (dannySaturday ? DANNY_SATURDAY_END : SATURDAY_END) : WEEKDAY_END;
+}
+
+function workScheduleEndForUser(data, userId, dateValue, userName = "") {
+  const baseEnd = baseWorkdayEnd(dateValue, userName);
+  const requestedEnd = clean(data.workScheduleByUserDate?.[clean(userId)]?.[dateValue]?.endTime);
+  return /^\d{2}:\d{2}$/.test(requestedEnd) &&
+    timeToMinutes(requestedEnd) >= timeToMinutes(baseEnd) &&
+    timeToMinutes(requestedEnd) <= timeToMinutes("23:45")
+    ? requestedEnd
+    : baseEnd;
+}
+
+function validWorkSchedule(dateValue, startTime, endTime, workSettings = null, userName = "", workEndOverride = "") {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateValue || ""))) return false;
   const day = new Date(`${dateValue}T12:00:00Z`).getUTCDay();
   if (day === 0) return false;
@@ -1604,7 +1741,12 @@ function validWorkSchedule(dateValue, startTime, endTime, workSettings = null, u
   const end = timeToMinutes(endTime);
   const dannySaturday = day === 6 && normalizedUserName(userName) === "DANNY DIOS";
   const workStart = timeToMinutes(dannySaturday ? DANNY_SATURDAY_START : WORKDAY_START);
-  const workEnd = timeToMinutes(day === 6 ? (dannySaturday ? DANNY_SATURDAY_END : SATURDAY_END) : WEEKDAY_END);
+  const baseEnd = baseWorkdayEnd(dateValue, userName);
+  const validOverride =
+    /^\d{2}:\d{2}$/.test(clean(workEndOverride)) &&
+    timeToMinutes(workEndOverride) >= timeToMinutes(baseEnd) &&
+    timeToMinutes(workEndOverride) <= timeToMinutes("23:45");
+  const workEnd = timeToMinutes(validOverride ? workEndOverride : baseEnd);
   if (start < workStart || end > workEnd || end <= start) return false;
   const settings = normalizeWorkSettings(workSettings);
   if (day !== 6 && start < timeToMinutes(settings.breakEnd) && end > timeToMinutes(settings.breakStart)) return false;
@@ -1637,6 +1779,7 @@ async function loadData(db) {
       workSettings: normalizeWorkSettings(parsed.workSettings),
       breakSettingsByUser: normalizeBreakSettingsByUser(parsed.breakSettingsByUser),
       breakSettingsByUserDate: normalizeBreakSettingsByUserDate(parsed.breakSettingsByUserDate),
+      workScheduleByUserDate: normalizeWorkScheduleByUserDate(parsed.workScheduleByUserDate),
       tasks: (parsed.tasks || []).map((task) => ({ ...task, category: normalizeTaskCategory(task.category) })),
       deletedTasks: (parsed.deletedTasks || []).map((task) => ({ ...task, category: normalizeTaskCategory(task.category) }))
     };
@@ -1647,10 +1790,11 @@ async function loadData(db) {
 
 async function saveData(db, data) {
   const payload = {
-    version: 12,
+    version: 13,
     workSettings: normalizeWorkSettings(data.workSettings),
     breakSettingsByUser: normalizeBreakSettingsByUser(data.breakSettingsByUser),
     breakSettingsByUserDate: normalizeBreakSettingsByUserDate(data.breakSettingsByUserDate),
+    workScheduleByUserDate: normalizeWorkScheduleByUserDate(data.workScheduleByUserDate),
     registrationRequests: data.registrationRequests || [],
     passwordRecoveryRequests: data.passwordRecoveryRequests || [],
     tasks: data.tasks || [],
