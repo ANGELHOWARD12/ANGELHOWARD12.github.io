@@ -178,14 +178,6 @@
         overflow-wrap: anywhere;
       }
 
-      #evidenceForm.inline-evidence-form #evidenceTaskSelection {
-        display: none;
-      }
-
-      #taskInlineEvidenceSection {
-        border-left: 5px solid var(--green);
-      }
-
       .upload-progress {
         background: var(--soft);
         border: 1px solid #b9cdfa;
@@ -2863,13 +2855,6 @@
           <strong>Acciones de la tarea</strong>
           <div id="taskPreviewActions" class="actions"></div>
         </section>
-        <section id="taskInlineEvidenceSection" class="note stack hidden">
-          <div>
-            <h3>Enviar sustento de esta tarea</h3>
-            <p class="muted">Adjunta los archivos y completa los datos sin salir de la tarea.</p>
-          </div>
-          <div id="taskInlineEvidenceMount"></div>
-        </section>
         <div id="taskPreviewContent" class="stack"></div>
         <div class="actions">
           <button id="taskPreviewHistory" class="small" type="button">Historial completo</button>
@@ -2965,7 +2950,7 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = 19;
+      const APP_VERSION = 20;
       const MAX_EVIDENCE_FILES = 8;
       const MAX_EVIDENCE_FILE_BYTES = 15_000_000;
       const EVIDENCE_DIRECT_BASE64 = 0;
@@ -3019,7 +3004,7 @@
       ];
 
       const initialState = {
-        version: 19,
+        version: 20,
         activeUserId: "",
         selectedProduct: "oled",
         selectedWeekStart: "",
@@ -3138,7 +3123,6 @@
       let breakEditorKey = "";
       let overtimeEditorKey = "";
       let previewedTaskId = "";
-      let evidenceInlineTaskId = "";
       let notificationAudioContext = null;
       let historyTaskId = "";
       let lateEvidenceTaskId = "";
@@ -3363,8 +3347,6 @@
         taskPreviewSubtitle: document.querySelector("#taskPreviewSubtitle"),
         taskPreviewActionsWrap: document.querySelector("#taskPreviewActionsWrap"),
         taskPreviewActions: document.querySelector("#taskPreviewActions"),
-        taskInlineEvidenceSection: document.querySelector("#taskInlineEvidenceSection"),
-        taskInlineEvidenceMount: document.querySelector("#taskInlineEvidenceMount"),
         taskPreviewContent: document.querySelector("#taskPreviewContent"),
         taskPreviewHistory: document.querySelector("#taskPreviewHistory"),
         closeTaskPreview: document.querySelector("#closeTaskPreview"),
@@ -4623,7 +4605,6 @@
       function openTaskPreviewDialog(taskId) {
         const task = state.tasks.find((item) => item.id === taskId);
         if (!task) return;
-        restoreEvidenceFormHome();
         previewedTaskId = task.id;
         refreshTaskPreviewDialog();
         els.taskPreviewDialog.showModal();
@@ -5712,9 +5693,7 @@
       }
 
       function renderEvidenceTaskPicker(preferredTaskId = "") {
-        const inlineTask = evidenceInlineTaskId ? state.tasks.find((task) => task.id === evidenceInlineTaskId) : null;
-        if (!els.evidenceTaskDate.value) els.evidenceTaskDate.value = inlineTask?.dueDate || todayIso;
-        if (inlineTask && els.evidenceTaskDate.value !== inlineTask.dueDate) els.evidenceTaskDate.value = inlineTask.dueDate;
+        if (!els.evidenceTaskDate.value) els.evidenceTaskDate.value = todayIso;
         const tasks = evidenceCandidateTasks(els.evidenceTaskDate.value);
         const selectedTaskId = tasks.some((task) => task.id === preferredTaskId)
           ? preferredTaskId
@@ -5762,7 +5741,7 @@
           els.evidenceTrainerFilter.value || "all"
         );
 
-        renderEvidenceTaskPicker(evidenceInlineTaskId || els.evidenceTask.value);
+        renderEvidenceTaskPicker(els.evidenceTask.value);
         els.taskDueDate.removeAttribute("min");
         els.taskDueDate.value = els.taskDueDate.value || nearestWorkingDay(todayIso);
         renderTaskAvailability(els.taskStartTime.value, els.taskEndTime.value);
@@ -6185,36 +6164,6 @@
         });
       }
 
-      function openEvidenceForTask(task) {
-        if (!task || isCoordinator()) return;
-        if (!taskAllowsEvidenceToday(task)) {
-          showToast(taskEvidenceDeadlineText(task), "error");
-          return;
-        }
-        previewedTaskId = task.id;
-        restoreEvidenceFormHome();
-        if (els.taskPreviewDialog.open) els.taskPreviewDialog.close();
-        activateView("evidenceView", { updateUrl: true, historyMode: "push", scroll: false });
-        els.evidenceTaskDate.value = task.dueDate;
-        renderEvidenceTaskPicker(task.id);
-        els.evidenceTask.value = task.id;
-        renderEvidenceTrainingTopic();
-        renderEvidence();
-        setEvidenceUploadProgress("", 0);
-        setMessage(els.evidenceMessage, `Tarea seleccionada: ${task.title}. Adjunta al menos un archivo y completa los datos.`, "ok");
-        showToast("Formulario de sustento abierto. La tarea ya esta seleccionada.", "success");
-        window.requestAnimationFrame(() => {
-          els.evidenceUploadPanel.scrollIntoView({ behavior: "auto", block: "start" });
-        });
-      }
-
-      function restoreEvidenceFormHome() {
-        if (els.evidenceForm.parentElement !== els.evidenceFormHome) els.evidenceFormHome.appendChild(els.evidenceForm);
-        els.evidenceForm.classList.remove("inline-evidence-form");
-        els.taskInlineEvidenceSection.classList.add("hidden");
-        evidenceInlineTaskId = "";
-      }
-
       function selectedEvidenceTask() {
         return state.tasks.find((task) => task.id === els.evidenceTask.value);
       }
@@ -6268,15 +6217,6 @@
           startButton.textContent = "Iniciar";
           startButton.addEventListener("click", () => startTask(task));
           container.appendChild(startButton);
-        } else if (task.status === "En proceso" || task.status === "Observada") {
-          const evidenceButton = document.createElement("button");
-          evidenceButton.className = "primary";
-          evidenceButton.type = "button";
-          evidenceButton.textContent = taskAllowsEvidenceToday(task) ? "Enviar sustento" : "Sustento no disponible";
-          evidenceButton.disabled = !taskAllowsEvidenceToday(task);
-          evidenceButton.title = taskEvidenceDeadlineText(task);
-          if (taskAllowsEvidenceToday(task)) evidenceButton.addEventListener("click", () => openEvidenceForTask(task));
-          container.appendChild(evidenceButton);
         }
         renderScheduleControl(container, task);
         renderReassignControl(container, task);
@@ -6665,7 +6605,7 @@
 
       function renderEvidence() {
         els.evidenceUploadPanel.classList.toggle("hidden", isCoordinator());
-        if (!isCoordinator() && !evidenceInlineTaskId) renderEvidenceTaskPicker(els.evidenceTask.value);
+        if (!isCoordinator()) renderEvidenceTaskPicker(els.evidenceTask.value);
         let allEvidence = relevantTasks()
           .flatMap((task) => (task.evidence || []).map((evidence) => ({ ...evidence, task })))
           .sort((a, b) => b.submittedAt - a.submittedAt);
@@ -7222,7 +7162,7 @@
         if (/sustento|evidencia|foto|archivo/.test(query)) {
           return {
             view: "tasksView",
-            text: "Para enviar un sustento: abre Tareas, pulsa Ver en la actividad y luego Enviar sustento. Adjunta al menos una foto o archivo, completa los datos y confirma el envio. La tarea quedara En revision hasta que Pablo la apruebe."
+            text: "Para enviar un sustento: inicia la tarea, abre la pestaña Sustentos, selecciona el dia y marca la actividad. Adjunta al menos una foto o archivo, completa los datos y confirma el envio. La tarea quedara En revision hasta que Pablo la apruebe."
           };
         }
         if (/mover|reprogram|cambiar.*hora|horario.*tarea/.test(query)) {
@@ -7708,7 +7648,6 @@
           if (success) els.renameTaskDialog.close();
         });
         els.closeTaskPreview.addEventListener("click", () => els.taskPreviewDialog.close());
-        els.taskPreviewDialog.addEventListener("close", restoreEvidenceFormHome);
         els.closeTaskHistory.addEventListener("click", () => els.taskHistoryDialog.close());
         els.taskPreviewHistory.addEventListener("click", () => {
           const taskId = previewedTaskId;
@@ -8120,7 +8059,6 @@
             setEvidenceUploadProgress("Selecciona una tarea antes de enviar.", 0, "err");
             return;
           }
-          const submittedInline = evidenceInlineTaskId === task.id || els.evidenceForm.classList.contains("inline-evidence-form");
           if (!taskAllowsEvidenceToday(task)) {
             setMessage(els.evidenceMessage, taskEvidenceDeadlineText(task), "err");
             setEvidenceUploadProgress("El plazo de esta tarea no permite la carga.", 0, "err");
@@ -8257,10 +8195,6 @@
           }
           els.evidenceForm.reset();
           els.evidenceResult.value = "Realizado";
-          if (submittedInline) {
-            restoreEvidenceFormHome();
-            if (els.taskPreviewDialog.open) els.taskPreviewDialog.close();
-          }
           renderEvidenceTaskPicker();
           renderEvidenceTrainingTopic();
           els.evidenceSubmitButton.disabled = false;
