@@ -3,7 +3,7 @@ const SESSION_DAYS = 14;
 const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb9775180ea780b71";
 
 const EMPTY_DATA = {
-  version: 16,
+  version: 17,
   workSettings: {
     breakStart: "12:30",
     breakEnd: "14:00"
@@ -92,7 +92,7 @@ export async function onRequest(context) {
       return json({ ok: false, message: "Solicitud no permitida." }, 403);
     }
 
-    if (route === "health" && request.method === "GET") return json({ ok: true, version: 16 });
+    if (route === "health" && request.method === "GET") return json({ ok: true, version: 17 });
     if (route === "auth/register" && request.method === "POST") return register(request, env.DB);
     if (route === "auth/login" && request.method === "POST") return login(request, env.DB);
     if (route === "auth/logout" && request.method === "POST") return logout(request, env.DB);
@@ -863,6 +863,9 @@ async function authorizeLateTaskEvidence(request, db, user, context) {
   if (task.status === "Cumplida") {
     return json({ ok: false, message: "La tarea ya fue aprobada y no necesita otro sustento." }, 409);
   }
+  if (lateEvidenceAuthorizationActive(task, today)) {
+    return stateResponse(db, user, data);
+  }
   const authorizedAt = Date.now();
   task.lateEvidenceAuthorization = {
     enabled: true,
@@ -1613,25 +1616,39 @@ function validReminderList(reminders, actorId, ownerId) {
 
 async function queueNotifications(db, notifications) {
   const notifiedUsers = new Set();
+  let knownUserIds;
+  try {
+    const rows = await db.prepare("SELECT id FROM users").all();
+    knownUserIds = new Set((rows.results || []).map((row) => clean(row.id)).filter(Boolean));
+  } catch (error) {
+    console.error("LGTASK notifications: no se pudo validar usuarios", error);
+    return [];
+  }
   for (const item of notifications) {
-    if (!clean(item.userId) || !clean(item.sourceKey)) continue;
-    const result = await db
-      .prepare(
-        `INSERT OR IGNORE INTO user_notifications
-         (id, user_id, title, body, target_url, source_key, created_at, delivered_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0)`
-      )
-      .bind(
-        crypto.randomUUID(),
-        clean(item.userId),
-        clean(item.title).slice(0, 100) || "LGTASK",
-        clean(item.body).slice(0, 280),
-        clean(item.url).slice(0, 500) || "/",
-        clean(item.sourceKey).slice(0, 500),
-        Date.now()
-      )
-      .run();
-    if (Number(result?.meta?.changes || 0) > 0) notifiedUsers.add(clean(item.userId));
+    const userId = clean(item.userId);
+    const sourceKey = clean(item.sourceKey);
+    if (!userId || !sourceKey || !knownUserIds.has(userId)) continue;
+    try {
+      const result = await db
+        .prepare(
+          `INSERT OR IGNORE INTO user_notifications
+           (id, user_id, title, body, target_url, source_key, created_at, delivered_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 0)`
+        )
+        .bind(
+          crypto.randomUUID(),
+          userId,
+          clean(item.title).slice(0, 100) || "LGTASK",
+          clean(item.body).slice(0, 280),
+          clean(item.url).slice(0, 500) || "/",
+          sourceKey.slice(0, 500),
+          Date.now()
+        )
+        .run();
+      if (Number(result?.meta?.changes || 0) > 0) notifiedUsers.add(userId);
+    } catch (error) {
+      console.error("LGTASK notifications: aviso omitido", { userId, sourceKey, error });
+    }
   }
   return Array.from(notifiedUsers);
 }
@@ -2019,7 +2036,7 @@ async function loadData(db) {
     return {
       ...structuredClone(EMPTY_DATA),
       ...parsed,
-      version: 16,
+      version: 17,
       workSettings: normalizeWorkSettings(parsed.workSettings),
       breakSettingsByUser: normalizeBreakSettingsByUser(parsed.breakSettingsByUser),
       breakSettingsByUserDate: normalizeBreakSettingsByUserDate(parsed.breakSettingsByUserDate),
@@ -2036,7 +2053,7 @@ async function loadData(db) {
 
 async function saveData(db, data) {
   const payload = {
-    version: 16,
+    version: 17,
     workSettings: normalizeWorkSettings(data.workSettings),
     breakSettingsByUser: normalizeBreakSettingsByUser(data.breakSettingsByUser),
     breakSettingsByUserDate: normalizeBreakSettingsByUserDate(data.breakSettingsByUserDate),
