@@ -1603,6 +1603,155 @@
         padding: 12px;
       }
 
+      .team-profile-card {
+        border-left: 5px solid var(--blue);
+      }
+
+      .team-profile-card.is-reference {
+        border-left-color: var(--yellow);
+      }
+
+      .profile-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .profile-tag {
+        background: var(--soft);
+        border: 1px solid #bcd0f5;
+        border-radius: 999px;
+        color: var(--blue-dark);
+        font-size: 12px;
+        font-weight: 800;
+        padding: 5px 9px;
+      }
+
+      .lg-update-card {
+        border-left: 5px solid var(--red);
+      }
+
+      .lg-update-card[data-line="HS"] {
+        border-left-color: var(--green);
+      }
+
+      .lg-update-card[data-line="TV"] {
+        border-left-color: var(--blue);
+      }
+
+      .lg-update-card[data-line="AV"] {
+        border-left-color: var(--cyan);
+      }
+
+      .info-checklist {
+        margin-top: 16px;
+      }
+
+      .assistant-launch {
+        align-items: center;
+        background: var(--red);
+        border: 0;
+        border-radius: 999px;
+        bottom: 20px;
+        box-shadow: 0 14px 30px rgba(165, 0, 52, 0.3);
+        color: #fff;
+        display: inline-flex;
+        font-size: 14px;
+        font-weight: 900;
+        gap: 8px;
+        min-height: 48px;
+        padding: 0 18px;
+        position: fixed;
+        right: 20px;
+        z-index: 45;
+      }
+
+      .assistant-launch:hover {
+        background: #8f1f2b;
+        transform: translateY(-2px);
+      }
+
+      .assistant-dialog {
+        max-height: min(82vh, 720px);
+        max-width: 600px;
+        overflow: hidden;
+        padding: 0;
+      }
+
+      .assistant-shell {
+        display: grid;
+        grid-template-rows: auto minmax(180px, 1fr) auto auto;
+        max-height: min(82vh, 720px);
+      }
+
+      .assistant-header {
+        align-items: flex-start;
+        background: var(--red);
+        color: #fff;
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+        padding: 16px;
+      }
+
+      .assistant-header .muted {
+        color: #ffe7ea;
+      }
+
+      .assistant-header button {
+        background: #fff;
+        color: var(--red);
+      }
+
+      .assistant-messages {
+        background: #f8fbff;
+        display: grid;
+        gap: 10px;
+        overflow-y: auto;
+        padding: 14px;
+      }
+
+      .assistant-message {
+        border-radius: 8px;
+        line-height: 1.45;
+        max-width: 88%;
+        padding: 10px 12px;
+        white-space: pre-line;
+      }
+
+      .assistant-message.bot {
+        background: #fff;
+        border: 1px solid var(--line);
+        justify-self: start;
+      }
+
+      .assistant-message.user {
+        background: var(--blue);
+        color: #fff;
+        justify-self: end;
+      }
+
+      .assistant-suggestions {
+        border-top: 1px solid var(--line);
+        display: flex;
+        gap: 7px;
+        overflow-x: auto;
+        padding: 10px 14px;
+      }
+
+      .assistant-suggestions button {
+        flex: 0 0 auto;
+        white-space: nowrap;
+      }
+
+      .assistant-form {
+        border-top: 1px solid var(--line);
+        display: grid;
+        gap: 8px;
+        grid-template-columns: minmax(0, 1fr) auto;
+        padding: 12px 14px 14px;
+      }
+
       @media (max-width: 1060px) {
         .dashboard,
         .two-col {
@@ -1748,6 +1897,22 @@
         .evidence-history-entry > summary {
           align-items: flex-start;
           flex-wrap: wrap;
+        }
+
+        .assistant-launch {
+          bottom: calc(78px + env(safe-area-inset-bottom));
+          min-height: 44px;
+          padding: 0 14px;
+          right: 10px;
+        }
+
+        .assistant-dialog,
+        .assistant-shell {
+          max-height: 86vh;
+        }
+
+        .assistant-form {
+          grid-template-columns: 1fr;
         }
 
         .task-item {
@@ -2438,23 +2603,100 @@
 
       <section id="infoView" class="view">
         <div class="two-col">
-          <section class="panel">
+          <section class="panel stack">
             <h2>Informacion LG</h2>
-            <p class="muted">Consulta rapida para reforzar argumentos de producto.</p>
+            <p class="muted">Guias base para reforzar argumentos de producto.</p>
             <div id="productTabs" class="product-tabs"></div>
             <div id="productInfo" class="stack"></div>
           </section>
-          <aside class="panel stack">
-            <h2>Checklist de visita</h2>
-            <div class="item">
-              <strong>Antes de cerrar una tarea</strong>
-              <p class="muted">Verifica exhibicion, precio, disponibilidad, limpieza, material POP y evidencia fotografica.</p>
+          <section class="panel stack">
+            <div>
+              <h2>Productos y lanzamientos</h2>
+              <p class="muted">Cualquier integrante puede agregar o actualizar informacion compartida de HS, TV y AV.</p>
             </div>
-            <div id="quizBox" class="stack"></div>
-          </aside>
+            <form id="lgUpdateForm" class="form-grid">
+              <label>
+                Linea
+                <select id="lgUpdateLine" required>
+                  <option>HS</option>
+                  <option>TV</option>
+                  <option>AV</option>
+                </select>
+              </label>
+              <label>
+                Tipo de informacion
+                <select id="lgUpdateType" required>
+                  <option>Producto</option>
+                  <option>Lanzamiento</option>
+                  <option>Tecnologia</option>
+                  <option>Argumento de venta</option>
+                </select>
+              </label>
+              <label class="wide">
+                Titulo
+                <input id="lgUpdateTitle" type="text" maxlength="140" placeholder="Ej. Nueva lavadora WashTower" required />
+              </label>
+              <label class="wide">
+                Producto o modelo
+                <input id="lgUpdateProduct" type="text" maxlength="120" placeholder="Ej. OLED evo G6" />
+              </label>
+              <label class="wide">
+                Informacion
+                <textarea id="lgUpdateDescription" maxlength="2000" placeholder="Beneficios, tecnologias, disponibilidad y argumentos importantes" required></textarea>
+              </label>
+              <div class="actions wide">
+                <button id="saveLgUpdate" class="primary" type="submit">Publicar informacion</button>
+                <button id="cancelLgUpdateEdit" class="ghost hidden" type="button">Cancelar edicion</button>
+              </div>
+              <p id="lgUpdateMessage" class="message wide" aria-live="polite"></p>
+            </form>
+            <label>
+              Filtrar publicaciones
+              <select id="lgUpdateFilter">
+                <option value="all">Todas las lineas</option>
+                <option>HS</option>
+                <option>TV</option>
+                <option>AV</option>
+              </select>
+            </label>
+            <div id="lgUpdatesList" class="list"></div>
+          </section>
         </div>
+        <aside class="panel stack info-checklist">
+          <h2>Checklist de visita</h2>
+          <div class="item">
+            <strong>Antes de cerrar una tarea</strong>
+            <p class="muted">Verifica exhibicion, precio, disponibilidad, limpieza, material POP y evidencia fotografica.</p>
+          </div>
+          <div id="quizBox" class="stack"></div>
+        </aside>
       </section>
     </main>
+
+    <button id="assistantButton" class="assistant-launch hidden" type="button" aria-haspopup="dialog">IA Ayuda</button>
+
+    <dialog id="assistantDialog" class="assistant-dialog">
+      <div class="assistant-shell">
+        <header class="assistant-header">
+          <div>
+            <h2>Asistente LGTASK</h2>
+            <p class="muted">Guia inteligente gratuita, sin consumo de API.</p>
+          </div>
+          <button id="closeAssistant" class="small" type="button" aria-label="Cerrar asistente">Cerrar</button>
+        </header>
+        <div id="assistantMessages" class="assistant-messages" aria-live="polite"></div>
+        <div id="assistantSuggestions" class="assistant-suggestions">
+          <button class="small" type="button" data-question="Como subo un sustento">Subir sustento</button>
+          <button class="small" type="button" data-question="Como muevo una tarea">Mover tarea</button>
+          <button class="small" type="button" data-question="Como cambio mi break">Cambiar break</button>
+          <button class="small" type="button" data-question="Que tareas tengo hoy">Mis tareas de hoy</button>
+        </div>
+        <form id="assistantForm" class="assistant-form">
+          <input id="assistantInput" type="text" maxlength="300" placeholder="Pregunta como usar LGTASK" aria-label="Pregunta para el asistente" required />
+          <button class="primary" type="submit">Preguntar</button>
+        </form>
+      </div>
+    </dialog>
 
     <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
 
@@ -2741,7 +2983,7 @@
       ];
 
       const initialState = {
-        version: 15,
+        version: 16,
         activeUserId: "",
         selectedProduct: "oled",
         selectedWeekStart: "",
@@ -2761,7 +3003,8 @@
         deletedTasks: [],
         announcements: [],
         supportRequests: [],
-        dailyMotivations: []
+        dailyMotivations: [],
+        lgUpdates: []
       };
 
       const products = [
@@ -2831,6 +3074,17 @@
         }
       ];
 
+      const TEAM_PROFILE_DEFAULTS = [
+        { name: "DANNY DIOS", aliases: ["DANNY DIOS"], chains: ["Plaza Vea", "Hiraoka"], specialty: "Trainer retail" },
+        { name: "CAROLINA PALACIOS", aliases: ["CAROLINA PALACIOS"], chains: ["Metro", "Oechsle", "Conecta"], specialty: "Trainer retail" },
+        { name: "ANGEL CARRENO", aliases: ["ANGEL CARRENO"], chains: ["Coolbox"], specialty: "Especialista AV" },
+        { name: "HAROLD MONTORO", aliases: ["HAROLD MONTORO"], chains: ["Estilos", "Ripley", "Credivargas"], specialty: "Trainer retail" },
+        { name: "ANTONIO GONZALES", aliases: ["ANTONIO GONZALES", "ANTONIO VIDAL"], chains: ["Integra", "Sodimac", "Rubi"], specialty: "Trainer retail" },
+        { name: "ELOY NIETO", aliases: ["ELOY NIETO"], chains: [], specialty: "ULG" },
+        { name: "BRYAN TAPIA", aliases: ["BRYAN TAPIA"], chains: [], specialty: "New Hired" },
+        { name: "GIANPIERO VASQUEZ", aliases: ["GIANPIERO VASQUEZ"], chains: [], specialty: "Asesor ULG" }
+      ];
+
       let state = loadState();
       let syncTimer = 0;
       let syncInFlight = null;
@@ -2850,10 +3104,13 @@
       let notificationAudioContext = null;
       let historyTaskId = "";
       let lateEvidenceTaskId = "";
+      let infoEditingId = "";
       const openTaskGroups = new Set();
       const openTaskDays = new Set();
       const openTrainerWeekDays = new Set();
       const openDeletedTaskDays = new Set();
+      const openEvidenceDays = new Set();
+      const openEvidenceEntries = new Set();
       let activeViewId = ALLOWED_VIEW_IDS.includes(new URLSearchParams(window.location.search).get("view"))
         ? new URLSearchParams(window.location.search).get("view")
         : "tasksView";
@@ -3104,6 +3361,24 @@
         productTabs: document.querySelector("#productTabs"),
         productInfo: document.querySelector("#productInfo"),
         quizBox: document.querySelector("#quizBox"),
+        lgUpdateForm: document.querySelector("#lgUpdateForm"),
+        lgUpdateLine: document.querySelector("#lgUpdateLine"),
+        lgUpdateType: document.querySelector("#lgUpdateType"),
+        lgUpdateTitle: document.querySelector("#lgUpdateTitle"),
+        lgUpdateProduct: document.querySelector("#lgUpdateProduct"),
+        lgUpdateDescription: document.querySelector("#lgUpdateDescription"),
+        saveLgUpdate: document.querySelector("#saveLgUpdate"),
+        cancelLgUpdateEdit: document.querySelector("#cancelLgUpdateEdit"),
+        lgUpdateMessage: document.querySelector("#lgUpdateMessage"),
+        lgUpdateFilter: document.querySelector("#lgUpdateFilter"),
+        lgUpdatesList: document.querySelector("#lgUpdatesList"),
+        assistantButton: document.querySelector("#assistantButton"),
+        assistantDialog: document.querySelector("#assistantDialog"),
+        closeAssistant: document.querySelector("#closeAssistant"),
+        assistantMessages: document.querySelector("#assistantMessages"),
+        assistantSuggestions: document.querySelector("#assistantSuggestions"),
+        assistantForm: document.querySelector("#assistantForm"),
+        assistantInput: document.querySelector("#assistantInput"),
         toastRegion: document.querySelector("#toastRegion")
       };
 
@@ -3192,7 +3467,7 @@
       }
 
       function normalizeState(nextState) {
-        nextState.version = 14;
+        nextState.version = 16;
         nextState.users = nextState.users?.length ? nextState.users : structuredClone(initialState.users);
         nextState.registrationRequests = nextState.registrationRequests || [];
         nextState.passwordRecoveryRequests = nextState.passwordRecoveryRequests || [];
@@ -3231,6 +3506,11 @@
         nextState.announcements = nextState.announcements || [];
         nextState.supportRequests = nextState.supportRequests || [];
         nextState.dailyMotivations = nextState.dailyMotivations || [];
+        nextState.lgUpdates = (nextState.lgUpdates || []).map((item) => ({
+          ...item,
+          line: ["HS", "TV", "AV"].includes(item.line) ? item.line : "HS",
+          type: ["Producto", "Lanzamiento", "Tecnologia", "Argumento de venta"].includes(item.type) ? item.type : "Producto"
+        }));
         nextState.selectedWeekStart = nextState.selectedWeekStart || weekStartIso(todayIso);
         nextState.selectedCoordinatorDate = nextState.selectedCoordinatorDate || nearestWorkingDay(todayIso);
         return nextState;
@@ -5126,6 +5406,8 @@
         els.loginScreen.classList.toggle("hidden", logged);
         els.appHeader.classList.toggle("hidden", !logged);
         els.appShell.classList.toggle("hidden", !logged);
+        els.assistantButton.classList.toggle("hidden", !logged);
+        if (!logged && els.assistantDialog.open) els.assistantDialog.close();
 
         if (!logged) return;
 
@@ -6349,7 +6631,7 @@
           const day = document.createElement("details");
           day.className = "evidence-history-day";
           const hasLinkedEntry = entries.some((entry) => entry.id === linkedEvidenceId || evidenceFilesForEntry(entry).some((file) => file.id === linkedFileId));
-          day.open = hasLinkedEntry;
+          day.open = hasLinkedEntry || openEvidenceDays.has(dayKey);
           day.innerHTML = `
             <summary>
               <strong>${escapeHtml(formatShortDate(dayKey))}</strong>
@@ -6357,6 +6639,10 @@
             </summary>
             <div class="evidence-history-day-body"></div>
           `;
+          day.addEventListener("toggle", () => {
+            if (day.open) openEvidenceDays.add(dayKey);
+            else openEvidenceDays.delete(dayKey);
+          });
           const dayBody = day.querySelector(".evidence-history-day-body");
 
           entries.forEach((entry) => {
@@ -6382,7 +6668,7 @@
               .join("");
             const entryDetails = document.createElement("details");
             entryDetails.className = "evidence-history-entry";
-            entryDetails.open = isLinked;
+            entryDetails.open = isLinked || openEvidenceEntries.has(entry.id);
             entryDetails.innerHTML = `
               <summary>
                 <span class="evidence-history-summary">
@@ -6408,6 +6694,10 @@
                 ${files.length ? `<div class="evidence-file-list">${filesMarkup}</div>` : `<p class="muted">Sustento sin archivo adjunto.</p>`}
               </div>
             `;
+            entryDetails.addEventListener("toggle", () => {
+              if (entryDetails.open) openEvidenceEntries.add(entry.id);
+              else openEvidenceEntries.delete(entry.id);
+            });
 
             const latestEvidence = entry.task.evidence?.at(-1);
             const canReview =
@@ -6449,6 +6739,24 @@
             openEvidenceFilePreview(linkedFile, { syncUrl: false }).catch(() => {});
           });
         }
+      }
+
+      function teamProfileForName(name) {
+        const normalized = normalizedUserName(name);
+        return TEAM_PROFILE_DEFAULTS.find((profile) => profile.aliases.includes(normalized)) || null;
+      }
+
+      function teamProfileMarkup(profile) {
+        const chains = profile?.chains || [];
+        return `
+          <div class="profile-tags">
+            ${chains.length ? chains.map((chain) => `<span class="profile-tag">${escapeHtml(chain)}</span>`).join("") : `<span class="profile-tag">Sin cadena fija</span>`}
+          </div>
+          <div class="note">
+            <strong>Funcion / especialidad</strong>
+            <p>${escapeHtml(profile?.specialty || "Trainer LG")}</p>
+          </div>
+        `;
       }
 
       function renderTeam() {
@@ -6499,13 +6807,24 @@
         renderPasswordRecoveryRequests();
 
         els.teamList.innerHTML = "";
-        const visibleUsers = isCoordinator() ? state.users.filter((user) => user.status === "Activo") : [activeUser()].filter(Boolean);
+        const activeUsers = state.users.filter((user) => user.status === "Activo");
+        const visibleUsers = isCoordinator() ? activeUsers : activeUsers.filter((user) => user.role === "Trainer");
+        const matchedProfiles = new Set();
         visibleUsers
+          .sort((left, right) => {
+            const leftProfile = teamProfileForName(left.name);
+            const rightProfile = teamProfileForName(right.name);
+            const leftIndex = leftProfile ? TEAM_PROFILE_DEFAULTS.indexOf(leftProfile) : TEAM_PROFILE_DEFAULTS.length;
+            const rightIndex = rightProfile ? TEAM_PROFILE_DEFAULTS.indexOf(rightProfile) : TEAM_PROFILE_DEFAULTS.length;
+            return leftIndex - rightIndex || left.name.localeCompare(right.name);
+          })
           .forEach((user) => {
             const assigned = state.tasks.filter((task) => task.ownerId === user.id);
             const completed = assigned.filter((task) => task.status === "Cumplida").length;
+            const profile = teamProfileForName(user.name);
+            if (profile) matchedProfiles.add(profile.name);
             const card = document.createElement("article");
-            card.className = "item";
+            card.className = "item team-profile-card";
             card.innerHTML = `
               <div class="title-row">
                 <h3>${escapeHtml(user.name)}</h3>
@@ -6513,10 +6832,11 @@
               </div>
               <div class="meta">
                 <span>${escapeHtml(user.zone)}</span>
-                <span>${escapeHtml(user.email)}</span>
+                ${isCoordinator() || user.id === state.activeUserId ? `<span>${escapeHtml(user.email)}</span>` : ""}
                 <span>${completed}/${assigned.length} tareas cumplidas</span>
-                <span>Clave actual: protegida</span>
+                ${isCoordinator() || user.id === state.activeUserId ? `<span>Clave actual: protegida</span>` : ""}
               </div>
+              ${user.role === "Trainer" ? teamProfileMarkup(profile) : `<div class="note"><strong>Coordinacion</strong><p>Gestion y seguimiento del equipo de trainers.</p></div>`}
               ${
                 isCoordinator()
                   ? `<div class="note">
@@ -6525,7 +6845,9 @@
                       ${user.passwordResetTemp ? `<p><strong>Clave temporal:</strong> ${escapeHtml(user.passwordResetTemp)}</p>` : ""}
                     </div>
                     <div class="actions"></div>`
-                  : `<div class="note"><strong>Mi acceso</strong><p class="muted">Si olvidas tu clave, usa Olvide mi clave en la pantalla de ingreso.</p></div>`
+                  : user.id === state.activeUserId
+                    ? `<div class="note"><strong>Mi acceso</strong><p class="muted">Si olvidas tu clave, usa Olvide mi clave en la pantalla de ingreso.</p></div>`
+                    : ""
               }
             `;
             const actions = card.querySelector(".actions");
@@ -6556,6 +6878,20 @@
             }
             els.teamList.appendChild(card);
           });
+
+        TEAM_PROFILE_DEFAULTS.filter((profile) => !matchedProfiles.has(profile.name)).forEach((profile) => {
+          const card = document.createElement("article");
+          card.className = "item team-profile-card is-reference";
+          card.innerHTML = `
+            <div class="title-row">
+              <h3>${escapeHtml(profile.name)}</h3>
+              <span class="pill pending">Perfil informativo</span>
+            </div>
+            ${teamProfileMarkup(profile)}
+            <p class="muted">La ficha esta visible para el equipo. Se vinculara automaticamente cuando el nombre del acceso coincida.</p>
+          `;
+          els.teamList.appendChild(card);
+        });
       }
 
       function renderPasswordRecoveryRequests() {
@@ -6644,6 +6980,90 @@
         });
       }
 
+      function resetLgUpdateEditor() {
+        infoEditingId = "";
+        els.lgUpdateForm.reset();
+        els.lgUpdateLine.value = "HS";
+        els.lgUpdateType.value = "Producto";
+        els.saveLgUpdate.textContent = "Publicar informacion";
+        els.cancelLgUpdateEdit.classList.add("hidden");
+        setMessage(els.lgUpdateMessage, "", "");
+      }
+
+      function editLgUpdate(item) {
+        infoEditingId = item.id;
+        els.lgUpdateLine.value = item.line;
+        els.lgUpdateType.value = item.type;
+        els.lgUpdateTitle.value = item.title;
+        els.lgUpdateProduct.value = item.product || "";
+        els.lgUpdateDescription.value = item.description;
+        els.saveLgUpdate.textContent = "Guardar cambios";
+        els.cancelLgUpdateEdit.classList.remove("hidden");
+        setMessage(els.lgUpdateMessage, `Editando: ${item.title}`, "");
+        els.lgUpdateForm.scrollIntoView({ behavior: "smooth", block: "start" });
+        els.lgUpdateTitle.focus();
+      }
+
+      async function removeLgUpdate(item) {
+        if (!window.confirm(`Eliminar la informacion "${item.title}" de Info LG?`)) return;
+        try {
+          const data = await apiRequest("/info/updates", {
+            method: "POST",
+            body: JSON.stringify({ action: "delete", id: item.id })
+          });
+          applyCloudState(data.state);
+          if (infoEditingId === item.id) resetLgUpdateEditor();
+          renderProducts();
+          showToast("Informacion eliminada de Info LG.", "success");
+        } catch (error) {
+          setMessage(els.lgUpdateMessage, error.message || "No se pudo eliminar la informacion.", "err");
+        }
+      }
+
+      function renderLgUpdates() {
+        const filter = els.lgUpdateFilter.value || "all";
+        const updates = (state.lgUpdates || [])
+          .filter((item) => filter === "all" || item.line === filter)
+          .sort((left, right) => Number(right.updatedAt || right.createdAt || 0) - Number(left.updatedAt || left.createdAt || 0));
+        els.lgUpdatesList.innerHTML = "";
+        if (!updates.length) {
+          els.lgUpdatesList.innerHTML = emptyState("No hay publicaciones en esta linea", "Agrega el primer producto, tecnologia o lanzamiento para compartirlo con el equipo.");
+          return;
+        }
+        updates.forEach((item) => {
+          const card = document.createElement("article");
+          card.className = "item lg-update-card";
+          card.dataset.line = item.line;
+          card.innerHTML = `
+            <div class="title-row">
+              <h3>${escapeHtml(item.title)}</h3>
+              <span class="pill">${escapeHtml(item.line)}</span>
+              <span class="pill medium">${escapeHtml(item.type)}</span>
+            </div>
+            ${item.product ? `<p><strong>Producto / modelo:</strong> ${escapeHtml(item.product)}</p>` : ""}
+            <p>${escapeHtml(item.description)}</p>
+            <div class="meta">
+              <span>Actualizado por ${escapeHtml(item.updatedByName || item.createdByName || "Equipo LG")}</span>
+              <span>${formatDateTime(item.updatedAt || item.createdAt)}</span>
+            </div>
+            <div class="actions"></div>
+          `;
+          const actions = card.querySelector(".actions");
+          const editButton = document.createElement("button");
+          editButton.className = "small";
+          editButton.type = "button";
+          editButton.textContent = "Editar";
+          editButton.addEventListener("click", () => editLgUpdate(item));
+          const deleteButton = document.createElement("button");
+          deleteButton.className = "danger small";
+          deleteButton.type = "button";
+          deleteButton.textContent = "Eliminar";
+          deleteButton.addEventListener("click", () => removeLgUpdate(item));
+          actions.append(editButton, deleteButton);
+          els.lgUpdatesList.appendChild(card);
+        });
+      }
+
       function renderProducts() {
         els.productTabs.innerHTML = "";
         products.forEach((product) => {
@@ -6692,6 +7112,117 @@
             result.textContent = button.dataset.answer === product.quiz.answer ? "Correcto. Usa ese argumento en tienda." : `Respuesta correcta: ${product.quiz.answer}`;
           });
         });
+        renderLgUpdates();
+      }
+
+      function assistantText(value) {
+        return clean(value)
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase();
+      }
+
+      function assistantAnswer(question) {
+        const query = assistantText(question);
+        const todayTasks = state.tasks
+          .filter((task) => task.ownerId === state.activeUserId && task.dueDate === todayIso)
+          .sort((left, right) => (left.startTime || WORKDAY_START).localeCompare(right.startTime || WORKDAY_START));
+        if (/tarea.*hoy|hoy.*tarea|que.*tengo/.test(query)) {
+          return {
+            view: "tasksView",
+            text: todayTasks.length
+              ? `Hoy tienes ${todayTasks.length} tarea${todayTasks.length === 1 ? "" : "s"}:\n${todayTasks.map((task) => `${task.startTime}-${task.endTime} | ${task.title} | ${taskStatusLabel(task.status)}`).join("\n")}`
+              : "Hoy no tienes tareas asignadas. Puedes agregar una desde Tareas usando el formulario Agregar mi tarea."
+          };
+        }
+        if (/sustento|evidencia|foto|archivo/.test(query)) {
+          return {
+            view: "tasksView",
+            text: "Para enviar un sustento: abre Tareas, pulsa Ver en la actividad y luego Enviar sustento. Adjunta al menos una foto o archivo, completa los datos y confirma el envio. La tarea quedara En revision hasta que Pablo la apruebe."
+          };
+        }
+        if (/mover|reprogram|cambiar.*hora|horario.*tarea/.test(query)) {
+          return {
+            view: "tasksView",
+            text: "Abre la tarea con Ver y selecciona Mover horario. LGTASK mostrara solamente los bloques disponibles y bloqueara cruces con tareas, jornada o break."
+          };
+        }
+        if (/break|descanso|almuerzo/.test(query)) {
+          return {
+            view: "tasksView",
+            text: "En Tareas abre Mi break por dia, elige la fecha, la duracion y uno de los horarios libres. El cambio se guarda solo para ese dia y no modifica el resto de la semana."
+          };
+        }
+        if (/hora.*extra|ampliar.*jornada|salir.*tarde/.test(query)) {
+          return {
+            view: "tasksView",
+            text: isCoordinator()
+              ? "En Ampliar jornada por dia selecciona trainer, fecha, nueva hora de salida y motivo. Tambien puedes aprobar o rechazar solicitudes pendientes."
+              : "En Ampliar jornada por dia selecciona fecha, hora de salida y motivo. El horario adicional se habilitara cuando Pablo apruebe la solicitud."
+          };
+        }
+        if (/reasign|otro trainer|no puedo/.test(query)) {
+          return {
+            view: "tasksView",
+            text: "Abre la tarea con Ver y usa Reasignar. Indica el motivo y elige una persona disponible. El movimiento quedara registrado en el historial para seguimiento de Pablo."
+          };
+        }
+        if (/producto|lanzamiento|info lg|tecnologia|hs|tv|av/.test(query)) {
+          return {
+            view: "infoView",
+            text: "En Info LG puedes consultar guias de producto y las publicaciones compartidas de HS, TV y AV. Cualquier integrante puede agregar o editar productos, tecnologias y lanzamientos."
+          };
+        }
+        if (/equipo|cadena|trainer|especialidad/.test(query)) {
+          return {
+            view: "teamView",
+            text: "En Equipo encontraras la ficha de cada trainer, sus cadenas asignadas, especialidad y avance de tareas."
+          };
+        }
+        if (/notificacion|aviso|recordatorio/.test(query)) {
+          return {
+            view: "tasksView",
+            text: "Pulsa Activar notificaciones en la parte superior y permite los avisos del navegador. Los recordatorios y nuevas tareas llegaran al celular cuando Android permita notificaciones de Chrome o de la app instalada."
+          };
+        }
+        if (/clave|contrasena|password|ingresar/.test(query)) {
+          return {
+            text: "En la pantalla de ingreso usa Olvide mi clave y escribe tu correo registrado. Pablo recibira la solicitud y podra generar una clave temporal."
+          };
+        }
+        return {
+          text: "Puedo ayudarte con: tareas de hoy, envio de sustentos, cambio de horario, break, horas extra, reasignaciones, notificaciones, Equipo e Info LG. Escribe una pregunta corta sobre lo que necesitas hacer."
+        };
+      }
+
+      function addAssistantMessage(role, text, viewId = "") {
+        const message = document.createElement("div");
+        message.className = `assistant-message ${role}`;
+        const body = document.createElement("div");
+        body.textContent = text;
+        message.appendChild(body);
+        if (role === "bot" && ALLOWED_VIEW_IDS.includes(viewId)) {
+          const action = document.createElement("button");
+          action.className = "small";
+          action.type = "button";
+          action.textContent = `Ir a ${viewId === "infoView" ? "Info LG" : viewId === "teamView" ? "Equipo" : "Tareas"}`;
+          action.addEventListener("click", () => {
+            activateView(viewId, { updateUrl: true, historyMode: "push", scroll: true });
+            render();
+            els.assistantDialog.close();
+          });
+          message.appendChild(action);
+        }
+        els.assistantMessages.appendChild(message);
+        els.assistantMessages.scrollTop = els.assistantMessages.scrollHeight;
+      }
+
+      function askAssistant(question) {
+        const value = clean(question);
+        if (!value) return;
+        addAssistantMessage("user", value);
+        const answer = assistantAnswer(value);
+        addAssistantMessage("bot", answer.text, answer.view);
       }
 
       async function resetUserPassword(userId, requestId = "") {
@@ -6907,6 +7438,8 @@
           state.activeUserId = "";
           state.users = [];
           state.tasks = [];
+          els.assistantMessages.innerHTML = "";
+          if (els.assistantDialog.open) els.assistantDialog.close();
           openTaskGroups.clear();
           openTaskDays.clear();
           openTrainerWeekDays.clear();
@@ -6924,6 +7457,27 @@
             window.alert(error.message || "No se pudieron activar las notificaciones.");
             updateNotificationButton();
           });
+        });
+
+        els.assistantButton.addEventListener("click", () => {
+          if (!els.assistantMessages.children.length) {
+            addAssistantMessage(
+              "bot",
+              `Hola, ${activeUser()?.name || "equipo"}. Puedo guiarte paso a paso para usar tareas, sustentos, horarios, Equipo e Info LG.`
+            );
+          }
+          els.assistantDialog.showModal();
+          els.assistantInput.focus();
+        });
+        els.closeAssistant.addEventListener("click", () => els.assistantDialog.close());
+        els.assistantSuggestions.querySelectorAll("button[data-question]").forEach((button) => {
+          button.addEventListener("click", () => askAssistant(button.dataset.question));
+        });
+        els.assistantForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const question = els.assistantInput.value;
+          els.assistantInput.value = "";
+          askAssistant(question);
         });
 
         document.querySelectorAll(".tab").forEach((tab) => {
@@ -7589,6 +8143,36 @@
             await refreshStateFromServer();
           } catch (error) {
             setMessage(els.trainerMessage, error.message, "err");
+          }
+        });
+
+        els.lgUpdateFilter.addEventListener("change", renderLgUpdates);
+        els.cancelLgUpdateEdit.addEventListener("click", resetLgUpdateEditor);
+        els.lgUpdateForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          els.saveLgUpdate.disabled = true;
+          setMessage(els.lgUpdateMessage, infoEditingId ? "Guardando cambios..." : "Publicando informacion...", "");
+          try {
+            const data = await apiRequest("/info/updates", {
+              method: "POST",
+              body: JSON.stringify({
+                action: "upsert",
+                id: infoEditingId,
+                line: els.lgUpdateLine.value,
+                type: els.lgUpdateType.value,
+                title: els.lgUpdateTitle.value,
+                product: els.lgUpdateProduct.value,
+                description: els.lgUpdateDescription.value
+              })
+            });
+            applyCloudState(data.state);
+            resetLgUpdateEditor();
+            renderProducts();
+            showToast("Info LG actualizada para todo el equipo.", "success");
+          } catch (error) {
+            setMessage(els.lgUpdateMessage, error.message || "No se pudo guardar Info LG.", "err");
+          } finally {
+            els.saveLgUpdate.disabled = false;
           }
         });
 
