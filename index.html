@@ -2961,11 +2961,13 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = 21;
+      const APP_VERSION = 22;
       const MAX_EVIDENCE_FILES = 8;
       const MAX_EVIDENCE_FILE_BYTES = 15_000_000;
       const EVIDENCE_DIRECT_BASE64 = 0;
       const EVIDENCE_CHUNK_BASE64 = 750_000;
+      const EVIDENCE_SELECTION_TASK_KEY = "lgtask-evidence-task-v1";
+      const EVIDENCE_SELECTION_DATE_KEY = "lgtask-evidence-date-v1";
       const NOTIFICATION_TASKS_KEY = "lgtask-notified-tasks-v1";
       const ALLOWED_VIEW_IDS = ["tasksView", "evidenceView", "teamView", "announcementsView", "infoView"];
       const EVIDENCE_FILE_EXTENSIONS = new Set([
@@ -3015,7 +3017,7 @@
       ];
 
       const initialState = {
-        version: 21,
+        version: 22,
         activeUserId: "",
         selectedProduct: "oled",
         selectedWeekStart: "",
@@ -3124,6 +3126,8 @@
       let stateRevision = 0;
       let serviceWorkerRegistration = null;
       let evidenceSubmitInFlight = false;
+      let selectedEvidenceTaskId = sessionStorage.getItem(EVIDENCE_SELECTION_TASK_KEY) || "";
+      let selectedEvidenceDate = sessionStorage.getItem(EVIDENCE_SELECTION_DATE_KEY) || "";
       let taskCreateInFlight = false;
       let notificationCheckInFlight = null;
       let toastTimer = 0;
@@ -5703,12 +5707,29 @@
           .sort((left, right) => (left.startTime || WORKDAY_START).localeCompare(right.startTime || WORKDAY_START));
       }
 
+      function rememberEvidenceSelection(taskId = "", dateValue = els.evidenceTaskDate.value) {
+        selectedEvidenceTaskId = taskId;
+        selectedEvidenceDate = dateValue || todayIso;
+        if (selectedEvidenceTaskId) sessionStorage.setItem(EVIDENCE_SELECTION_TASK_KEY, selectedEvidenceTaskId);
+        else sessionStorage.removeItem(EVIDENCE_SELECTION_TASK_KEY);
+        sessionStorage.setItem(EVIDENCE_SELECTION_DATE_KEY, selectedEvidenceDate);
+      }
+
+      function clearEvidenceSelection() {
+        selectedEvidenceTaskId = "";
+        selectedEvidenceDate = "";
+        sessionStorage.removeItem(EVIDENCE_SELECTION_TASK_KEY);
+        sessionStorage.removeItem(EVIDENCE_SELECTION_DATE_KEY);
+      }
+
       function renderEvidenceTaskPicker(preferredTaskId = "") {
-        if (!els.evidenceTaskDate.value) els.evidenceTaskDate.value = todayIso;
+        if (!els.evidenceTaskDate.value) els.evidenceTaskDate.value = selectedEvidenceDate || todayIso;
         const tasks = evidenceCandidateTasks(els.evidenceTaskDate.value);
-        const selectedTaskId = tasks.some((task) => task.id === preferredTaskId)
-          ? preferredTaskId
+        const requestedTaskId = preferredTaskId || selectedEvidenceTaskId || els.evidenceTask.value;
+        const selectedTaskId = tasks.some((task) => task.id === requestedTaskId)
+          ? requestedTaskId
           : tasks.find((task) => taskAllowsEvidenceToday(task))?.id || "";
+        rememberEvidenceSelection(selectedTaskId, els.evidenceTaskDate.value);
         fillSelect(
           els.evidenceTask,
           tasks.map((task) => ({ value: task.id, label: task.title })),
@@ -5732,6 +5753,7 @@
           : emptyState("No hay tareas disponibles este dia", "Inicia una tarea pendiente o selecciona otro dia.");
         els.evidenceTaskPicker.querySelectorAll('input[name="evidenceTaskChoice"]').forEach((input) => {
           input.addEventListener("change", () => {
+            rememberEvidenceSelection(input.value, els.evidenceTaskDate.value);
             els.evidenceTask.value = input.value;
             renderEvidenceTaskPicker(input.value);
             renderEvidenceTrainingTopic();
@@ -6205,6 +6227,7 @@
 
       function openEvidenceModuleForTask(task) {
         if (!task || task.ownerId !== state.activeUserId || isCoordinator()) return;
+        rememberEvidenceSelection(task.id, task.dueDate);
         els.evidenceTaskDate.value = task.dueDate;
         activateView("evidenceView", { updateUrl: true, historyMode: "push" });
         render();
@@ -8068,6 +8091,7 @@
           setEvidenceUploadProgress("Falta seleccionar una foto o archivo.", 0, "err");
         });
         els.evidenceTaskDate.addEventListener("change", () => {
+          rememberEvidenceSelection("", els.evidenceTaskDate.value);
           renderEvidenceTaskPicker();
           renderEvidenceTrainingTopic();
           setMessage(els.evidenceMessage, "", "");
@@ -8226,6 +8250,7 @@
           }
           els.evidenceForm.reset();
           els.evidenceResult.value = "Realizado";
+          clearEvidenceSelection();
           renderEvidenceTaskPicker();
           renderEvidenceTrainingTopic();
           els.evidenceSubmitButton.disabled = false;
@@ -8340,6 +8365,7 @@
       }
 
       els.announcementTargetWrap.classList.add("hidden");
+      if (selectedEvidenceDate) els.evidenceTaskDate.value = selectedEvidenceDate;
       els.taskDueDate.value = nearestWorkingDay(todayIso);
       els.taskStartTime.value = WORKDAY_START;
       els.taskEndTime.value = "09:30";
@@ -8351,6 +8377,20 @@
           navigator.serviceWorker.addEventListener("controllerchange", () => {
             if (sessionStorage.getItem(reloadKey)) return;
             sessionStorage.setItem(reloadKey, "1");
+            const evidenceDraftActive =
+              activeViewId === "evidenceView" &&
+              Boolean(
+                selectedEvidenceTaskId ||
+                els.evidenceTask.value ||
+                els.evidenceFiles.files?.length ||
+                clean(els.evidenceStore.value) ||
+                clean(els.evidenceProduct.value) ||
+                clean(els.evidenceNotes.value)
+              );
+            if (evidenceDraftActive) {
+              showToast("Actualizacion lista. Tu seleccion y el sustento en preparacion se mantendran sin recargar la pantalla.", "success");
+              return;
+            }
             window.location.reload();
           });
         }
