@@ -929,6 +929,17 @@
         padding: 10px;
       }
 
+      .trainer-task-card > .actions {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .trainer-task-card > .actions > button,
+      .trainer-task-card > .actions > .workflow-status {
+        max-width: 100%;
+      }
+
       .trainer-task-card.approved {
         border-left-color: var(--green);
       }
@@ -2950,7 +2961,7 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = 20;
+      const APP_VERSION = 21;
       const MAX_EVIDENCE_FILES = 8;
       const MAX_EVIDENCE_FILE_BYTES = 15_000_000;
       const EVIDENCE_DIRECT_BASE64 = 0;
@@ -3004,7 +3015,7 @@
       ];
 
       const initialState = {
-        version: 20,
+        version: 21,
         activeUserId: "",
         selectedProduct: "oled",
         selectedWeekStart: "",
@@ -6192,6 +6203,16 @@
         render();
       }
 
+      function openEvidenceModuleForTask(task) {
+        if (!task || task.ownerId !== state.activeUserId || isCoordinator()) return;
+        els.evidenceTaskDate.value = task.dueDate;
+        activateView("evidenceView", { updateUrl: true, historyMode: "push" });
+        render();
+        renderEvidenceTaskPicker(task.id);
+        renderEvidenceTrainingTopic();
+        window.requestAnimationFrame(() => els.evidenceUploadPanel.scrollIntoView({ behavior: "smooth", block: "start" }));
+      }
+
       function renderTrainerTaskActions(container, task) {
         if (task.status === "Cumplida") {
           const check = document.createElement("span");
@@ -6217,6 +6238,16 @@
           startButton.textContent = "Iniciar";
           startButton.addEventListener("click", () => startTask(task));
           container.appendChild(startButton);
+        }
+        if (task.status === "En proceso" || task.status === "Observada") {
+          const evidenceButton = document.createElement("button");
+          const evidenceAllowed = taskAllowsEvidenceToday(task);
+          evidenceButton.className = "primary";
+          evidenceButton.type = "button";
+          evidenceButton.textContent = evidenceAllowed ? "Enviar sustento" : "Sustento no disponible";
+          evidenceButton.disabled = !evidenceAllowed;
+          evidenceButton.addEventListener("click", () => openEvidenceModuleForTask(task));
+          container.appendChild(evidenceButton);
         }
         renderScheduleControl(container, task);
         renderReassignControl(container, task);
@@ -6273,7 +6304,7 @@
                 <span class="muted">${escapeHtml(task.category)}${task.product ? ` | ${escapeHtml(task.product)}` : ""}</span>
                 <div class="actions"></div>
               `;
-              renderViewTaskControl(card.querySelector(".actions"), task);
+              renderTrainerTaskActions(card.querySelector(".actions"), task);
               wrap.appendChild(card);
             });
           }
@@ -7162,7 +7193,7 @@
         if (/sustento|evidencia|foto|archivo/.test(query)) {
           return {
             view: "tasksView",
-            text: "Para enviar un sustento: inicia la tarea, abre la pestaña Sustentos, selecciona el dia y marca la actividad. Adjunta al menos una foto o archivo, completa los datos y confirma el envio. La tarea quedara En revision hasta que Pablo la apruebe."
+            text: "Para enviar un sustento: pulsa Iniciar directamente en la tarjeta y luego Enviar sustento. LGTASK abrira el formulario con la tarea seleccionada. Adjunta al menos una foto o archivo, completa los datos y confirma el envio. La tarea quedara En revision hasta que Pablo la apruebe."
           };
         }
         if (/mover|reprogram|cambiar.*hora|horario.*tarea/.test(query)) {
