@@ -3,7 +3,7 @@ const SESSION_DAYS = 14;
 const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb9775180ea780b71";
 
 const EMPTY_DATA = {
-  version: 19,
+  version: 20,
   workSettings: {
     breakStart: "12:30",
     breakEnd: "14:00"
@@ -96,7 +96,7 @@ export async function onRequest(context) {
       return json({ ok: false, message: "Solicitud no permitida." }, 403);
     }
 
-    if (route === "health" && request.method === "GET") return json({ ok: true, version: 19 });
+    if (route === "health" && request.method === "GET") return json({ ok: true, version: 20 });
     if (route === "auth/register" && request.method === "POST") return register(request, env.DB);
     if (route === "auth/login" && request.method === "POST") return login(request, env.DB);
     if (route === "auth/logout" && request.method === "POST") return logout(request, env.DB);
@@ -2144,7 +2144,7 @@ async function loadData(db) {
     return {
       ...structuredClone(EMPTY_DATA),
       ...parsed,
-      version: 19,
+      version: 20,
       workSettings: normalizeWorkSettings(parsed.workSettings),
       breakSettingsByUser: normalizeBreakSettingsByUser(parsed.breakSettingsByUser),
       breakSettingsByUserDate: normalizeBreakSettingsByUserDate(parsed.breakSettingsByUserDate),
@@ -2161,7 +2161,7 @@ async function loadData(db) {
 
 async function saveData(db, data) {
   const payload = {
-    version: 19,
+    version: 20,
     workSettings: normalizeWorkSettings(data.workSettings),
     breakSettingsByUser: normalizeBreakSettingsByUser(data.breakSettingsByUser),
     breakSettingsByUserDate: normalizeBreakSettingsByUserDate(data.breakSettingsByUserDate),
