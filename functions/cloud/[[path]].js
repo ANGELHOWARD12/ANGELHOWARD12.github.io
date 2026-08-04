@@ -3,7 +3,7 @@ const SESSION_DAYS = 14;
 const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb9775180ea780b71";
 
 const EMPTY_DATA = {
-  version: 17,
+  version: 18,
   workSettings: {
     breakStart: "12:30",
     breakEnd: "14:00"
@@ -29,7 +29,7 @@ const DANNY_SATURDAY_START = "09:00";
 const DANNY_SATURDAY_END = "14:30";
 const BREAK_START = "12:30";
 const BREAK_END = "14:00";
-const MAX_FILE_BASE64 = 1_800_000;
+const MAX_FILE_BASE64 = 700_000;
 const MAX_FILE_TOTAL_BASE64 = 21_000_000;
 const MAX_FILE_CHUNK_BASE64 = 900_000;
 const ALLOWED_FILE_EXTENSIONS = new Set([
@@ -37,6 +37,8 @@ const ALLOWED_FILE_EXTENSIONS = new Set([
   "jpeg",
   "png",
   "webp",
+  "heic",
+  "heif",
   "mp4",
   "mov",
   "webm",
@@ -55,6 +57,8 @@ const ALLOWED_FILE_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
+  "image/heic",
+  "image/heif",
   "video/mp4",
   "video/quicktime",
   "video/webm",
@@ -92,7 +96,7 @@ export async function onRequest(context) {
       return json({ ok: false, message: "Solicitud no permitida." }, 403);
     }
 
-    if (route === "health" && request.method === "GET") return json({ ok: true, version: 17 });
+    if (route === "health" && request.method === "GET") return json({ ok: true, version: 18 });
     if (route === "auth/register" && request.method === "POST") return register(request, env.DB);
     if (route === "auth/login" && request.method === "POST") return login(request, env.DB);
     if (route === "auth/logout" && request.method === "POST") return logout(request, env.DB);
@@ -118,6 +122,7 @@ export async function onRequest(context) {
     const evidenceFileMatch = route.match(/^evidence\/([^/]+)\/(?:file|photo)$/);
     if (evidenceFileMatch && request.method === "GET") return evidenceFile(env.DB, session.user, evidenceFileMatch[1]);
     if (route === "tasks/evidence" && request.method === "POST") return submitTaskEvidence(request, env.DB, session.user, context);
+    if (route === "tasks/create" && request.method === "POST") return createTask(request, env.DB, session.user, context);
     if (route === "tasks/evidence-authorize" && request.method === "POST") return authorizeLateTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/review" && request.method === "POST") return reviewTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/delete" && request.method === "POST") return deleteTaskAndArchive(request, env.DB, session.user, context);
@@ -542,7 +547,8 @@ async function uploadEvidence(request, db, user) {
   }
   if (!taskAllowsEvidenceUpload(task)) return json({ ok: false, message: evidenceUploadWindowError(task) }, 409);
 
-  const fileId = crypto.randomUUID();
+  const requestedFileId = clean(body.fileId);
+  const fileId = /^[A-Za-z0-9-]{16,100}$/.test(requestedFileId) ? requestedFileId : crypto.randomUUID();
   const fileName = clean(body.fileName).replace(/[\\/:*?"<>|]/g, "-").slice(0, 120) || "archivo-sustento";
   const extension = fileName.includes(".") ? fileName.split(".").pop().toLowerCase() : "";
   const fileMatch = /^data:([^;,]{1,150});base64,([A-Za-z0-9+/=]+)$/.exec(String(body.fileData || body.photoData || ""));
@@ -551,7 +557,18 @@ async function uploadEvidence(request, db, user) {
     return json({ ok: false, message: "El archivo no tiene un formato permitido." }, 400);
   }
   if (fileMatch[2].length > MAX_FILE_BASE64) {
-    return json({ ok: false, message: "El archivo supera el limite de 1.35 MB permitido por la nube." }, 413);
+    return json({ ok: false, message: "El archivo requiere carga por bloques." }, 413);
+  }
+
+  const existing = await db.prepare("SELECT task_id, submitted_by_id, file_name, mime_type, created_at FROM evidence_files WHERE id = ?").bind(fileId).first();
+  if (existing) {
+    if (clean(existing.task_id) !== taskId || clean(existing.submitted_by_id) !== user.id) {
+      return json({ ok: false, message: "El identificador del archivo ya esta en uso." }, 409);
+    }
+    return json({
+      ok: true,
+      file: { id: fileId, name: existing.file_name, mimeType: existing.mime_type, createdAt: existing.created_at, url: `/cloud/evidence/${fileId}/file` }
+    });
   }
 
   const createdAt = Date.now();
@@ -596,8 +613,16 @@ async function initEvidenceUpload(request, db, user) {
     return json({ ok: false, message: "El archivo no tiene un formato o tamano permitido." }, 400);
   }
 
-  const fileId = crypto.randomUUID();
+  const requestedFileId = clean(body.fileId);
+  const fileId = /^[A-Za-z0-9-]{16,100}$/.test(requestedFileId) ? requestedFileId : crypto.randomUUID();
   const createdAt = Date.now();
+  const existing = await db.prepare("SELECT task_id, submitted_by_id, created_at FROM evidence_files WHERE id = ?").bind(fileId).first();
+  if (existing) {
+    if (clean(existing.task_id) !== taskId || clean(existing.submitted_by_id) !== user.id) {
+      return json({ ok: false, message: "El identificador de la carga ya esta en uso." }, 409);
+    }
+    return json({ ok: true, fileId, chunkCount, createdAt: existing.created_at });
+  }
   await db
     .prepare(
       "INSERT INTO evidence_files (id, task_id, owner_id, submitted_by_id, file_name, mime_type, photo_base64, created_at) VALUES (?, ?, ?, ?, ?, ?, '', ?)"
@@ -710,6 +735,89 @@ async function evidenceFile(db, user, fileId) {
       "X-Content-Type-Options": "nosniff"
     }
   });
+}
+
+async function createTask(request, db, user, context) {
+  const body = await readJson(request);
+  const submitted = body.task || {};
+  const taskId = clean(submitted.id) || crypto.randomUUID();
+  const title = clean(submitted.title).slice(0, 140);
+  const ownerId = user.role === "Coordinador" ? clean(submitted.ownerId) : user.id;
+  const dueDate = clean(submitted.dueDate);
+  const startTime = clean(submitted.startTime);
+  const endTime = clean(submitted.endTime);
+  if (!title || title.length < 2) return json({ ok: false, message: "Escribe el nombre de la tarea." }, 400);
+
+  const owner = await db
+    .prepare("SELECT id, name, role, status FROM users WHERE id = ? AND status = 'Activo'")
+    .bind(ownerId)
+    .first();
+  if (!owner) return json({ ok: false, message: "El responsable ya no esta activo." }, 400);
+  if (user.role !== "Coordinador" && clean(owner.id) !== user.id) {
+    return json({ ok: false, message: "Solo puedes crear tareas para tu propio usuario." }, 403);
+  }
+
+  const data = await loadData(db);
+  const existing = data.tasks.find((task) => clean(task.id) === taskId);
+  if (existing) {
+    if (clean(existing.createdById) !== user.id || clean(existing.ownerId) !== ownerId) {
+      return json({ ok: false, message: "El identificador de la tarea ya esta en uso." }, 409);
+    }
+    return stateResponse(db, user, data);
+  }
+  if (
+    !validWorkSchedule(
+      dueDate,
+      startTime,
+      endTime,
+      breakSettingsForUser(data, ownerId, dueDate),
+      owner.name,
+      workScheduleEndForUser(data, ownerId, dueDate, owner.name)
+    )
+  ) {
+    const scheduleEnd = workScheduleEndForUser(data, ownerId, dueDate, owner.name);
+    const schedule = breakSettingsForUser(data, ownerId, dueDate);
+    return json({
+      ok: false,
+      message: `El horario no esta disponible. Jornada hasta ${scheduleEnd}${new Date(`${dueDate}T12:00:00Z`).getUTCDay() === 6 ? " sin break" : ` y break ${schedule.breakStart}-${schedule.breakEnd}`}.`
+    }, 409);
+  }
+  if (hasTaskConflict(data.tasks, ownerId, dueDate, startTime, endTime)) {
+    return json({ ok: false, message: "Ese horario ya esta ocupado por otra tarea." }, 409);
+  }
+
+  const createdAt = Date.now();
+  const task = {
+    id: taskId,
+    title,
+    ownerId,
+    createdById: user.id,
+    category: normalizeTaskCategory(submitted.category),
+    priority: ["Alta", "Media", "Baja"].includes(submitted.priority) ? submitted.priority : "Media",
+    dueDate,
+    startTime,
+    endTime,
+    product: clean(submitted.product).slice(0, 120) || "GENERAL",
+    description: clean(submitted.description).slice(0, 1500),
+    status: "Pendiente",
+    createdAt,
+    history: [{ type: "Asignacion", toId: ownerId, byId: user.id, reason: "Tarea creada", at: createdAt }],
+    evidence: [],
+    reminders: []
+  };
+  data.tasks.unshift(task);
+  await saveData(db, data);
+  if (ownerId !== user.id) {
+    const notifiedUsers = await queueNotifications(db, [{
+      userId: ownerId,
+      title: "Nueva tarea asignada",
+      body: `${title} | ${dueDate} ${startTime}-${endTime}`,
+      url: `/?view=tasksView&task=${encodeURIComponent(taskId)}`,
+      sourceKey: `task:create:${taskId}:${ownerId}`
+    }]);
+    if (notifiedUsers.length) context.waitUntil(pushNotificationsForUsers(db, notifiedUsers));
+  }
+  return stateResponse(db, user, data);
 }
 
 async function submitTaskEvidence(request, db, user, context) {
@@ -2036,7 +2144,7 @@ async function loadData(db) {
     return {
       ...structuredClone(EMPTY_DATA),
       ...parsed,
-      version: 17,
+      version: 18,
       workSettings: normalizeWorkSettings(parsed.workSettings),
       breakSettingsByUser: normalizeBreakSettingsByUser(parsed.breakSettingsByUser),
       breakSettingsByUserDate: normalizeBreakSettingsByUserDate(parsed.breakSettingsByUserDate),
@@ -2053,7 +2161,7 @@ async function loadData(db) {
 
 async function saveData(db, data) {
   const payload = {
-    version: 17,
+    version: 18,
     workSettings: normalizeWorkSettings(data.workSettings),
     breakSettingsByUser: normalizeBreakSettingsByUser(data.breakSettingsByUser),
     breakSettingsByUserDate: normalizeBreakSettingsByUserDate(data.breakSettingsByUserDate),
