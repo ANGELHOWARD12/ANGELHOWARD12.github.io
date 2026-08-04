@@ -3,7 +3,7 @@ const SESSION_DAYS = 14;
 const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb9775180ea780b71";
 
 const EMPTY_DATA = {
-  version: 15,
+  version: 16,
   workSettings: {
     breakStart: "12:30",
     breakEnd: "14:00"
@@ -18,7 +18,8 @@ const EMPTY_DATA = {
   deletedTasks: [],
   announcements: [],
   supportRequests: [],
-  dailyMotivations: []
+  dailyMotivations: [],
+  lgUpdates: []
 };
 
 const WORKDAY_START = "08:30";
@@ -91,7 +92,7 @@ export async function onRequest(context) {
       return json({ ok: false, message: "Solicitud no permitida." }, 403);
     }
 
-    if (route === "health" && request.method === "GET") return json({ ok: true, version: 15 });
+    if (route === "health" && request.method === "GET") return json({ ok: true, version: 16 });
     if (route === "auth/register" && request.method === "POST") return register(request, env.DB);
     if (route === "auth/login" && request.method === "POST") return login(request, env.DB);
     if (route === "auth/logout" && request.method === "POST") return logout(request, env.DB);
@@ -125,6 +126,7 @@ export async function onRequest(context) {
     if (route === "schedule/overtime-review" && request.method === "POST") return reviewOvertimeSchedule(request, env.DB, session.user, context);
     if (route === "state" && request.method === "GET") return getState(env.DB, session.user, context);
     if (route === "state" && request.method === "PUT") return putState(request, env.DB, session.user, context);
+    if (route === "info/updates" && request.method === "POST") return saveInfoUpdate(request, env.DB, session.user);
     if (route === "admin/users" && request.method === "POST") return createUser(request, env.DB, session.user);
     if (route === "admin/reset-password" && request.method === "POST") return resetPassword(request, env.DB, session.user);
 
@@ -316,6 +318,54 @@ async function authenticate(request, db) {
 async function getState(db, user, context) {
   const data = await loadData(db);
   context.waitUntil(dispatchDueReminders(db, data));
+  return stateResponse(db, user, data);
+}
+
+async function saveInfoUpdate(request, db, user) {
+  const body = await readJson(request);
+  const data = await loadData(db);
+  const action = clean(body.action) || "upsert";
+  const itemId = clean(body.id);
+
+  if (action === "delete") {
+    if (!itemId || !data.lgUpdates.some((item) => item.id === itemId)) {
+      return json({ ok: false, message: "La publicacion de Info LG ya no existe." }, 404);
+    }
+    data.lgUpdates = data.lgUpdates.filter((item) => item.id !== itemId);
+    await saveData(db, data);
+    return stateResponse(db, user, data);
+  }
+
+  const line = ["HS", "TV", "AV"].includes(body.line) ? body.line : "";
+  const type = ["Producto", "Lanzamiento", "Tecnologia", "Argumento de venta"].includes(body.type) ? body.type : "";
+  const title = clean(body.title).slice(0, 140);
+  const product = clean(body.product).slice(0, 120);
+  const description = clean(body.description).slice(0, 2000);
+  if (!line || !type || title.length < 3 || description.length < 5) {
+    return json({ ok: false, message: "Completa linea, tipo, titulo e informacion antes de publicar." }, 400);
+  }
+
+  const now = Date.now();
+  const existingIndex = itemId ? data.lgUpdates.findIndex((item) => item.id === itemId) : -1;
+  const existing = existingIndex >= 0 ? data.lgUpdates[existingIndex] : null;
+  const nextItem = {
+    id: existing?.id || crypto.randomUUID(),
+    line,
+    type,
+    title,
+    product,
+    description,
+    createdById: existing?.createdById || user.id,
+    createdByName: existing?.createdByName || user.name,
+    createdAt: existing?.createdAt || now,
+    updatedById: user.id,
+    updatedByName: user.name,
+    updatedAt: now
+  };
+  if (existingIndex >= 0) data.lgUpdates[existingIndex] = nextItem;
+  else data.lgUpdates.unshift(nextItem);
+  data.lgUpdates = normalizeLgUpdates(data.lgUpdates).slice(0, 500);
+  await saveData(db, data);
   return stateResponse(db, user, data);
 }
 
@@ -1889,6 +1939,27 @@ function normalizedUserName(value) {
     .toUpperCase();
 }
 
+function normalizeLgUpdates(items) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter((item) => clean(item?.id) && clean(item?.title) && clean(item?.description))
+    .map((item) => ({
+      id: clean(item.id),
+      line: ["HS", "TV", "AV"].includes(item.line) ? item.line : "HS",
+      type: ["Producto", "Lanzamiento", "Tecnologia", "Argumento de venta"].includes(item.type) ? item.type : "Producto",
+      title: clean(item.title).slice(0, 140),
+      product: clean(item.product).slice(0, 120),
+      description: clean(item.description).slice(0, 2000),
+      createdById: clean(item.createdById),
+      createdByName: clean(item.createdByName),
+      createdAt: Number(item.createdAt || 0),
+      updatedById: clean(item.updatedById),
+      updatedByName: clean(item.updatedByName),
+      updatedAt: Number(item.updatedAt || item.createdAt || 0)
+    }))
+    .slice(0, 500);
+}
+
 function baseWorkdayEnd(dateValue, userName = "") {
   const day = new Date(`${dateValue}T12:00:00Z`).getUTCDay();
   const dannySaturday = day === 6 && normalizedUserName(userName) === "DANNY DIOS";
@@ -1948,12 +2019,13 @@ async function loadData(db) {
     return {
       ...structuredClone(EMPTY_DATA),
       ...parsed,
-      version: 15,
+      version: 16,
       workSettings: normalizeWorkSettings(parsed.workSettings),
       breakSettingsByUser: normalizeBreakSettingsByUser(parsed.breakSettingsByUser),
       breakSettingsByUserDate: normalizeBreakSettingsByUserDate(parsed.breakSettingsByUserDate),
       workScheduleByUserDate: normalizeWorkScheduleByUserDate(parsed.workScheduleByUserDate),
       overtimeRequests: normalizeOvertimeRequests(parsed.overtimeRequests),
+      lgUpdates: normalizeLgUpdates(parsed.lgUpdates),
       tasks: (parsed.tasks || []).map((task) => ({ ...task, category: normalizeTaskCategory(task.category) })),
       deletedTasks: (parsed.deletedTasks || []).map((task) => ({ ...task, category: normalizeTaskCategory(task.category) }))
     };
@@ -1964,7 +2036,7 @@ async function loadData(db) {
 
 async function saveData(db, data) {
   const payload = {
-    version: 15,
+    version: 16,
     workSettings: normalizeWorkSettings(data.workSettings),
     breakSettingsByUser: normalizeBreakSettingsByUser(data.breakSettingsByUser),
     breakSettingsByUserDate: normalizeBreakSettingsByUserDate(data.breakSettingsByUserDate),
@@ -1976,7 +2048,8 @@ async function saveData(db, data) {
     deletedTasks: data.deletedTasks || [],
     announcements: data.announcements || [],
     supportRequests: data.supportRequests || [],
-    dailyMotivations: data.dailyMotivations || []
+    dailyMotivations: data.dailyMotivations || [],
+    lgUpdates: normalizeLgUpdates(data.lgUpdates)
   };
   await db.prepare("UPDATE app_data SET data = ?, updated_at = ? WHERE id = 1").bind(JSON.stringify(payload), Date.now()).run();
 }
