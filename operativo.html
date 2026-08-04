@@ -2983,7 +2983,7 @@
       ];
 
       const initialState = {
-        version: 16,
+        version: 17,
         activeUserId: "",
         selectedProduct: "oled",
         selectedWeekStart: "",
@@ -6416,6 +6416,14 @@
           render();
           showToast("Carga tardia habilitada por un solo envio durante el dia de hoy.", "success");
         } catch (error) {
+          const refreshed = await refreshStateFromServer({ quiet: true });
+          const savedTask = state.tasks.find((task) => task.id === taskId);
+          if (refreshed && lateEvidenceAuthorizationActive(savedTask)) {
+            els.lateEvidenceDialog.close();
+            render();
+            showToast("Carga tardia guardada. El aviso se completara en segundo plano.", "success");
+            return;
+          }
           setMessage(els.lateEvidenceMessage, error.message || "No se pudo guardar la autorizacion.", "err");
         } finally {
           els.confirmLateEvidence.disabled = false;
@@ -8092,6 +8100,7 @@
             review: "Pendiente"
           };
           evidence.cloudPath = cloudFolderForEvidence(evidence, task);
+          let recoveredAfterSyncError = false;
           try {
             const data = await apiRequest("/tasks/evidence", {
               method: "POST",
@@ -8099,10 +8108,16 @@
             });
             applyCloudState(data.state);
           } catch (error) {
-            setMessage(els.evidenceMessage, `El archivo se guardo, pero falta sincronizar el formulario: ${error.message}`, "err");
-            els.evidenceSubmitButton.disabled = false;
-            els.evidenceSubmitButton.textContent = "Reintentar envio";
-            return;
+            const refreshed = await refreshStateFromServer({ quiet: true });
+            const savedTask = state.tasks.find((item) => item.id === task.id);
+            const savedEvidence = savedTask?.evidence?.some((item) => item.id === evidence.id);
+            if (!refreshed || !savedEvidence) {
+              setMessage(els.evidenceMessage, `El archivo se guardo, pero falta sincronizar el formulario: ${error.message}`, "err");
+              els.evidenceSubmitButton.disabled = false;
+              els.evidenceSubmitButton.textContent = "Reintentar envio";
+              return;
+            }
+            recoveredAfterSyncError = true;
           }
           els.evidenceForm.reset();
           els.evidenceResult.value = "Realizado";
@@ -8114,7 +8129,7 @@
           renderEvidenceTrainingTopic();
           els.evidenceSubmitButton.disabled = false;
           els.evidenceSubmitButton.textContent = "Enviar sustento";
-          const successMessage = `Sustento guardado con ${uploadedFiles.length} archivo${uploadedFiles.length === 1 ? "" : "s"}. Pablo debe aprobarlo para completar la tarea.`;
+          const successMessage = `${recoveredAfterSyncError ? "Sustento confirmado en la nube" : "Sustento guardado"} con ${uploadedFiles.length} archivo${uploadedFiles.length === 1 ? "" : "s"}. Pablo debe aprobarlo para completar la tarea.`;
           setMessage(els.evidenceMessage, "", "");
           activateView("tasksView", { updateUrl: true, historyMode: "replace" });
           render();
