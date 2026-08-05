@@ -2986,7 +2986,7 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = 23;
+      const APP_VERSION = 24;
       const MAX_EVIDENCE_FILES = 8;
       const MAX_EVIDENCE_FILE_BYTES = 15_000_000;
       const EVIDENCE_DIRECT_FILE_BYTES = 300_000;
@@ -6285,17 +6285,17 @@
 
       async function startTask(task) {
         if (!task || task.status !== "Pendiente" || task.ownerId !== state.activeUserId) return;
-        task.history = task.history || [];
-        task.history.push({ type: "Inicio", byId: state.activeUserId, at: Date.now() });
-        task.status = "En proceso";
-        saveState();
-        render();
-        window.clearTimeout(syncTimer);
-        syncTimer = 0;
         try {
-          await syncState();
+          const data = await apiRequestWithRetry("/tasks/start", {
+            method: "POST",
+            body: JSON.stringify({ taskId: task.id })
+          });
+          applyCloudState(data.state);
+          render();
         } catch (error) {
-          showToast(`La tarea se inicio, pero falta sincronizar: ${error.message}`, "error");
+          showToast(`No se pudo iniciar la tarea: ${error.message}`, "error");
+          await refreshStateFromServer({ quiet: true });
+          render();
         }
       }
 
@@ -6304,12 +6304,7 @@
         evidenceOpenInFlight = true;
         rememberEvidenceSelection(task.id, task.dueDate);
         els.evidenceTaskDate.value = task.dueDate;
-        window.clearTimeout(syncTimer);
-        syncTimer = 0;
         try {
-          if (syncInFlight) await syncInFlight;
-          await syncState();
-          rememberEvidenceSelection(task.id, task.dueDate);
           activateView("evidenceView", { updateUrl: true, historyMode: "push" });
           render();
           renderEvidenceTaskPicker(task.id);
