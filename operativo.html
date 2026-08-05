@@ -2704,6 +2704,7 @@
       let previewedTaskId = "";
       let historyTaskId = "";
       let lateEvidenceTaskId = "";
+      let selectedEvidenceTaskId = "";
       const openTaskGroups = new Set();
       const openTaskDays = new Set();
       const openTrainerWeekDays = new Set();
@@ -5164,7 +5165,14 @@
             value: task.id,
             label: `${task.title} (${formatDate(task.dueDate)} | ${taskTimeLabel(task)})${taskAllowsEvidenceToday(task) ? "" : " | Plazo no disponible"}`
           }));
-        fillSelect(els.evidenceTask, availableTasks, els.evidenceTask.value);
+        const preferredEvidenceTaskId = selectedEvidenceTaskId || els.evidenceTask.value;
+        fillSelect(els.evidenceTask, availableTasks, preferredEvidenceTaskId);
+        if (availableTasks.some((task) => task.value === preferredEvidenceTaskId)) {
+          els.evidenceTask.value = preferredEvidenceTaskId;
+          selectedEvidenceTaskId = preferredEvidenceTaskId;
+        } else if (selectedEvidenceTaskId) {
+          selectedEvidenceTaskId = "";
+        }
         els.taskDueDate.removeAttribute("min");
         els.taskDueDate.value = els.taskDueDate.value || nearestWorkingDay(todayIso);
         renderTaskAvailability(els.taskStartTime.value, els.taskEndTime.value);
@@ -5588,6 +5596,8 @@
       }
 
       function openEvidenceForTask(task) {
+        selectedEvidenceTaskId = task.id;
+        if (els.taskPreviewDialog.open) els.taskPreviewDialog.close();
         activateView("evidenceView", { updateUrl: true, historyMode: "push", scroll: true });
         render();
         els.evidenceTask.value = task.id;
@@ -5596,7 +5606,12 @@
       }
 
       function selectedEvidenceTask() {
-        return state.tasks.find((task) => task.id === els.evidenceTask.value);
+        const taskId = selectedEvidenceTaskId || els.evidenceTask.value;
+        return state.tasks.find((task) => task.id === taskId);
+      }
+
+      function evidenceDraftInProgress() {
+        return Boolean(!isCoordinator() && activeViewId === "evidenceView" && selectedEvidenceTaskId);
       }
 
       function renderEvidenceTrainingTopic() {
@@ -6614,6 +6629,7 @@
           openTaskDays.clear();
           openTrainerWeekDays.clear();
           openDeletedTaskDays.clear();
+          selectedEvidenceTaskId = "";
           activeViewId = "tasksView";
           activateView("tasksView", { updateUrl: true });
           els.loginEmail.value = "";
@@ -6631,6 +6647,7 @@
 
         document.querySelectorAll(".tab").forEach((tab) => {
           tab.addEventListener("click", () => {
+            if (tab.dataset.view !== "evidenceView") selectedEvidenceTaskId = "";
             activateView(tab.dataset.view, { updateUrl: true, historyMode: "push", scroll: true });
             render();
           });
@@ -7122,6 +7139,7 @@
         els.exportEvidencePackage.addEventListener("click", exportEvidencePackage);
 
         els.evidenceFiles.addEventListener("change", () => {
+          selectedEvidenceTaskId = els.evidenceTask.value || selectedEvidenceTaskId;
           els.evidenceFiles.setCustomValidity("");
           setMessage(els.evidenceMessage, "", "");
         });
@@ -7130,6 +7148,7 @@
           setMessage(els.evidenceMessage, "Debes adjuntar al menos una foto o archivo antes de enviar el sustento.", "err");
         });
         els.evidenceTask.addEventListener("change", () => {
+          selectedEvidenceTaskId = els.evidenceTask.value;
           renderEvidenceTrainingTopic();
           setMessage(els.evidenceMessage, "", "");
         });
@@ -7245,6 +7264,7 @@
             els.evidenceSubmitButton.textContent = "Reintentar envio";
             return;
           }
+          selectedEvidenceTaskId = "";
           els.evidenceForm.reset();
           els.evidenceResult.value = "Realizado";
           renderEvidenceTrainingTopic();
@@ -7337,7 +7357,7 @@
         await refreshStateFromServer();
         await syncNotificationSubscription().catch(() => {});
         window.setInterval(() => {
-          if (state.activeUserId && !document.hidden && !syncInFlight) {
+          if (state.activeUserId && !document.hidden && !syncInFlight && !evidenceDraftInProgress()) {
             refreshStateFromServer().catch(() => {});
           }
         }, 5000);
