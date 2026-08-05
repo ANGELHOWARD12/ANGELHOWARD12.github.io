@@ -1,6 +1,9 @@
 const SESSION_COOKIE = "lg_session";
 const SESSION_DAYS = 14;
 const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb9775180ea780b71";
+const MICROSOFT_STORAGE_PROVIDER = "onedrive";
+
+let microsoftTokenCache = { token: "", expiresAt: 0 };
 
 const EMPTY_DATA = {
   version: 14,
@@ -110,16 +113,16 @@ export async function onRequest(context) {
     if (route === "notifications/pending" && request.method === "GET") {
       return pendingNotifications(env.DB, session.user);
     }
-    if (route === "evidence/upload" && request.method === "POST") return uploadEvidence(request, env.DB, session.user);
+    if (route === "evidence/upload" && request.method === "POST") return uploadEvidence(request, env.DB, session.user, env);
     if (route === "evidence/upload/init" && request.method === "POST") return initEvidenceUpload(request, env.DB, session.user);
     if (route === "evidence/upload/chunk" && request.method === "POST") return uploadEvidenceChunk(request, env.DB, session.user);
-    if (route === "evidence/upload/complete" && request.method === "POST") return completeEvidenceUpload(request, env.DB, session.user);
+    if (route === "evidence/upload/complete" && request.method === "POST") return completeEvidenceUpload(request, env.DB, session.user, env);
     const evidenceFileMatch = route.match(/^evidence\/([^/]+)\/(?:file|photo)$/);
-    if (evidenceFileMatch && request.method === "GET") return evidenceFile(env.DB, session.user, evidenceFileMatch[1]);
+    if (evidenceFileMatch && request.method === "GET") return evidenceFile(env.DB, session.user, evidenceFileMatch[1], env);
     if (route === "tasks/evidence" && request.method === "POST") return submitTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/evidence-authorize" && request.method === "POST") return authorizeLateTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/review" && request.method === "POST") return reviewTaskEvidence(request, env.DB, session.user, context);
-    if (route === "tasks/delete" && request.method === "POST") return deleteTaskAndArchive(request, env.DB, session.user, context);
+    if (route === "tasks/delete" && request.method === "POST") return deleteTaskAndArchive(request, env.DB, session.user, context, env);
     if (route === "schedule/overtime" && request.method === "POST") return saveOvertimeSchedule(request, env.DB, session.user, context);
     if (route === "schedule/overtime-request" && request.method === "POST") return requestOvertimeSchedule(request, env.DB, session.user, context);
     if (route === "schedule/overtime-review" && request.method === "POST") return reviewOvertimeSchedule(request, env.DB, session.user, context);
@@ -177,6 +180,17 @@ async function ensureSchema(db) {
       PRIMARY KEY (file_id, chunk_index),
       FOREIGN KEY (file_id) REFERENCES evidence_files(id) ON DELETE CASCADE
     )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS evidence_storage (
+      file_id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
+      drive_id TEXT NOT NULL,
+      drive_item_id TEXT NOT NULL,
+      parent_path TEXT NOT NULL DEFAULT '',
+      size_bytes INTEGER NOT NULL DEFAULT 0,
+      sha256 TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (file_id) REFERENCES evidence_files(id) ON DELETE CASCADE
+    )`),
     db.prepare(`CREATE TABLE IF NOT EXISTS notification_subscriptions (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -209,6 +223,7 @@ async function ensureSchema(db) {
     db.prepare("CREATE INDEX IF NOT EXISTS idx_evidence_task ON evidence_files(task_id)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_evidence_submitter ON evidence_files(submitted_by_id)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_evidence_chunks_file ON evidence_file_chunks(file_id)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_evidence_storage_item ON evidence_storage(drive_item_id)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_notification_subscriptions_user ON notification_subscriptions(user_id)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_user_notifications_pending ON user_notifications(user_id, delivered_at)")
   ]);
@@ -481,7 +496,186 @@ function historyIsAppendOnly(previousHistory, nextHistory) {
   return next.length >= previous.length && previous.every((entry, index) => JSON.stringify(entry) === JSON.stringify(next[index]));
 }
 
-async function uploadEvidence(request, db, user) {
+function microsoftStorageConfigured(env) {
+  return Boolean(
+    clean(env.MS_TENANT_ID) &&
+      clean(env.MS_CLIENT_ID) &&
+      clean(env.MS_CLIENT_SECRET) &&
+      clean(env.MS_DRIVE_ID) &&
+      clean(env.MS_ROOT_FOLDER_ID)
+  );
+}
+
+function microsoftStorageEnabled(env) {
+  return microsoftStorageConfigured(env) && clean(env.MS_STORAGE_ENABLED).toLowerCase() === "true";
+}
+
+async function microsoftAccessToken(env, forceRefresh = false) {
+  if (!microsoftStorageConfigured(env)) throw new Error("Microsoft storage is not configured");
+  if (!forceRefresh && microsoftTokenCache.token && microsoftTokenCache.expiresAt > Date.now() + 60_000) {
+    return microsoftTokenCache.token;
+  }
+  const response = await fetch(
+    `https://login.microsoftonline.com/${encodeURIComponent(clean(env.MS_TENANT_ID))}/oauth2/v2.0/token`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: clean(env.MS_CLIENT_ID),
+        client_secret: String(env.MS_CLIENT_SECRET || ""),
+        scope: "https://graph.microsoft.com/.default",
+        grant_type: "client_credentials"
+      })
+    }
+  );
+  if (!response.ok) throw new Error(`Microsoft token request failed (${response.status})`);
+  const payload = await response.json();
+  if (!payload.access_token) throw new Error("Microsoft token response is incomplete");
+  microsoftTokenCache = {
+    token: payload.access_token,
+    expiresAt: Date.now() + Math.max(60, Number(payload.expires_in || 3600)) * 1000
+  };
+  return microsoftTokenCache.token;
+}
+
+async function graphFetch(env, path, init = {}, retry = true) {
+  const headers = new Headers(init.headers || {});
+  headers.set("Authorization", `Bearer ${await microsoftAccessToken(env)}`);
+  const response = await fetch(`https://graph.microsoft.com/v1.0${path}`, { ...init, headers });
+  if (response.status === 401 && retry) {
+    microsoftTokenCache = { token: "", expiresAt: 0 };
+    return graphFetch(env, path, init, false);
+  }
+  return response;
+}
+
+function oneDriveSafeName(value, fallback, maxLength = 90) {
+  return (
+    clean(value)
+      .replace(/[\\/:*?"<>|#%]/g, "-")
+      .replace(/[. ]+$/g, "")
+      .replace(/\s+/g, " ")
+      .slice(0, maxLength) || fallback
+  );
+}
+
+async function graphResponseError(response, operation) {
+  let code = "unknown";
+  try {
+    const payload = await response.json();
+    code = clean(payload?.error?.code) || code;
+  } catch {
+    // Graph occasionally returns an empty response for infrastructure errors.
+  }
+  return new Error(`${operation} failed (${response.status}, ${code})`);
+}
+
+async function ensureOneDriveFolder(env, parentId, folderName) {
+  const safeName = oneDriveSafeName(folderName, "Sin nombre", 80);
+  const driveId = encodeURIComponent(clean(env.MS_DRIVE_ID));
+  const parent = encodeURIComponent(clean(parentId));
+  const itemPath = `/drives/${driveId}/items/${parent}:/${encodeURIComponent(safeName)}`;
+  let response = await graphFetch(env, itemPath);
+  if (response.ok) return response.json();
+  if (response.status !== 404) throw await graphResponseError(response, "OneDrive folder lookup");
+
+  response = await graphFetch(env, `/drives/${driveId}/items/${parent}/children`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: safeName,
+      folder: {},
+      "@microsoft.graph.conflictBehavior": "fail"
+    })
+  });
+  if (response.ok) return response.json();
+  if (response.status === 409) {
+    const existing = await graphFetch(env, itemPath);
+    if (existing.ok) return existing.json();
+    throw await graphResponseError(existing, "OneDrive folder lookup after conflict");
+  }
+  throw await graphResponseError(response, "OneDrive folder creation");
+}
+
+function decodeEvidenceBase64(fileBase64) {
+  const binary = atob(fileBase64);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+async function sha256Bytes(bytes) {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function uploadEvidenceToOneDrive(env, db, task, file, fileBase64) {
+  const owner = await db.prepare("SELECT name FROM users WHERE id = ?").bind(clean(task.ownerId)).first();
+  const trainerName = oneDriveSafeName(owner?.name, "Trainer");
+  const dueDate = oneDriveSafeName(task.dueDate, dateIsoInLima(Date.now()), 20);
+  const taskName = oneDriveSafeName(task.title, "Tarea");
+  const trainerFolder = await ensureOneDriveFolder(env, clean(env.MS_ROOT_FOLDER_ID), trainerName);
+  const dateFolder = await ensureOneDriveFolder(env, trainerFolder.id, dueDate);
+  const taskFolder = await ensureOneDriveFolder(env, dateFolder.id, taskName);
+  const storedName = oneDriveSafeName(`${clean(file.id).slice(0, 8)} - ${file.fileName}`, "sustento", 120);
+  const bytes = decodeEvidenceBase64(fileBase64);
+  const driveId = encodeURIComponent(clean(env.MS_DRIVE_ID));
+  const uploadPath = `/drives/${driveId}/items/${encodeURIComponent(taskFolder.id)}:/${encodeURIComponent(storedName)}:/content`;
+  const response = await graphFetch(env, uploadPath, {
+    method: "PUT",
+    headers: { "Content-Type": file.mimeType },
+    body: bytes
+  });
+  if (!response.ok) throw await graphResponseError(response, "OneDrive file upload");
+  const item = await response.json();
+  const parentPath = `LGTASK Sustentos / ${trainerName} / ${dueDate} / ${taskName}`;
+  await db
+    .prepare(
+      `INSERT OR REPLACE INTO evidence_storage
+       (file_id, provider, drive_id, drive_item_id, parent_path, size_bytes, sha256, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      file.id,
+      MICROSOFT_STORAGE_PROVIDER,
+      clean(env.MS_DRIVE_ID),
+      clean(item.id),
+      parentPath,
+      bytes.byteLength,
+      await sha256Bytes(bytes),
+      Date.now()
+    )
+    .run();
+  return item;
+}
+
+async function oneDriveFileResponse(env, storage, row) {
+  if (!microsoftStorageConfigured(env)) {
+    return json({ ok: false, message: "El almacenamiento de OneDrive no esta configurado." }, 503);
+  }
+  const path = `/drives/${encodeURIComponent(storage.drive_id)}/items/${encodeURIComponent(storage.drive_item_id)}/content`;
+  let response = await graphFetch(env, path, { redirect: "manual" });
+  if (response.status >= 300 && response.status < 400 && response.headers.get("Location")) {
+    response = await fetch(response.headers.get("Location"), { redirect: "follow" });
+  }
+  if (!response.ok) return json({ ok: false, message: "No se pudo abrir el archivo de OneDrive." }, response.status === 404 ? 404 : 503);
+  const safeName = String(row.file_name || "sustento.jpg").replace(/["\r\n]/g, "-");
+  const disposition =
+    String(row.mime_type).startsWith("image/") ||
+    String(row.mime_type).startsWith("video/") ||
+    row.mime_type === "application/pdf"
+      ? "inline"
+      : "attachment";
+  const headers = new Headers({
+    "Content-Type": row.mime_type,
+    "Content-Disposition": `${disposition}; filename="${safeName}"`,
+    "Cache-Control": "private, max-age=300",
+    "X-Content-Type-Options": "nosniff"
+  });
+  const contentLength = response.headers.get("Content-Length") || String(storage.size_bytes || "");
+  if (contentLength) headers.set("Content-Length", contentLength);
+  return new Response(response.body, { status: 200, headers });
+}
+
+async function uploadEvidence(request, db, user, env) {
   const body = await readJson(request, 2_000_000);
   const taskId = clean(body.taskId);
   const data = await loadData(db);
@@ -505,12 +699,28 @@ async function uploadEvidence(request, db, user) {
   }
 
   const createdAt = Date.now();
+  const useMicrosoft = microsoftStorageEnabled(env);
   await db
     .prepare(
       "INSERT INTO evidence_files (id, task_id, owner_id, submitted_by_id, file_name, mime_type, photo_base64, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     )
-    .bind(fileId, task.id, task.ownerId, user.id, fileName, mimeType, fileMatch[2], createdAt)
+    .bind(fileId, task.id, task.ownerId, user.id, fileName, mimeType, useMicrosoft ? "" : fileMatch[2], createdAt)
     .run();
+  if (useMicrosoft) {
+    try {
+      await uploadEvidenceToOneDrive(
+        env,
+        db,
+        task,
+        { id: fileId, fileName, mimeType },
+        fileMatch[2]
+      );
+    } catch (error) {
+      await db.prepare("DELETE FROM evidence_files WHERE id = ?").bind(fileId).run();
+      console.error("OneDrive evidence upload", error);
+      return json({ ok: false, message: "No se pudo guardar el archivo en OneDrive. Intenta nuevamente." }, 503);
+    }
+  }
 
   return json({
     ok: true,
@@ -589,7 +799,7 @@ async function uploadEvidenceChunk(request, db, user) {
   return json({ ok: true, chunkIndex });
 }
 
-async function completeEvidenceUpload(request, db, user) {
+async function completeEvidenceUpload(request, db, user, env) {
   const body = await readJson(request);
   const fileId = clean(body.fileId);
   const expectedChunks = Number(body.chunkCount);
@@ -615,6 +825,26 @@ async function completeEvidenceUpload(request, db, user) {
   ) {
     return json({ ok: false, message: "Faltan bloques del archivo. Intenta subirlo nuevamente." }, 400);
   }
+  if (microsoftStorageEnabled(env)) {
+    const chunks = await db
+      .prepare("SELECT chunk_base64 FROM evidence_file_chunks WHERE file_id = ? ORDER BY chunk_index ASC")
+      .bind(fileId)
+      .all();
+    const fileBase64 = (chunks.results || []).map((item) => item.chunk_base64).join("");
+    try {
+      await uploadEvidenceToOneDrive(
+        env,
+        db,
+        task,
+        { id: row.id, fileName: row.file_name, mimeType: row.mime_type },
+        fileBase64
+      );
+      await db.prepare("DELETE FROM evidence_file_chunks WHERE file_id = ?").bind(fileId).run();
+    } catch (error) {
+      console.error("OneDrive chunked evidence upload", error);
+      return json({ ok: false, message: "No se pudo guardar el archivo en OneDrive. La carga puede reintentarse." }, 503);
+    }
+  }
   return json({
     ok: true,
     file: {
@@ -627,11 +857,14 @@ async function completeEvidenceUpload(request, db, user) {
   }, 201);
 }
 
-async function evidenceFile(db, user, fileId) {
+async function evidenceFile(db, user, fileId, env) {
   const row = await db.prepare("SELECT * FROM evidence_files WHERE id = ?").bind(clean(fileId)).first();
   if (!row) return json({ ok: false, message: "Archivo no encontrado." }, 404);
   const allowed = user.role === "Coordinador" || row.submitted_by_id === user.id || row.owner_id === user.id;
   if (!allowed) return json({ ok: false, message: "No tienes acceso a este archivo." }, 403);
+
+  const storage = await db.prepare("SELECT * FROM evidence_storage WHERE file_id = ?").bind(row.id).first();
+  if (storage?.provider === MICROSOFT_STORAGE_PROVIDER) return oneDriveFileResponse(env, storage, row);
 
   let fileBase64 = row.photo_base64 || "";
   if (!fileBase64) {
@@ -919,15 +1152,49 @@ function archiveDeletedTask(data, task, actor, reason = "") {
   return record;
 }
 
-async function deleteTaskEvidenceFiles(db, taskId) {
+async function deleteOneDriveEvidenceItems(env, items) {
+  if (!microsoftStorageConfigured(env)) return;
+  for (const item of items) {
+    try {
+      const response = await graphFetch(
+        env,
+        `/drives/${encodeURIComponent(item.drive_id)}/items/${encodeURIComponent(item.drive_item_id)}`,
+        { method: "DELETE" }
+      );
+      if (!response.ok && response.status !== 404) {
+        console.error("OneDrive evidence deletion", response.status);
+      }
+    } catch (error) {
+      console.error("OneDrive evidence deletion", error);
+    }
+  }
+}
+
+async function deleteTaskEvidenceFiles(db, taskId, env, context) {
+  const storedItems = await db
+    .prepare(
+      `SELECT storage.drive_id, storage.drive_item_id
+       FROM evidence_storage storage
+       INNER JOIN evidence_files files ON files.id = storage.file_id
+       WHERE files.task_id = ? AND storage.provider = ?`
+    )
+    .bind(taskId, MICROSOFT_STORAGE_PROVIDER)
+    .all();
   await db
     .prepare("DELETE FROM evidence_file_chunks WHERE file_id IN (SELECT id FROM evidence_files WHERE task_id = ?)")
     .bind(taskId)
     .run();
+  await db
+    .prepare("DELETE FROM evidence_storage WHERE file_id IN (SELECT id FROM evidence_files WHERE task_id = ?)")
+    .bind(taskId)
+    .run();
   await db.prepare("DELETE FROM evidence_files WHERE task_id = ?").bind(taskId).run();
+  if (storedItems.results?.length) {
+    context.waitUntil(deleteOneDriveEvidenceItems(env, storedItems.results));
+  }
 }
 
-async function deleteTaskAndArchive(request, db, user, context) {
+async function deleteTaskAndArchive(request, db, user, context, env) {
   if (user.role !== "Coordinador") {
     return json({ ok: false, message: "Solo el coordinador puede eliminar tareas." }, 403);
   }
@@ -943,7 +1210,7 @@ async function deleteTaskAndArchive(request, db, user, context) {
   const task = data.tasks[taskIndex];
   const archived = archiveDeletedTask(data, task, user, reason);
   data.tasks.splice(taskIndex, 1);
-  await deleteTaskEvidenceFiles(db, taskId);
+  await deleteTaskEvidenceFiles(db, taskId, env, context);
   await saveData(db, data);
 
   const notifications = task.ownerId === user.id
