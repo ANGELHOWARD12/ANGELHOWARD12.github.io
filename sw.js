@@ -1,4 +1,4 @@
-const CACHE_NAME = "lgtask-shell-v24";
+const CACHE_NAME = "lgtask-shell-v23";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -10,22 +10,6 @@ const APP_SHELL = [
   "/icons/lgtask-192.png",
   "/icons/lgtask-512.png"
 ];
-
-function notificationOptions(notification = {}) {
-  return {
-    body: notification.body || "Tienes una actualizacion pendiente.",
-    icon: "/icons/lgtask-192.png",
-    badge: "/icons/lgtask-96.png",
-    tag: notification.id || `lgtask-${Date.now()}`,
-    renotify: true,
-    requireInteraction: true,
-    vibrate: [180, 90, 180, 90, 360],
-    silent: false,
-    timestamp: Date.now(),
-    actions: [{ action: "open", title: "Abrir LGTASK" }],
-    data: { url: notification.url || "/?view=tasksView" }
-  };
-}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
@@ -82,17 +66,23 @@ async function showPendingNotifications() {
     if (!response.ok) throw new Error("No active session");
     const data = await response.json();
     for (const notification of data.notifications || []) {
-      await self.registration.showNotification(notification.title || "LGTASK", notificationOptions(notification));
+      await self.registration.showNotification(notification.title || "LGTASK", {
+        body: notification.body || "Tienes una actualizacion pendiente.",
+        icon: "/icons/lgtask-192.png",
+        badge: "/icons/lgtask-96.png",
+        tag: notification.id,
+        renotify: true,
+        data: { url: notification.url || "/?view=tasksView" }
+      });
     }
   } catch {
-    await self.registration.showNotification(
-      "Nueva actividad en LGTASK",
-      notificationOptions({
-        id: "lgtask-generic",
-        body: "Abre LGTASK para revisar tus tareas y recordatorios.",
-        url: "/?view=tasksView"
-      })
-    );
+    await self.registration.showNotification("Nueva actividad en LGTASK", {
+      body: "Abre LGTASK para revisar tus tareas y recordatorios.",
+      icon: "/icons/lgtask-192.png",
+      badge: "/icons/lgtask-96.png",
+      tag: "lgtask-generic",
+      data: { url: "/?view=tasksView" }
+    });
   }
 }
 
@@ -113,14 +103,13 @@ self.addEventListener("periodicsync", (event) => {
 self.addEventListener("message", (event) => {
   if (event.data?.type !== "SHOW_NOTIFICATION") return;
   event.waitUntil(
-    self.registration.showNotification(
-      event.data.title || "LGTASK",
-      notificationOptions({
-        id: event.data.tag,
-        body: event.data.body,
-        url: event.data.url
-      })
-    )
+    self.registration.showNotification(event.data.title || "LGTASK", {
+      body: event.data.body || "",
+      icon: "/icons/lgtask-192.png",
+      badge: "/icons/lgtask-96.png",
+      tag: event.data.tag || `lgtask-${Date.now()}`,
+      data: { url: event.data.url || "/?view=tasksView" }
+    })
   );
 });
 
