@@ -194,6 +194,31 @@
         width: 100%;
       }
 
+      .evidence-selected-files {
+        display: grid;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .evidence-selected-file {
+        align-items: center;
+        background: #f4f7fb;
+        border: 1px solid #d8e0ec;
+        border-radius: 6px;
+        display: flex;
+        gap: 8px;
+        justify-content: space-between;
+        min-width: 0;
+        padding: 8px 10px;
+      }
+
+      .evidence-selected-file span:first-child {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
       .upload-progress.is-error {
         background: var(--red-soft);
         border-color: #f2b8be;
@@ -2462,9 +2487,9 @@
                   id="evidenceFiles"
                   type="file"
                   multiple
-                  required
                   accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.mp4,.mov,.webm,.m4v,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt"
                 />
+                <span id="evidenceSelectedFiles" class="evidence-selected-files" aria-live="polite"></span>
               </label>
               <p class="muted wide">Debes adjuntar al menos un sustento. Puedes cargar hasta 8 fotos, videos o documentos de 15 MB cada uno y los originales conservan su calidad.</p>
               <label class="wide">
@@ -2961,13 +2986,14 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = 22;
+      const APP_VERSION = 23;
       const MAX_EVIDENCE_FILES = 8;
       const MAX_EVIDENCE_FILE_BYTES = 15_000_000;
-      const EVIDENCE_DIRECT_BASE64 = 0;
-      const EVIDENCE_CHUNK_BASE64 = 750_000;
+      const EVIDENCE_DIRECT_FILE_BYTES = 300_000;
+      const EVIDENCE_CHUNK_FILE_BYTES = 600_000;
       const EVIDENCE_SELECTION_TASK_KEY = "lgtask-evidence-task-v1";
       const EVIDENCE_SELECTION_DATE_KEY = "lgtask-evidence-date-v1";
+      const EVIDENCE_PENDING_SUBMISSION_KEY = "lgtask-evidence-pending-v1";
       const NOTIFICATION_TASKS_KEY = "lgtask-notified-tasks-v1";
       const ALLOWED_VIEW_IDS = ["tasksView", "evidenceView", "teamView", "announcementsView", "infoView"];
       const EVIDENCE_FILE_EXTENSIONS = new Set([
@@ -3126,6 +3152,14 @@
       let stateRevision = 0;
       let serviceWorkerRegistration = null;
       let evidenceSubmitInFlight = false;
+      let evidenceOpenInFlight = false;
+      let pendingEvidenceSubmission = (() => {
+        try {
+          return JSON.parse(sessionStorage.getItem(EVIDENCE_PENDING_SUBMISSION_KEY) || "null");
+        } catch {
+          return null;
+        }
+      })();
       let selectedEvidenceTaskId = sessionStorage.getItem(EVIDENCE_SELECTION_TASK_KEY) || "";
       let selectedEvidenceDate = sessionStorage.getItem(EVIDENCE_SELECTION_DATE_KEY) || "";
       let taskCreateInFlight = false;
@@ -3274,6 +3308,7 @@
         evidenceTrainingTopic: document.querySelector("#evidenceTrainingTopic"),
         evidenceResult: document.querySelector("#evidenceResult"),
         evidenceFiles: document.querySelector("#evidenceFiles"),
+        evidenceSelectedFiles: document.querySelector("#evidenceSelectedFiles"),
         evidenceLinks: document.querySelector("#evidenceLinks"),
         evidenceNotes: document.querySelector("#evidenceNotes"),
         evidenceDeadlineMessage: document.querySelector("#evidenceDeadlineMessage"),
@@ -3576,18 +3611,33 @@
       }
 
       async function apiRequest(path, options = {}) {
-        const response = await fetch(`${API_BASE}${path}`, {
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-          ...options
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          const error = new Error(data.message || `No se pudo conectar con la nube (HTTP ${response.status}).`);
-          error.status = response.status;
+        const { timeoutMs = 45_000, ...fetchOptions } = options;
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          const response = await fetch(`${API_BASE}${path}`, {
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json", ...(fetchOptions.headers || {}) },
+            ...fetchOptions,
+            signal: fetchOptions.signal || controller.signal
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            const error = new Error(data.message || `No se pudo conectar con la nube (HTTP ${response.status}).`);
+            error.status = response.status;
+            throw error;
+          }
+          return data;
+        } catch (error) {
+          if (error.name === "AbortError") {
+            const timeoutError = new Error("La nube demoro demasiado en responder. LGTASK volvera a intentarlo automaticamente.");
+            timeoutError.status = 0;
+            throw timeoutError;
+          }
           throw error;
+        } finally {
+          window.clearTimeout(timeout);
         }
-        return data;
       }
 
       async function apiRequestWithRetry(path, options = {}, attempts = 3) {
@@ -5722,6 +5772,15 @@
         sessionStorage.removeItem(EVIDENCE_SELECTION_DATE_KEY);
       }
 
+      function rememberPendingEvidenceSubmission(submission) {
+        pendingEvidenceSubmission = submission || null;
+        if (pendingEvidenceSubmission) {
+          sessionStorage.setItem(EVIDENCE_PENDING_SUBMISSION_KEY, JSON.stringify(pendingEvidenceSubmission));
+        } else {
+          sessionStorage.removeItem(EVIDENCE_PENDING_SUBMISSION_KEY);
+        }
+      }
+
       function renderEvidenceTaskPicker(preferredTaskId = "") {
         if (!els.evidenceTaskDate.value) els.evidenceTaskDate.value = selectedEvidenceDate || todayIso;
         const tasks = evidenceCandidateTasks(els.evidenceTaskDate.value);
@@ -5753,6 +5812,7 @@
           : emptyState("No hay tareas disponibles este dia", "Inicia una tarea pendiente o selecciona otro dia.");
         els.evidenceTaskPicker.querySelectorAll('input[name="evidenceTaskChoice"]').forEach((input) => {
           input.addEventListener("change", () => {
+            rememberPendingEvidenceSubmission(null);
             rememberEvidenceSelection(input.value, els.evidenceTaskDate.value);
             els.evidenceTask.value = input.value;
             renderEvidenceTaskPicker(input.value);
@@ -6204,6 +6264,7 @@
       function renderEvidenceTrainingTopic() {
         const task = selectedEvidenceTask();
         const isTraining = clean(task?.category).toLowerCase() === "entrenamiento";
+        const hasPendingConfirmation = Boolean(task && pendingEvidenceSubmission?.taskId === task.id);
         els.evidenceTrainingTopicWrap.classList.toggle("hidden", !isTraining);
         els.evidenceTrainingTopic.required = isTraining;
         if (!isTraining) els.evidenceTrainingTopic.value = "";
@@ -6214,26 +6275,51 @@
         els.evidenceFiles.disabled = Boolean(task && !allowed);
         els.evidenceLinks.disabled = Boolean(task && !allowed);
         els.evidenceSubmitButton.disabled = !task || !allowed;
+        if (!evidenceSubmitInFlight) {
+          els.evidenceSubmitButton.textContent = hasPendingConfirmation ? "Confirmar sustento guardado" : "Enviar sustento";
+          if (hasPendingConfirmation) {
+            setEvidenceUploadProgress("Los archivos ya estan en la nube. Pulsa confirmar para finalizar el sustento.", 95);
+          }
+        }
       }
 
-      function startTask(task) {
+      async function startTask(task) {
         if (!task || task.status !== "Pendiente" || task.ownerId !== state.activeUserId) return;
         task.history = task.history || [];
         task.history.push({ type: "Inicio", byId: state.activeUserId, at: Date.now() });
         task.status = "En proceso";
         saveState();
         render();
+        window.clearTimeout(syncTimer);
+        syncTimer = 0;
+        try {
+          await syncState();
+        } catch (error) {
+          showToast(`La tarea se inicio, pero falta sincronizar: ${error.message}`, "error");
+        }
       }
 
-      function openEvidenceModuleForTask(task) {
-        if (!task || task.ownerId !== state.activeUserId || isCoordinator()) return;
+      async function openEvidenceModuleForTask(task) {
+        if (!task || task.ownerId !== state.activeUserId || isCoordinator() || evidenceOpenInFlight) return;
+        evidenceOpenInFlight = true;
         rememberEvidenceSelection(task.id, task.dueDate);
         els.evidenceTaskDate.value = task.dueDate;
-        activateView("evidenceView", { updateUrl: true, historyMode: "push" });
-        render();
-        renderEvidenceTaskPicker(task.id);
-        renderEvidenceTrainingTopic();
-        window.requestAnimationFrame(() => els.evidenceUploadPanel.scrollIntoView({ behavior: "smooth", block: "start" }));
+        window.clearTimeout(syncTimer);
+        syncTimer = 0;
+        try {
+          if (syncInFlight) await syncInFlight;
+          await syncState();
+          rememberEvidenceSelection(task.id, task.dueDate);
+          activateView("evidenceView", { updateUrl: true, historyMode: "push" });
+          render();
+          renderEvidenceTaskPicker(task.id);
+          renderEvidenceTrainingTopic();
+          window.requestAnimationFrame(() => els.evidenceUploadPanel.scrollIntoView({ behavior: "smooth", block: "start" }));
+        } catch (error) {
+          showToast(`No se pudo preparar la tarea para el sustento: ${error.message}`, "error");
+        } finally {
+          evidenceOpenInFlight = false;
+        }
       }
 
       function renderTrainerTaskActions(container, task) {
@@ -6259,7 +6345,11 @@
           startButton.className = "primary";
           startButton.type = "button";
           startButton.textContent = "Iniciar";
-          startButton.addEventListener("click", () => startTask(task));
+          startButton.addEventListener("click", async () => {
+            startButton.disabled = true;
+            startButton.textContent = "Iniciando...";
+            await startTask(task);
+          });
           container.appendChild(startButton);
         }
         if (task.status === "En proceso" || task.status === "Observada") {
@@ -7324,13 +7414,51 @@
         }
       }
 
-      function readFileAsDataUrl(file) {
+      function readFileAsDataUrl(file, displayName = file?.name || "archivo") {
         return new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result);
-          reader.onerror = () => reject(new Error(`No se pudo leer ${file.name}.`));
+          reader.onerror = () => reject(new Error(`No se pudo leer ${displayName}.`));
           reader.readAsDataURL(file);
         });
+      }
+
+      async function readBlobAsBase64(blob, fileName) {
+        const dataUrl = await readFileAsDataUrl(blob, fileName);
+        const base64 = String(dataUrl).split(",")[1] || "";
+        if (!base64) throw new Error(`No se pudo preparar ${fileName}.`);
+        return base64;
+      }
+
+      function evidenceFileSignature(files = Array.from(els.evidenceFiles.files || [])) {
+        return files.map((file) => `${file.name}:${file.size}:${file.lastModified}`).join("|");
+      }
+
+      function evidenceDraftActive() {
+        return Boolean(
+          evidenceSubmitInFlight ||
+          selectedEvidenceTaskId ||
+          els.evidenceTask.value ||
+          els.evidenceFiles.files?.length ||
+          clean(els.evidenceStore.value) ||
+          clean(els.evidenceProduct.value) ||
+          clean(els.evidenceTrainingTopic.value) ||
+          clean(els.evidenceLinks.value) ||
+          clean(els.evidenceNotes.value)
+        );
+      }
+
+      function renderSelectedEvidenceFiles() {
+        const files = Array.from(els.evidenceFiles.files || []);
+        els.evidenceSelectedFiles.innerHTML = files
+          .map(
+            (file) => `
+              <span class="evidence-selected-file">
+                <span>${escapeHtml(file.name)}</span>
+                <span class="muted">${Math.max(1, Math.ceil(file.size / 1024))} KB</span>
+              </span>`
+          )
+          .join("");
       }
 
       function evidenceMimeType(extension, currentType = "") {
@@ -7366,34 +7494,30 @@
         if (file.size > MAX_EVIDENCE_FILE_BYTES) {
           throw new Error(`${file.name}: supera el maximo de 15 MB permitido por la nube.`);
         }
-        const originalDataUrl = await readFileAsDataUrl(file);
-        const base64 = String(originalDataUrl).split(",")[1] || "";
-        if (!base64 || base64.length > 21_000_000) {
-          throw new Error(`${file.name}: no se pudo preparar dentro del limite de 15 MB.`);
-        }
         const mimeType = evidenceMimeType(extension, file.type);
         return {
-          fileData: `data:${mimeType};base64,${base64}`,
+          file,
           fileName: file.name,
           mimeType,
-          base64
+          totalBase64: 4 * Math.ceil(file.size / 3)
         };
       }
 
       async function uploadPreparedEvidenceFile(taskId, prepared, onChunk) {
         const fileId = id();
-        if (prepared.base64.length <= EVIDENCE_DIRECT_BASE64) {
+        if (prepared.file.size <= EVIDENCE_DIRECT_FILE_BYTES) {
+          const base64 = await readBlobAsBase64(prepared.file, prepared.fileName);
           return apiRequestWithRetry("/evidence/upload", {
             method: "POST",
             body: JSON.stringify({
               taskId,
               fileId,
-              fileData: prepared.fileData,
+              fileData: `data:${prepared.mimeType};base64,${base64}`,
               fileName: prepared.fileName
             })
           });
         }
-        const chunks = Math.ceil(prepared.base64.length / EVIDENCE_CHUNK_BASE64);
+        const chunks = Math.ceil(prepared.file.size / EVIDENCE_CHUNK_FILE_BYTES);
         const initialized = await apiRequestWithRetry("/evidence/upload/init", {
           method: "POST",
           body: JSON.stringify({
@@ -7401,21 +7525,23 @@
             fileId,
             fileName: prepared.fileName,
             mimeType: prepared.mimeType,
-            totalBase64: prepared.base64.length,
+            totalBase64: prepared.totalBase64,
             chunkCount: chunks
           })
         });
         for (let chunkIndex = 0; chunkIndex < chunks; chunkIndex += 1) {
           onChunk?.(chunkIndex + 1, chunks);
+          const chunkBlob = prepared.file.slice(
+            chunkIndex * EVIDENCE_CHUNK_FILE_BYTES,
+            (chunkIndex + 1) * EVIDENCE_CHUNK_FILE_BYTES
+          );
+          const chunkBase64 = await readBlobAsBase64(chunkBlob, prepared.fileName);
           await apiRequestWithRetry("/evidence/upload/chunk", {
             method: "POST",
             body: JSON.stringify({
               fileId: initialized.fileId,
               chunkIndex,
-              chunkBase64: prepared.base64.slice(
-                chunkIndex * EVIDENCE_CHUNK_BASE64,
-                (chunkIndex + 1) * EVIDENCE_CHUNK_BASE64
-              )
+              chunkBase64
             })
           });
         }
@@ -8078,8 +8204,10 @@
 
         els.evidenceFiles.addEventListener("change", () => {
           els.evidenceFiles.setCustomValidity("");
+          rememberPendingEvidenceSubmission(null);
           setMessage(els.evidenceMessage, "", "");
           const fileCount = els.evidenceFiles.files?.length || 0;
+          renderSelectedEvidenceFiles();
           setEvidenceUploadProgress(
             fileCount ? `${fileCount} archivo${fileCount === 1 ? "" : "s"} listo${fileCount === 1 ? "" : "s"} para subir.` : "",
             0
@@ -8091,6 +8219,7 @@
           setEvidenceUploadProgress("Falta seleccionar una foto o archivo.", 0, "err");
         });
         els.evidenceTaskDate.addEventListener("change", () => {
+          rememberPendingEvidenceSubmission(null);
           rememberEvidenceSelection("", els.evidenceTaskDate.value);
           renderEvidenceTaskPicker();
           renderEvidenceTrainingTopic();
@@ -8098,6 +8227,8 @@
           setEvidenceUploadProgress("", 0);
         });
         els.evidenceTask.addEventListener("change", () => {
+          rememberPendingEvidenceSubmission(null);
+          rememberEvidenceSelection(els.evidenceTask.value, els.evidenceTaskDate.value);
           renderEvidenceTrainingTopic();
           setMessage(els.evidenceMessage, "", "");
         });
@@ -8140,7 +8271,8 @@
           }
           els.evidenceTrainingTopic.setCustomValidity("");
           const selectedFiles = Array.from(els.evidenceFiles.files || []);
-          if (!selectedFiles.length) {
+          const pendingForTask = pendingEvidenceSubmission?.taskId === task.id ? pendingEvidenceSubmission : null;
+          if (!selectedFiles.length && !pendingForTask) {
             els.evidenceFiles.setCustomValidity("Debes adjuntar al menos una foto o archivo de sustento.");
             els.evidenceFiles.reportValidity();
             setMessage(els.evidenceMessage, "Debes adjuntar al menos una foto o archivo antes de enviar el sustento.", "err");
@@ -8150,8 +8282,8 @@
           els.evidenceFiles.setCustomValidity("");
           evidenceSubmitInFlight = true;
           els.evidenceSubmitButton.disabled = true;
-          els.evidenceSubmitButton.textContent = "Preparando archivos...";
-          setEvidenceUploadProgress("Preparando archivos para la nube...", 2);
+          els.evidenceSubmitButton.textContent = pendingForTask ? "Confirmando sustento..." : "Preparando archivos...";
+          setEvidenceUploadProgress(pendingForTask ? "Reintentando la confirmacion en la nube..." : "Preparando archivos para la nube...", pendingForTask ? 95 : 2);
           if (selectedFiles.length > MAX_EVIDENCE_FILES) {
             setMessage(els.evidenceMessage, `Puedes adjuntar un maximo de ${MAX_EVIDENCE_FILES} archivos por sustento.`, "err");
             setEvidenceUploadProgress(`Seleccionaste mas de ${MAX_EVIDENCE_FILES} archivos.`, 0, "err");
@@ -8160,71 +8292,69 @@
             evidenceSubmitInFlight = false;
             return;
           }
-          setMessage(els.evidenceMessage, "Validando archivos...", "");
-          setEvidenceUploadProgress("Validando archivos...", 5);
-          let preparedFiles = [];
-          try {
-            preparedFiles = await Promise.all(selectedFiles.map(prepareEvidenceFile));
-          } catch (error) {
-            setMessage(els.evidenceMessage, error.message, "err");
-            setEvidenceUploadProgress(error.message, 0, "err");
-            els.evidenceSubmitButton.disabled = false;
-            els.evidenceSubmitButton.textContent = "Enviar sustento";
-            evidenceSubmitInFlight = false;
-            return;
-          }
-          const uploadedFiles = [];
-          try {
-            for (let index = 0; index < preparedFiles.length; index += 1) {
-              const prepared = preparedFiles[index];
-              setMessage(els.evidenceMessage, `Subiendo archivo ${index + 1} de ${preparedFiles.length}...`, "");
-              els.evidenceSubmitButton.textContent = `Subiendo ${index + 1} de ${preparedFiles.length}...`;
-              setEvidenceUploadProgress(
-                `Archivo ${index + 1} de ${preparedFiles.length}: iniciando carga por bloques...`,
-                10 + Math.round((index / preparedFiles.length) * 80)
-              );
-              const upload = await uploadPreparedEvidenceFile(task.id, prepared, (chunk, total) => {
-                const percent = 10 + Math.round(((index + chunk / total) / preparedFiles.length) * 80);
-                setMessage(
-                  els.evidenceMessage,
-                  `Subiendo archivo ${index + 1} de ${preparedFiles.length} | bloque ${chunk} de ${total}...`,
-                  ""
-                );
+          let uploadedFiles = pendingForTask?.evidence?.files || [];
+          let evidence = pendingForTask?.evidence || null;
+          if (!pendingForTask) {
+            setMessage(els.evidenceMessage, "Validando archivos...", "");
+            setEvidenceUploadProgress("Validando archivos...", 5);
+            uploadedFiles = [];
+            try {
+              for (let index = 0; index < selectedFiles.length; index += 1) {
+                const prepared = await prepareEvidenceFile(selectedFiles[index]);
+                setMessage(els.evidenceMessage, `Subiendo archivo ${index + 1} de ${selectedFiles.length}...`, "");
+                els.evidenceSubmitButton.textContent = `Subiendo ${index + 1} de ${selectedFiles.length}...`;
                 setEvidenceUploadProgress(
-                  `Archivo ${index + 1} de ${preparedFiles.length} | bloque ${chunk} de ${total} | ${percent}%`,
-                  percent
+                  `Archivo ${index + 1} de ${selectedFiles.length}: iniciando carga segura...`,
+                  10 + Math.round((index / selectedFiles.length) * 80)
                 );
-              });
-              uploadedFiles.push({
-                id: upload.file.id,
-                name: upload.file.name,
-                mimeType: upload.file.mimeType
-              });
+                const upload = await uploadPreparedEvidenceFile(task.id, prepared, (chunk, total) => {
+                  const percent = 10 + Math.round(((index + chunk / total) / selectedFiles.length) * 80);
+                  setMessage(
+                    els.evidenceMessage,
+                    `Subiendo archivo ${index + 1} de ${selectedFiles.length} | bloque ${chunk} de ${total}...`,
+                    ""
+                  );
+                  setEvidenceUploadProgress(
+                    `Archivo ${index + 1} de ${selectedFiles.length} | bloque ${chunk} de ${total} | ${percent}%`,
+                    percent
+                  );
+                });
+                uploadedFiles.push({
+                  id: upload.file.id,
+                  name: upload.file.name,
+                  mimeType: upload.file.mimeType
+                });
+              }
+            } catch (error) {
+              setMessage(els.evidenceMessage, `No se pudieron subir todos los archivos: ${error.message}`, "err");
+              setEvidenceUploadProgress(
+                `Carga interrumpida: ${error.message}. La tarea continuara marcada para volver a intentar.`,
+                0,
+                "err"
+              );
+              els.evidenceSubmitButton.disabled = false;
+              els.evidenceSubmitButton.textContent = "Reintentar carga";
+              evidenceSubmitInFlight = false;
+              return;
             }
-          } catch (error) {
-            setMessage(els.evidenceMessage, `No se pudieron subir todos los archivos: ${error.message}`, "err");
-            setEvidenceUploadProgress(`Carga interrumpida: ${error.message}`, 0, "err");
-            els.evidenceSubmitButton.disabled = false;
-            els.evidenceSubmitButton.textContent = "Enviar sustento";
-            evidenceSubmitInFlight = false;
-            return;
+            evidence = {
+              id: id(),
+              submittedById: state.activeUserId,
+              submittedAt: Date.now(),
+              store:
+                clean(els.evidenceStore.value) ||
+                (["PDP", "PDV"].includes(clean(task.category).toUpperCase()) ? "No especificada" : "No aplica"),
+              product: clean(els.evidenceProduct.value),
+              trainingTopic,
+              result: "Realizado",
+              notes,
+              links,
+              files: uploadedFiles,
+              review: "Pendiente"
+            };
+            evidence.cloudPath = cloudFolderForEvidence(evidence, task);
+            rememberPendingEvidenceSubmission({ taskId: task.id, fileSignature: evidenceFileSignature(selectedFiles), evidence });
           }
-          const evidence = {
-            id: id(),
-            submittedById: state.activeUserId,
-            submittedAt: Date.now(),
-            store:
-              clean(els.evidenceStore.value) ||
-              (["PDP", "PDV"].includes(clean(task.category).toUpperCase()) ? "No especificada" : "No aplica"),
-            product: clean(els.evidenceProduct.value),
-            trainingTopic,
-            result: "Realizado",
-            notes,
-            links,
-            files: uploadedFiles,
-            review: "Pendiente"
-          };
-          evidence.cloudPath = cloudFolderForEvidence(evidence, task);
           els.evidenceSubmitButton.textContent = "Confirmando sustento...";
           setEvidenceUploadProgress("Archivos cargados. Confirmando el sustento en la nube...", 95);
           let recoveredAfterSyncError = false;
@@ -8248,8 +8378,10 @@
             }
             recoveredAfterSyncError = true;
           }
+          rememberPendingEvidenceSubmission(null);
           els.evidenceForm.reset();
           els.evidenceResult.value = "Realizado";
+          renderSelectedEvidenceFiles();
           clearEvidenceSelection();
           renderEvidenceTaskPicker();
           renderEvidenceTrainingTopic();
@@ -8377,17 +8509,7 @@
           navigator.serviceWorker.addEventListener("controllerchange", () => {
             if (sessionStorage.getItem(reloadKey)) return;
             sessionStorage.setItem(reloadKey, "1");
-            const evidenceDraftActive =
-              activeViewId === "evidenceView" &&
-              Boolean(
-                selectedEvidenceTaskId ||
-                els.evidenceTask.value ||
-                els.evidenceFiles.files?.length ||
-                clean(els.evidenceStore.value) ||
-                clean(els.evidenceProduct.value) ||
-                clean(els.evidenceNotes.value)
-              );
-            if (evidenceDraftActive) {
+            if (activeViewId === "evidenceView" && evidenceDraftActive()) {
               showToast("Actualizacion lista. Tu seleccion y el sustento en preparacion se mantendran sin recargar la pantalla.", "success");
               return;
             }
@@ -8398,7 +8520,14 @@
         await refreshStateFromServer();
         await syncNotificationSubscription().catch(() => {});
         window.setInterval(() => {
-          if (state.activeUserId && !document.hidden && !syncInFlight && !evidenceSubmitInFlight && !taskCreateInFlight) {
+          if (
+            state.activeUserId &&
+            !document.hidden &&
+            !syncInFlight &&
+            !evidenceSubmitInFlight &&
+            !taskCreateInFlight &&
+            !(activeViewId === "evidenceView" && evidenceDraftActive())
+          ) {
             refreshStateFromServer().catch(() => {});
           }
         }, 5000);
