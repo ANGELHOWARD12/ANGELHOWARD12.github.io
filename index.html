@@ -178,57 +178,12 @@
         overflow-wrap: anywhere;
       }
 
-      .upload-progress {
-        background: var(--soft);
-        border: 1px solid #b9cdfa;
-        border-radius: 8px;
-        color: var(--blue-dark);
-        display: grid;
-        gap: 8px;
-        padding: 11px;
+      #evidenceForm.inline-evidence-form #evidenceTaskSelection {
+        display: none;
       }
 
-      .upload-progress progress {
-        accent-color: var(--blue);
-        height: 14px;
-        width: 100%;
-      }
-
-      .evidence-selected-files {
-        display: grid;
-        gap: 6px;
-        margin-top: 8px;
-      }
-
-      .evidence-selected-file {
-        align-items: center;
-        background: #f4f7fb;
-        border: 1px solid #d8e0ec;
-        border-radius: 6px;
-        display: flex;
-        gap: 8px;
-        justify-content: space-between;
-        min-width: 0;
-        padding: 8px 10px;
-      }
-
-      .evidence-selected-file span:first-child {
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .upload-progress.is-error {
-        background: var(--red-soft);
-        border-color: #f2b8be;
-        color: var(--red);
-      }
-
-      .upload-progress.is-success {
-        background: var(--green-soft);
-        border-color: #a6dfc5;
-        color: var(--green);
+      #taskInlineEvidenceSection {
+        border-left: 5px solid var(--green);
       }
 
       .evidence-history-day,
@@ -954,17 +909,6 @@
         padding: 10px;
       }
 
-      .trainer-task-card > .actions {
-        align-items: flex-start;
-        flex-direction: column;
-        gap: 6px;
-      }
-
-      .trainer-task-card > .actions > button,
-      .trainer-task-card > .actions > .workflow-status {
-        max-width: 100%;
-      }
-
       .trainer-task-card.approved {
         border-left-color: var(--green);
       }
@@ -1659,155 +1603,6 @@
         padding: 12px;
       }
 
-      .team-profile-card {
-        border-left: 5px solid var(--blue);
-      }
-
-      .team-profile-card.is-reference {
-        border-left-color: var(--yellow);
-      }
-
-      .profile-tags {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-      }
-
-      .profile-tag {
-        background: var(--soft);
-        border: 1px solid #bcd0f5;
-        border-radius: 999px;
-        color: var(--blue-dark);
-        font-size: 12px;
-        font-weight: 800;
-        padding: 5px 9px;
-      }
-
-      .lg-update-card {
-        border-left: 5px solid var(--red);
-      }
-
-      .lg-update-card[data-line="HS"] {
-        border-left-color: var(--green);
-      }
-
-      .lg-update-card[data-line="TV"] {
-        border-left-color: var(--blue);
-      }
-
-      .lg-update-card[data-line="AV"] {
-        border-left-color: var(--cyan);
-      }
-
-      .info-checklist {
-        margin-top: 16px;
-      }
-
-      .assistant-launch {
-        align-items: center;
-        background: var(--red);
-        border: 0;
-        border-radius: 999px;
-        bottom: 20px;
-        box-shadow: 0 14px 30px rgba(165, 0, 52, 0.3);
-        color: #fff;
-        display: inline-flex;
-        font-size: 14px;
-        font-weight: 900;
-        gap: 8px;
-        min-height: 48px;
-        padding: 0 18px;
-        position: fixed;
-        right: 20px;
-        z-index: 45;
-      }
-
-      .assistant-launch:hover {
-        background: #8f1f2b;
-        transform: translateY(-2px);
-      }
-
-      .assistant-dialog {
-        max-height: min(82vh, 720px);
-        max-width: 600px;
-        overflow: hidden;
-        padding: 0;
-      }
-
-      .assistant-shell {
-        display: grid;
-        grid-template-rows: auto minmax(180px, 1fr) auto auto;
-        max-height: min(82vh, 720px);
-      }
-
-      .assistant-header {
-        align-items: flex-start;
-        background: var(--red);
-        color: #fff;
-        display: flex;
-        gap: 12px;
-        justify-content: space-between;
-        padding: 16px;
-      }
-
-      .assistant-header .muted {
-        color: #ffe7ea;
-      }
-
-      .assistant-header button {
-        background: #fff;
-        color: var(--red);
-      }
-
-      .assistant-messages {
-        background: #f8fbff;
-        display: grid;
-        gap: 10px;
-        overflow-y: auto;
-        padding: 14px;
-      }
-
-      .assistant-message {
-        border-radius: 8px;
-        line-height: 1.45;
-        max-width: 88%;
-        padding: 10px 12px;
-        white-space: pre-line;
-      }
-
-      .assistant-message.bot {
-        background: #fff;
-        border: 1px solid var(--line);
-        justify-self: start;
-      }
-
-      .assistant-message.user {
-        background: var(--blue);
-        color: #fff;
-        justify-self: end;
-      }
-
-      .assistant-suggestions {
-        border-top: 1px solid var(--line);
-        display: flex;
-        gap: 7px;
-        overflow-x: auto;
-        padding: 10px 14px;
-      }
-
-      .assistant-suggestions button {
-        flex: 0 0 auto;
-        white-space: nowrap;
-      }
-
-      .assistant-form {
-        border-top: 1px solid var(--line);
-        display: grid;
-        gap: 8px;
-        grid-template-columns: minmax(0, 1fr) auto;
-        padding: 12px 14px 14px;
-      }
-
       @media (max-width: 1060px) {
         .dashboard,
         .two-col {
@@ -1953,22 +1748,6 @@
         .evidence-history-entry > summary {
           align-items: flex-start;
           flex-wrap: wrap;
-        }
-
-        .assistant-launch {
-          bottom: calc(78px + env(safe-area-inset-bottom));
-          min-height: 44px;
-          padding: 0 14px;
-          right: 10px;
-        }
-
-        .assistant-dialog,
-        .assistant-shell {
-          max-height: 86vh;
-        }
-
-        .assistant-form {
-          grid-template-columns: 1fr;
         }
 
         .task-item {
@@ -2487,9 +2266,9 @@
                   id="evidenceFiles"
                   type="file"
                   multiple
-                  accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.mp4,.mov,.webm,.m4v,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt"
+                  required
+                  accept=".jpg,.jpeg,.png,.webp,.mp4,.mov,.webm,.m4v,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt"
                 />
-                <span id="evidenceSelectedFiles" class="evidence-selected-files" aria-live="polite"></span>
               </label>
               <p class="muted wide">Debes adjuntar al menos un sustento. Puedes cargar hasta 8 fotos, videos o documentos de 15 MB cada uno y los originales conservan su calidad.</p>
               <label class="wide">
@@ -2501,10 +2280,6 @@
                 <textarea id="evidenceNotes" placeholder="Describe que se realizo, hallazgos, incidencias o acuerdos"></textarea>
               </label>
               <p id="evidenceDeadlineMessage" class="wide deadline-alert hidden" aria-live="polite"></p>
-              <div id="evidenceUploadProgress" class="wide upload-progress hidden" aria-live="polite">
-                <strong id="evidenceUploadProgressText">Preparando carga...</strong>
-                <progress id="evidenceUploadProgressBar" max="100" value="0">0%</progress>
-              </div>
               <button id="evidenceSubmitButton" class="primary wide" type="submit">Enviar sustento</button>
               </form>
             </div>
@@ -2663,100 +2438,23 @@
 
       <section id="infoView" class="view">
         <div class="two-col">
-          <section class="panel stack">
+          <section class="panel">
             <h2>Informacion LG</h2>
-            <p class="muted">Guias base para reforzar argumentos de producto.</p>
+            <p class="muted">Consulta rapida para reforzar argumentos de producto.</p>
             <div id="productTabs" class="product-tabs"></div>
             <div id="productInfo" class="stack"></div>
           </section>
-          <section class="panel stack">
-            <div>
-              <h2>Productos y lanzamientos</h2>
-              <p class="muted">Cualquier integrante puede agregar o actualizar informacion compartida de HS, TV y AV.</p>
+          <aside class="panel stack">
+            <h2>Checklist de visita</h2>
+            <div class="item">
+              <strong>Antes de cerrar una tarea</strong>
+              <p class="muted">Verifica exhibicion, precio, disponibilidad, limpieza, material POP y evidencia fotografica.</p>
             </div>
-            <form id="lgUpdateForm" class="form-grid">
-              <label>
-                Linea
-                <select id="lgUpdateLine" required>
-                  <option>HS</option>
-                  <option>TV</option>
-                  <option>AV</option>
-                </select>
-              </label>
-              <label>
-                Tipo de informacion
-                <select id="lgUpdateType" required>
-                  <option>Producto</option>
-                  <option>Lanzamiento</option>
-                  <option>Tecnologia</option>
-                  <option>Argumento de venta</option>
-                </select>
-              </label>
-              <label class="wide">
-                Titulo
-                <input id="lgUpdateTitle" type="text" maxlength="140" placeholder="Ej. Nueva lavadora WashTower" required />
-              </label>
-              <label class="wide">
-                Producto o modelo
-                <input id="lgUpdateProduct" type="text" maxlength="120" placeholder="Ej. OLED evo G6" />
-              </label>
-              <label class="wide">
-                Informacion
-                <textarea id="lgUpdateDescription" maxlength="2000" placeholder="Beneficios, tecnologias, disponibilidad y argumentos importantes" required></textarea>
-              </label>
-              <div class="actions wide">
-                <button id="saveLgUpdate" class="primary" type="submit">Publicar informacion</button>
-                <button id="cancelLgUpdateEdit" class="ghost hidden" type="button">Cancelar edicion</button>
-              </div>
-              <p id="lgUpdateMessage" class="message wide" aria-live="polite"></p>
-            </form>
-            <label>
-              Filtrar publicaciones
-              <select id="lgUpdateFilter">
-                <option value="all">Todas las lineas</option>
-                <option>HS</option>
-                <option>TV</option>
-                <option>AV</option>
-              </select>
-            </label>
-            <div id="lgUpdatesList" class="list"></div>
-          </section>
+            <div id="quizBox" class="stack"></div>
+          </aside>
         </div>
-        <aside class="panel stack info-checklist">
-          <h2>Checklist de visita</h2>
-          <div class="item">
-            <strong>Antes de cerrar una tarea</strong>
-            <p class="muted">Verifica exhibicion, precio, disponibilidad, limpieza, material POP y evidencia fotografica.</p>
-          </div>
-          <div id="quizBox" class="stack"></div>
-        </aside>
       </section>
     </main>
-
-    <button id="assistantButton" class="assistant-launch hidden" type="button" aria-haspopup="dialog">IA Ayuda</button>
-
-    <dialog id="assistantDialog" class="assistant-dialog">
-      <div class="assistant-shell">
-        <header class="assistant-header">
-          <div>
-            <h2>Asistente LGTASK</h2>
-            <p class="muted">Guia inteligente gratuita, sin consumo de API.</p>
-          </div>
-          <button id="closeAssistant" class="small" type="button" aria-label="Cerrar asistente">Cerrar</button>
-        </header>
-        <div id="assistantMessages" class="assistant-messages" aria-live="polite"></div>
-        <div id="assistantSuggestions" class="assistant-suggestions">
-          <button class="small" type="button" data-question="Como subo un sustento">Subir sustento</button>
-          <button class="small" type="button" data-question="Como muevo una tarea">Mover tarea</button>
-          <button class="small" type="button" data-question="Como cambio mi break">Cambiar break</button>
-          <button class="small" type="button" data-question="Que tareas tengo hoy">Mis tareas de hoy</button>
-        </div>
-        <form id="assistantForm" class="assistant-form">
-          <input id="assistantInput" type="text" maxlength="300" placeholder="Pregunta como usar LGTASK" aria-label="Pregunta para el asistente" required />
-          <button class="primary" type="submit">Preguntar</button>
-        </form>
-      </div>
-    </dialog>
 
     <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
 
@@ -2891,6 +2589,13 @@
           <strong>Acciones de la tarea</strong>
           <div id="taskPreviewActions" class="actions"></div>
         </section>
+        <section id="taskInlineEvidenceSection" class="note stack hidden">
+          <div>
+            <h3>Enviar sustento de esta tarea</h3>
+            <p class="muted">Adjunta los archivos y completa los datos sin salir de la tarea.</p>
+          </div>
+          <div id="taskInlineEvidenceMount"></div>
+        </section>
         <div id="taskPreviewContent" class="stack"></div>
         <div class="actions">
           <button id="taskPreviewHistory" class="small" type="button">Historial completo</button>
@@ -2986,14 +2691,9 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = 24;
       const MAX_EVIDENCE_FILES = 8;
       const MAX_EVIDENCE_FILE_BYTES = 15_000_000;
-      const EVIDENCE_DIRECT_FILE_BYTES = 300_000;
-      const EVIDENCE_CHUNK_FILE_BYTES = 600_000;
-      const EVIDENCE_SELECTION_TASK_KEY = "lgtask-evidence-task-v1";
-      const EVIDENCE_SELECTION_DATE_KEY = "lgtask-evidence-date-v1";
-      const EVIDENCE_PENDING_SUBMISSION_KEY = "lgtask-evidence-pending-v1";
+      const EVIDENCE_CHUNK_BASE64 = 750_000;
       const NOTIFICATION_TASKS_KEY = "lgtask-notified-tasks-v1";
       const ALLOWED_VIEW_IDS = ["tasksView", "evidenceView", "teamView", "announcementsView", "infoView"];
       const EVIDENCE_FILE_EXTENSIONS = new Set([
@@ -3001,8 +2701,6 @@
         "jpeg",
         "png",
         "webp",
-        "heic",
-        "heif",
         "mp4",
         "mov",
         "webm",
@@ -3043,7 +2741,7 @@
       ];
 
       const initialState = {
-        version: 22,
+        version: 15,
         activeUserId: "",
         selectedProduct: "oled",
         selectedWeekStart: "",
@@ -3063,8 +2761,7 @@
         deletedTasks: [],
         announcements: [],
         supportRequests: [],
-        dailyMotivations: [],
-        lgUpdates: []
+        dailyMotivations: []
       };
 
       const products = [
@@ -3134,35 +2831,12 @@
         }
       ];
 
-      const TEAM_PROFILE_DEFAULTS = [
-        { name: "DANNY DIOS", aliases: ["DANNY DIOS"], chains: ["Plaza Vea", "Hiraoka"], specialty: "Trainer retail" },
-        { name: "CAROLINA PALACIOS", aliases: ["CAROLINA PALACIOS"], chains: ["Metro", "Oechsle", "Conecta"], specialty: "Trainer retail" },
-        { name: "ANGEL CARRENO", aliases: ["ANGEL CARRENO"], chains: ["Coolbox"], specialty: "Especialista AV" },
-        { name: "HAROLD MONTORO", aliases: ["HAROLD MONTORO"], chains: ["Estilos", "Ripley", "Credivargas"], specialty: "Trainer retail" },
-        { name: "ANTONIO GONZALES", aliases: ["ANTONIO GONZALES", "ANTONIO VIDAL"], chains: ["Integra", "Sodimac", "Rubi"], specialty: "Trainer retail" },
-        { name: "ELOY NIETO", aliases: ["ELOY NIETO"], chains: [], specialty: "ULG" },
-        { name: "BRYAN TAPIA", aliases: ["BRYAN TAPIA"], chains: [], specialty: "New Hired" },
-        { name: "GIANPIERO VASQUEZ", aliases: ["GIANPIERO VASQUEZ"], chains: [], specialty: "Asesor ULG" }
-      ];
-
       let state = loadState();
       let syncTimer = 0;
       let syncInFlight = null;
       let syncQueued = false;
       let stateRevision = 0;
       let serviceWorkerRegistration = null;
-      let evidenceSubmitInFlight = false;
-      let evidenceOpenInFlight = false;
-      let pendingEvidenceSubmission = (() => {
-        try {
-          return JSON.parse(sessionStorage.getItem(EVIDENCE_PENDING_SUBMISSION_KEY) || "null");
-        } catch {
-          return null;
-        }
-      })();
-      let selectedEvidenceTaskId = sessionStorage.getItem(EVIDENCE_SELECTION_TASK_KEY) || "";
-      let selectedEvidenceDate = sessionStorage.getItem(EVIDENCE_SELECTION_DATE_KEY) || "";
-      let taskCreateInFlight = false;
       let notificationCheckInFlight = null;
       let toastTimer = 0;
       let activePreviewObjectUrl = "";
@@ -3172,16 +2846,14 @@
       let breakEditorKey = "";
       let overtimeEditorKey = "";
       let previewedTaskId = "";
+      let evidenceInlineTaskId = "";
       let notificationAudioContext = null;
       let historyTaskId = "";
       let lateEvidenceTaskId = "";
-      let infoEditingId = "";
       const openTaskGroups = new Set();
       const openTaskDays = new Set();
       const openTrainerWeekDays = new Set();
       const openDeletedTaskDays = new Set();
-      const openEvidenceDays = new Set();
-      const openEvidenceEntries = new Set();
       let activeViewId = ALLOWED_VIEW_IDS.includes(new URLSearchParams(window.location.search).get("view"))
         ? new URLSearchParams(window.location.search).get("view")
         : "tasksView";
@@ -3308,13 +2980,9 @@
         evidenceTrainingTopic: document.querySelector("#evidenceTrainingTopic"),
         evidenceResult: document.querySelector("#evidenceResult"),
         evidenceFiles: document.querySelector("#evidenceFiles"),
-        evidenceSelectedFiles: document.querySelector("#evidenceSelectedFiles"),
         evidenceLinks: document.querySelector("#evidenceLinks"),
         evidenceNotes: document.querySelector("#evidenceNotes"),
         evidenceDeadlineMessage: document.querySelector("#evidenceDeadlineMessage"),
-        evidenceUploadProgress: document.querySelector("#evidenceUploadProgress"),
-        evidenceUploadProgressText: document.querySelector("#evidenceUploadProgressText"),
-        evidenceUploadProgressBar: document.querySelector("#evidenceUploadProgressBar"),
         evidenceSubmitButton: document.querySelector("#evidenceSubmitButton"),
         evidenceMessage: document.querySelector("#evidenceMessage"),
         evidenceHistoryPanel: document.querySelector("#evidenceHistoryPanel"),
@@ -3397,6 +3065,8 @@
         taskPreviewSubtitle: document.querySelector("#taskPreviewSubtitle"),
         taskPreviewActionsWrap: document.querySelector("#taskPreviewActionsWrap"),
         taskPreviewActions: document.querySelector("#taskPreviewActions"),
+        taskInlineEvidenceSection: document.querySelector("#taskInlineEvidenceSection"),
+        taskInlineEvidenceMount: document.querySelector("#taskInlineEvidenceMount"),
         taskPreviewContent: document.querySelector("#taskPreviewContent"),
         taskPreviewHistory: document.querySelector("#taskPreviewHistory"),
         closeTaskPreview: document.querySelector("#closeTaskPreview"),
@@ -3434,24 +3104,6 @@
         productTabs: document.querySelector("#productTabs"),
         productInfo: document.querySelector("#productInfo"),
         quizBox: document.querySelector("#quizBox"),
-        lgUpdateForm: document.querySelector("#lgUpdateForm"),
-        lgUpdateLine: document.querySelector("#lgUpdateLine"),
-        lgUpdateType: document.querySelector("#lgUpdateType"),
-        lgUpdateTitle: document.querySelector("#lgUpdateTitle"),
-        lgUpdateProduct: document.querySelector("#lgUpdateProduct"),
-        lgUpdateDescription: document.querySelector("#lgUpdateDescription"),
-        saveLgUpdate: document.querySelector("#saveLgUpdate"),
-        cancelLgUpdateEdit: document.querySelector("#cancelLgUpdateEdit"),
-        lgUpdateMessage: document.querySelector("#lgUpdateMessage"),
-        lgUpdateFilter: document.querySelector("#lgUpdateFilter"),
-        lgUpdatesList: document.querySelector("#lgUpdatesList"),
-        assistantButton: document.querySelector("#assistantButton"),
-        assistantDialog: document.querySelector("#assistantDialog"),
-        closeAssistant: document.querySelector("#closeAssistant"),
-        assistantMessages: document.querySelector("#assistantMessages"),
-        assistantSuggestions: document.querySelector("#assistantSuggestions"),
-        assistantForm: document.querySelector("#assistantForm"),
-        assistantInput: document.querySelector("#assistantInput"),
         toastRegion: document.querySelector("#toastRegion")
       };
 
@@ -3540,7 +3192,7 @@
       }
 
       function normalizeState(nextState) {
-        nextState.version = 16;
+        nextState.version = 14;
         nextState.users = nextState.users?.length ? nextState.users : structuredClone(initialState.users);
         nextState.registrationRequests = nextState.registrationRequests || [];
         nextState.passwordRecoveryRequests = nextState.passwordRecoveryRequests || [];
@@ -3579,11 +3231,6 @@
         nextState.announcements = nextState.announcements || [];
         nextState.supportRequests = nextState.supportRequests || [];
         nextState.dailyMotivations = nextState.dailyMotivations || [];
-        nextState.lgUpdates = (nextState.lgUpdates || []).map((item) => ({
-          ...item,
-          line: ["HS", "TV", "AV"].includes(item.line) ? item.line : "HS",
-          type: ["Producto", "Lanzamiento", "Tecnologia", "Argumento de venta"].includes(item.type) ? item.type : "Producto"
-        }));
         nextState.selectedWeekStart = nextState.selectedWeekStart || weekStartIso(todayIso);
         nextState.selectedCoordinatorDate = nextState.selectedCoordinatorDate || nearestWorkingDay(todayIso);
         return nextState;
@@ -3611,47 +3258,18 @@
       }
 
       async function apiRequest(path, options = {}) {
-        const { timeoutMs = 45_000, ...fetchOptions } = options;
-        const controller = new AbortController();
-        const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
-        try {
-          const response = await fetch(`${API_BASE}${path}`, {
-            credentials: "same-origin",
-            headers: { "Content-Type": "application/json", ...(fetchOptions.headers || {}) },
-            ...fetchOptions,
-            signal: fetchOptions.signal || controller.signal
-          });
-          const data = await response.json().catch(() => ({}));
-          if (!response.ok) {
-            const error = new Error(data.message || `No se pudo conectar con la nube (HTTP ${response.status}).`);
-            error.status = response.status;
-            throw error;
-          }
-          return data;
-        } catch (error) {
-          if (error.name === "AbortError") {
-            const timeoutError = new Error("La nube demoro demasiado en responder. LGTASK volvera a intentarlo automaticamente.");
-            timeoutError.status = 0;
-            throw timeoutError;
-          }
+        const response = await fetch(`${API_BASE}${path}`, {
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+          ...options
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const error = new Error(data.message || `No se pudo conectar con la nube (HTTP ${response.status}).`);
+          error.status = response.status;
           throw error;
-        } finally {
-          window.clearTimeout(timeout);
         }
-      }
-
-      async function apiRequestWithRetry(path, options = {}, attempts = 3) {
-        let lastError;
-        for (let attempt = 1; attempt <= attempts; attempt += 1) {
-          try {
-            return await apiRequest(path, options);
-          } catch (error) {
-            lastError = error;
-            if (attempt >= attempts || (error.status && error.status < 500)) throw error;
-            await new Promise((resolve) => window.setTimeout(resolve, attempt * 500));
-          }
-        }
-        throw lastError;
+        return data;
       }
 
       function urlBase64ToUint8Array(value) {
@@ -3664,9 +3282,8 @@
       async function registerServiceWorker() {
         if (!("serviceWorker" in navigator)) return null;
         try {
-          await navigator.serviceWorker.register(`/sw.js?v=${APP_VERSION}`, { scope: "/", updateViaCache: "none" });
+          await navigator.serviceWorker.register("/sw.js", { scope: "/" });
           serviceWorkerRegistration = await navigator.serviceWorker.ready;
-          await serviceWorkerRegistration.update().catch(() => {});
           return serviceWorkerRegistration;
         } catch (error) {
           console.error("No se pudo registrar el modo app", error);
@@ -3947,22 +3564,6 @@
       function setMessage(element, text, type = "") {
         element.textContent = text;
         element.className = `message ${type}`.trim();
-        if (type === "err" && text && (element === els.evidenceMessage || element === els.taskMessage)) {
-          showToast(text, "error");
-          if (element === els.evidenceMessage) {
-            window.requestAnimationFrame(() => element.scrollIntoView({ behavior: "smooth", block: "nearest" }));
-          }
-        }
-      }
-
-      function setEvidenceUploadProgress(text = "", percent = 0, type = "") {
-        const value = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
-        els.evidenceUploadProgress.classList.toggle("hidden", !text);
-        els.evidenceUploadProgress.classList.toggle("is-error", type === "err");
-        els.evidenceUploadProgress.classList.toggle("is-success", type === "ok");
-        els.evidenceUploadProgressText.textContent = text;
-        els.evidenceUploadProgressBar.value = value;
-        els.evidenceUploadProgressBar.textContent = `${value}%`;
       }
 
       function fillSelect(select, options, selected = "") {
@@ -4670,6 +4271,7 @@
       function openTaskPreviewDialog(taskId) {
         const task = state.tasks.find((item) => item.id === taskId);
         if (!task) return;
+        restoreEvidenceFormHome();
         previewedTaskId = task.id;
         refreshTaskPreviewDialog();
         els.taskPreviewDialog.showModal();
@@ -5524,8 +5126,6 @@
         els.loginScreen.classList.toggle("hidden", logged);
         els.appHeader.classList.toggle("hidden", !logged);
         els.appShell.classList.toggle("hidden", !logged);
-        els.assistantButton.classList.toggle("hidden", !logged);
-        if (!logged && els.assistantDialog.open) els.assistantDialog.close();
 
         if (!logged) return;
 
@@ -5757,38 +5357,14 @@
           .sort((left, right) => (left.startTime || WORKDAY_START).localeCompare(right.startTime || WORKDAY_START));
       }
 
-      function rememberEvidenceSelection(taskId = "", dateValue = els.evidenceTaskDate.value) {
-        selectedEvidenceTaskId = taskId;
-        selectedEvidenceDate = dateValue || todayIso;
-        if (selectedEvidenceTaskId) sessionStorage.setItem(EVIDENCE_SELECTION_TASK_KEY, selectedEvidenceTaskId);
-        else sessionStorage.removeItem(EVIDENCE_SELECTION_TASK_KEY);
-        sessionStorage.setItem(EVIDENCE_SELECTION_DATE_KEY, selectedEvidenceDate);
-      }
-
-      function clearEvidenceSelection() {
-        selectedEvidenceTaskId = "";
-        selectedEvidenceDate = "";
-        sessionStorage.removeItem(EVIDENCE_SELECTION_TASK_KEY);
-        sessionStorage.removeItem(EVIDENCE_SELECTION_DATE_KEY);
-      }
-
-      function rememberPendingEvidenceSubmission(submission) {
-        pendingEvidenceSubmission = submission || null;
-        if (pendingEvidenceSubmission) {
-          sessionStorage.setItem(EVIDENCE_PENDING_SUBMISSION_KEY, JSON.stringify(pendingEvidenceSubmission));
-        } else {
-          sessionStorage.removeItem(EVIDENCE_PENDING_SUBMISSION_KEY);
-        }
-      }
-
       function renderEvidenceTaskPicker(preferredTaskId = "") {
-        if (!els.evidenceTaskDate.value) els.evidenceTaskDate.value = selectedEvidenceDate || todayIso;
+        const inlineTask = evidenceInlineTaskId ? state.tasks.find((task) => task.id === evidenceInlineTaskId) : null;
+        if (!els.evidenceTaskDate.value) els.evidenceTaskDate.value = inlineTask?.dueDate || todayIso;
+        if (inlineTask && els.evidenceTaskDate.value !== inlineTask.dueDate) els.evidenceTaskDate.value = inlineTask.dueDate;
         const tasks = evidenceCandidateTasks(els.evidenceTaskDate.value);
-        const requestedTaskId = preferredTaskId || selectedEvidenceTaskId || els.evidenceTask.value;
-        const selectedTaskId = tasks.some((task) => task.id === requestedTaskId)
-          ? requestedTaskId
+        const selectedTaskId = tasks.some((task) => task.id === preferredTaskId)
+          ? preferredTaskId
           : tasks.find((task) => taskAllowsEvidenceToday(task))?.id || "";
-        rememberEvidenceSelection(selectedTaskId, els.evidenceTaskDate.value);
         fillSelect(
           els.evidenceTask,
           tasks.map((task) => ({ value: task.id, label: task.title })),
@@ -5812,8 +5388,6 @@
           : emptyState("No hay tareas disponibles este dia", "Inicia una tarea pendiente o selecciona otro dia.");
         els.evidenceTaskPicker.querySelectorAll('input[name="evidenceTaskChoice"]').forEach((input) => {
           input.addEventListener("change", () => {
-            rememberPendingEvidenceSubmission(null);
-            rememberEvidenceSelection(input.value, els.evidenceTaskDate.value);
             els.evidenceTask.value = input.value;
             renderEvidenceTaskPicker(input.value);
             renderEvidenceTrainingTopic();
@@ -5834,7 +5408,7 @@
           els.evidenceTrainerFilter.value || "all"
         );
 
-        renderEvidenceTaskPicker(els.evidenceTask.value);
+        renderEvidenceTaskPicker(evidenceInlineTaskId || els.evidenceTask.value);
         els.taskDueDate.removeAttribute("min");
         els.taskDueDate.value = els.taskDueDate.value || nearestWorkingDay(todayIso);
         renderTaskAvailability(els.taskStartTime.value, els.taskEndTime.value);
@@ -6257,6 +5831,32 @@
         });
       }
 
+      function openEvidenceForTask(task) {
+        if (!task || isCoordinator() || !taskAllowsEvidenceToday(task)) return;
+        previewedTaskId = task.id;
+        evidenceInlineTaskId = task.id;
+        els.evidenceTaskDate.value = task.dueDate;
+        renderEvidenceTaskPicker(task.id);
+        els.evidenceTask.value = task.id;
+        renderEvidenceTrainingTopic();
+        els.evidenceForm.classList.add("inline-evidence-form");
+        els.taskInlineEvidenceMount.appendChild(els.evidenceForm);
+        els.taskInlineEvidenceSection.classList.remove("hidden");
+        refreshTaskPreviewDialog();
+        if (!els.taskPreviewDialog.open) els.taskPreviewDialog.showModal();
+        window.requestAnimationFrame(() => {
+          els.taskInlineEvidenceSection.scrollIntoView({ behavior: "smooth", block: "start" });
+          els.evidenceFiles.focus();
+        });
+      }
+
+      function restoreEvidenceFormHome() {
+        if (els.evidenceForm.parentElement !== els.evidenceFormHome) els.evidenceFormHome.appendChild(els.evidenceForm);
+        els.evidenceForm.classList.remove("inline-evidence-form");
+        els.taskInlineEvidenceSection.classList.add("hidden");
+        evidenceInlineTaskId = "";
+      }
+
       function selectedEvidenceTask() {
         return state.tasks.find((task) => task.id === els.evidenceTask.value);
       }
@@ -6264,7 +5864,6 @@
       function renderEvidenceTrainingTopic() {
         const task = selectedEvidenceTask();
         const isTraining = clean(task?.category).toLowerCase() === "entrenamiento";
-        const hasPendingConfirmation = Boolean(task && pendingEvidenceSubmission?.taskId === task.id);
         els.evidenceTrainingTopicWrap.classList.toggle("hidden", !isTraining);
         els.evidenceTrainingTopic.required = isTraining;
         if (!isTraining) els.evidenceTrainingTopic.value = "";
@@ -6275,46 +5874,15 @@
         els.evidenceFiles.disabled = Boolean(task && !allowed);
         els.evidenceLinks.disabled = Boolean(task && !allowed);
         els.evidenceSubmitButton.disabled = !task || !allowed;
-        if (!evidenceSubmitInFlight) {
-          els.evidenceSubmitButton.textContent = hasPendingConfirmation ? "Confirmar sustento guardado" : "Enviar sustento";
-          if (hasPendingConfirmation) {
-            setEvidenceUploadProgress("Los archivos ya estan en la nube. Pulsa confirmar para finalizar el sustento.", 95);
-          }
-        }
       }
 
-      async function startTask(task) {
+      function startTask(task) {
         if (!task || task.status !== "Pendiente" || task.ownerId !== state.activeUserId) return;
-        try {
-          const data = await apiRequestWithRetry("/tasks/start", {
-            method: "POST",
-            body: JSON.stringify({ taskId: task.id })
-          });
-          applyCloudState(data.state);
-          render();
-        } catch (error) {
-          showToast(`No se pudo iniciar la tarea: ${error.message}`, "error");
-          await refreshStateFromServer({ quiet: true });
-          render();
-        }
-      }
-
-      async function openEvidenceModuleForTask(task) {
-        if (!task || task.ownerId !== state.activeUserId || isCoordinator() || evidenceOpenInFlight) return;
-        evidenceOpenInFlight = true;
-        rememberEvidenceSelection(task.id, task.dueDate);
-        els.evidenceTaskDate.value = task.dueDate;
-        try {
-          activateView("evidenceView", { updateUrl: true, historyMode: "push" });
-          render();
-          renderEvidenceTaskPicker(task.id);
-          renderEvidenceTrainingTopic();
-          window.requestAnimationFrame(() => els.evidenceUploadPanel.scrollIntoView({ behavior: "smooth", block: "start" }));
-        } catch (error) {
-          showToast(`No se pudo preparar la tarea para el sustento: ${error.message}`, "error");
-        } finally {
-          evidenceOpenInFlight = false;
-        }
+        task.history = task.history || [];
+        task.history.push({ type: "Inicio", byId: state.activeUserId, at: Date.now() });
+        task.status = "En proceso";
+        saveState();
+        render();
       }
 
       function renderTrainerTaskActions(container, task) {
@@ -6340,21 +5908,16 @@
           startButton.className = "primary";
           startButton.type = "button";
           startButton.textContent = "Iniciar";
-          startButton.addEventListener("click", async () => {
-            startButton.disabled = true;
-            startButton.textContent = "Iniciando...";
-            await startTask(task);
-          });
+          startButton.addEventListener("click", () => startTask(task));
           container.appendChild(startButton);
-        }
-        if (task.status === "En proceso" || task.status === "Observada") {
+        } else if (task.status === "En proceso" || task.status === "Observada") {
           const evidenceButton = document.createElement("button");
-          const evidenceAllowed = taskAllowsEvidenceToday(task);
           evidenceButton.className = "primary";
           evidenceButton.type = "button";
-          evidenceButton.textContent = evidenceAllowed ? "Enviar sustento" : "Sustento no disponible";
-          evidenceButton.disabled = !evidenceAllowed;
-          evidenceButton.addEventListener("click", () => openEvidenceModuleForTask(task));
+          evidenceButton.textContent = taskAllowsEvidenceToday(task) ? "Enviar sustento" : "Sustento no disponible";
+          evidenceButton.disabled = !taskAllowsEvidenceToday(task);
+          evidenceButton.title = taskEvidenceDeadlineText(task);
+          if (taskAllowsEvidenceToday(task)) evidenceButton.addEventListener("click", () => openEvidenceForTask(task));
           container.appendChild(evidenceButton);
         }
         renderScheduleControl(container, task);
@@ -6412,7 +5975,7 @@
                 <span class="muted">${escapeHtml(task.category)}${task.product ? ` | ${escapeHtml(task.product)}` : ""}</span>
                 <div class="actions"></div>
               `;
-              renderTrainerTaskActions(card.querySelector(".actions"), task);
+              renderViewTaskControl(card.querySelector(".actions"), task);
               wrap.appendChild(card);
             });
           }
@@ -6571,14 +6134,6 @@
           render();
           showToast("Carga tardia habilitada por un solo envio durante el dia de hoy.", "success");
         } catch (error) {
-          const refreshed = await refreshStateFromServer({ quiet: true });
-          const savedTask = state.tasks.find((task) => task.id === taskId);
-          if (refreshed && lateEvidenceAuthorizationActive(savedTask)) {
-            els.lateEvidenceDialog.close();
-            render();
-            showToast("Carga tardia guardada. El aviso se completara en segundo plano.", "success");
-            return;
-          }
           setMessage(els.lateEvidenceMessage, error.message || "No se pudo guardar la autorizacion.", "err");
         } finally {
           els.confirmLateEvidence.disabled = false;
@@ -6744,7 +6299,7 @@
 
       function renderEvidence() {
         els.evidenceUploadPanel.classList.toggle("hidden", isCoordinator());
-        if (!isCoordinator()) renderEvidenceTaskPicker(els.evidenceTask.value);
+        if (!isCoordinator() && !evidenceInlineTaskId) renderEvidenceTaskPicker(els.evidenceTask.value);
         let allEvidence = relevantTasks()
           .flatMap((task) => (task.evidence || []).map((evidence) => ({ ...evidence, task })))
           .sort((a, b) => b.submittedAt - a.submittedAt);
@@ -6794,7 +6349,7 @@
           const day = document.createElement("details");
           day.className = "evidence-history-day";
           const hasLinkedEntry = entries.some((entry) => entry.id === linkedEvidenceId || evidenceFilesForEntry(entry).some((file) => file.id === linkedFileId));
-          day.open = hasLinkedEntry || openEvidenceDays.has(dayKey);
+          day.open = hasLinkedEntry;
           day.innerHTML = `
             <summary>
               <strong>${escapeHtml(formatShortDate(dayKey))}</strong>
@@ -6802,10 +6357,6 @@
             </summary>
             <div class="evidence-history-day-body"></div>
           `;
-          day.addEventListener("toggle", () => {
-            if (day.open) openEvidenceDays.add(dayKey);
-            else openEvidenceDays.delete(dayKey);
-          });
           const dayBody = day.querySelector(".evidence-history-day-body");
 
           entries.forEach((entry) => {
@@ -6831,7 +6382,7 @@
               .join("");
             const entryDetails = document.createElement("details");
             entryDetails.className = "evidence-history-entry";
-            entryDetails.open = isLinked || openEvidenceEntries.has(entry.id);
+            entryDetails.open = isLinked;
             entryDetails.innerHTML = `
               <summary>
                 <span class="evidence-history-summary">
@@ -6857,10 +6408,6 @@
                 ${files.length ? `<div class="evidence-file-list">${filesMarkup}</div>` : `<p class="muted">Sustento sin archivo adjunto.</p>`}
               </div>
             `;
-            entryDetails.addEventListener("toggle", () => {
-              if (entryDetails.open) openEvidenceEntries.add(entry.id);
-              else openEvidenceEntries.delete(entry.id);
-            });
 
             const latestEvidence = entry.task.evidence?.at(-1);
             const canReview =
@@ -6902,24 +6449,6 @@
             openEvidenceFilePreview(linkedFile, { syncUrl: false }).catch(() => {});
           });
         }
-      }
-
-      function teamProfileForName(name) {
-        const normalized = normalizedUserName(name);
-        return TEAM_PROFILE_DEFAULTS.find((profile) => profile.aliases.includes(normalized)) || null;
-      }
-
-      function teamProfileMarkup(profile) {
-        const chains = profile?.chains || [];
-        return `
-          <div class="profile-tags">
-            ${chains.length ? chains.map((chain) => `<span class="profile-tag">${escapeHtml(chain)}</span>`).join("") : `<span class="profile-tag">Sin cadena fija</span>`}
-          </div>
-          <div class="note">
-            <strong>Funcion / especialidad</strong>
-            <p>${escapeHtml(profile?.specialty || "Trainer LG")}</p>
-          </div>
-        `;
       }
 
       function renderTeam() {
@@ -6970,24 +6499,13 @@
         renderPasswordRecoveryRequests();
 
         els.teamList.innerHTML = "";
-        const activeUsers = state.users.filter((user) => user.status === "Activo");
-        const visibleUsers = isCoordinator() ? activeUsers : activeUsers.filter((user) => user.role === "Trainer");
-        const matchedProfiles = new Set();
+        const visibleUsers = isCoordinator() ? state.users.filter((user) => user.status === "Activo") : [activeUser()].filter(Boolean);
         visibleUsers
-          .sort((left, right) => {
-            const leftProfile = teamProfileForName(left.name);
-            const rightProfile = teamProfileForName(right.name);
-            const leftIndex = leftProfile ? TEAM_PROFILE_DEFAULTS.indexOf(leftProfile) : TEAM_PROFILE_DEFAULTS.length;
-            const rightIndex = rightProfile ? TEAM_PROFILE_DEFAULTS.indexOf(rightProfile) : TEAM_PROFILE_DEFAULTS.length;
-            return leftIndex - rightIndex || left.name.localeCompare(right.name);
-          })
           .forEach((user) => {
             const assigned = state.tasks.filter((task) => task.ownerId === user.id);
             const completed = assigned.filter((task) => task.status === "Cumplida").length;
-            const profile = teamProfileForName(user.name);
-            if (profile) matchedProfiles.add(profile.name);
             const card = document.createElement("article");
-            card.className = "item team-profile-card";
+            card.className = "item";
             card.innerHTML = `
               <div class="title-row">
                 <h3>${escapeHtml(user.name)}</h3>
@@ -6995,11 +6513,10 @@
               </div>
               <div class="meta">
                 <span>${escapeHtml(user.zone)}</span>
-                ${isCoordinator() || user.id === state.activeUserId ? `<span>${escapeHtml(user.email)}</span>` : ""}
+                <span>${escapeHtml(user.email)}</span>
                 <span>${completed}/${assigned.length} tareas cumplidas</span>
-                ${isCoordinator() || user.id === state.activeUserId ? `<span>Clave actual: protegida</span>` : ""}
+                <span>Clave actual: protegida</span>
               </div>
-              ${user.role === "Trainer" ? teamProfileMarkup(profile) : `<div class="note"><strong>Coordinacion</strong><p>Gestion y seguimiento del equipo de trainers.</p></div>`}
               ${
                 isCoordinator()
                   ? `<div class="note">
@@ -7008,9 +6525,7 @@
                       ${user.passwordResetTemp ? `<p><strong>Clave temporal:</strong> ${escapeHtml(user.passwordResetTemp)}</p>` : ""}
                     </div>
                     <div class="actions"></div>`
-                  : user.id === state.activeUserId
-                    ? `<div class="note"><strong>Mi acceso</strong><p class="muted">Si olvidas tu clave, usa Olvide mi clave en la pantalla de ingreso.</p></div>`
-                    : ""
+                  : `<div class="note"><strong>Mi acceso</strong><p class="muted">Si olvidas tu clave, usa Olvide mi clave en la pantalla de ingreso.</p></div>`
               }
             `;
             const actions = card.querySelector(".actions");
@@ -7041,20 +6556,6 @@
             }
             els.teamList.appendChild(card);
           });
-
-        TEAM_PROFILE_DEFAULTS.filter((profile) => !matchedProfiles.has(profile.name)).forEach((profile) => {
-          const card = document.createElement("article");
-          card.className = "item team-profile-card is-reference";
-          card.innerHTML = `
-            <div class="title-row">
-              <h3>${escapeHtml(profile.name)}</h3>
-              <span class="pill pending">Perfil informativo</span>
-            </div>
-            ${teamProfileMarkup(profile)}
-            <p class="muted">La ficha esta visible para el equipo. Se vinculara automaticamente cuando el nombre del acceso coincida.</p>
-          `;
-          els.teamList.appendChild(card);
-        });
       }
 
       function renderPasswordRecoveryRequests() {
@@ -7143,90 +6644,6 @@
         });
       }
 
-      function resetLgUpdateEditor() {
-        infoEditingId = "";
-        els.lgUpdateForm.reset();
-        els.lgUpdateLine.value = "HS";
-        els.lgUpdateType.value = "Producto";
-        els.saveLgUpdate.textContent = "Publicar informacion";
-        els.cancelLgUpdateEdit.classList.add("hidden");
-        setMessage(els.lgUpdateMessage, "", "");
-      }
-
-      function editLgUpdate(item) {
-        infoEditingId = item.id;
-        els.lgUpdateLine.value = item.line;
-        els.lgUpdateType.value = item.type;
-        els.lgUpdateTitle.value = item.title;
-        els.lgUpdateProduct.value = item.product || "";
-        els.lgUpdateDescription.value = item.description;
-        els.saveLgUpdate.textContent = "Guardar cambios";
-        els.cancelLgUpdateEdit.classList.remove("hidden");
-        setMessage(els.lgUpdateMessage, `Editando: ${item.title}`, "");
-        els.lgUpdateForm.scrollIntoView({ behavior: "smooth", block: "start" });
-        els.lgUpdateTitle.focus();
-      }
-
-      async function removeLgUpdate(item) {
-        if (!window.confirm(`Eliminar la informacion "${item.title}" de Info LG?`)) return;
-        try {
-          const data = await apiRequest("/info/updates", {
-            method: "POST",
-            body: JSON.stringify({ action: "delete", id: item.id })
-          });
-          applyCloudState(data.state);
-          if (infoEditingId === item.id) resetLgUpdateEditor();
-          renderProducts();
-          showToast("Informacion eliminada de Info LG.", "success");
-        } catch (error) {
-          setMessage(els.lgUpdateMessage, error.message || "No se pudo eliminar la informacion.", "err");
-        }
-      }
-
-      function renderLgUpdates() {
-        const filter = els.lgUpdateFilter.value || "all";
-        const updates = (state.lgUpdates || [])
-          .filter((item) => filter === "all" || item.line === filter)
-          .sort((left, right) => Number(right.updatedAt || right.createdAt || 0) - Number(left.updatedAt || left.createdAt || 0));
-        els.lgUpdatesList.innerHTML = "";
-        if (!updates.length) {
-          els.lgUpdatesList.innerHTML = emptyState("No hay publicaciones en esta linea", "Agrega el primer producto, tecnologia o lanzamiento para compartirlo con el equipo.");
-          return;
-        }
-        updates.forEach((item) => {
-          const card = document.createElement("article");
-          card.className = "item lg-update-card";
-          card.dataset.line = item.line;
-          card.innerHTML = `
-            <div class="title-row">
-              <h3>${escapeHtml(item.title)}</h3>
-              <span class="pill">${escapeHtml(item.line)}</span>
-              <span class="pill medium">${escapeHtml(item.type)}</span>
-            </div>
-            ${item.product ? `<p><strong>Producto / modelo:</strong> ${escapeHtml(item.product)}</p>` : ""}
-            <p>${escapeHtml(item.description)}</p>
-            <div class="meta">
-              <span>Actualizado por ${escapeHtml(item.updatedByName || item.createdByName || "Equipo LG")}</span>
-              <span>${formatDateTime(item.updatedAt || item.createdAt)}</span>
-            </div>
-            <div class="actions"></div>
-          `;
-          const actions = card.querySelector(".actions");
-          const editButton = document.createElement("button");
-          editButton.className = "small";
-          editButton.type = "button";
-          editButton.textContent = "Editar";
-          editButton.addEventListener("click", () => editLgUpdate(item));
-          const deleteButton = document.createElement("button");
-          deleteButton.className = "danger small";
-          deleteButton.type = "button";
-          deleteButton.textContent = "Eliminar";
-          deleteButton.addEventListener("click", () => removeLgUpdate(item));
-          actions.append(editButton, deleteButton);
-          els.lgUpdatesList.appendChild(card);
-        });
-      }
-
       function renderProducts() {
         els.productTabs.innerHTML = "";
         products.forEach((product) => {
@@ -7275,117 +6692,6 @@
             result.textContent = button.dataset.answer === product.quiz.answer ? "Correcto. Usa ese argumento en tienda." : `Respuesta correcta: ${product.quiz.answer}`;
           });
         });
-        renderLgUpdates();
-      }
-
-      function assistantText(value) {
-        return clean(value)
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .toLowerCase();
-      }
-
-      function assistantAnswer(question) {
-        const query = assistantText(question);
-        const todayTasks = state.tasks
-          .filter((task) => task.ownerId === state.activeUserId && task.dueDate === todayIso)
-          .sort((left, right) => (left.startTime || WORKDAY_START).localeCompare(right.startTime || WORKDAY_START));
-        if (/tarea.*hoy|hoy.*tarea|que.*tengo/.test(query)) {
-          return {
-            view: "tasksView",
-            text: todayTasks.length
-              ? `Hoy tienes ${todayTasks.length} tarea${todayTasks.length === 1 ? "" : "s"}:\n${todayTasks.map((task) => `${task.startTime}-${task.endTime} | ${task.title} | ${taskStatusLabel(task.status)}`).join("\n")}`
-              : "Hoy no tienes tareas asignadas. Puedes agregar una desde Tareas usando el formulario Agregar mi tarea."
-          };
-        }
-        if (/sustento|evidencia|foto|archivo/.test(query)) {
-          return {
-            view: "tasksView",
-            text: "Para enviar un sustento: pulsa Iniciar directamente en la tarjeta y luego Enviar sustento. LGTASK abrira el formulario con la tarea seleccionada. Adjunta al menos una foto o archivo, completa los datos y confirma el envio. La tarea quedara En revision hasta que Pablo la apruebe."
-          };
-        }
-        if (/mover|reprogram|cambiar.*hora|horario.*tarea/.test(query)) {
-          return {
-            view: "tasksView",
-            text: "Abre la tarea con Ver y selecciona Mover horario. LGTASK mostrara solamente los bloques disponibles y bloqueara cruces con tareas, jornada o break."
-          };
-        }
-        if (/break|descanso|almuerzo/.test(query)) {
-          return {
-            view: "tasksView",
-            text: "En Tareas abre Mi break por dia, elige la fecha, la duracion y uno de los horarios libres. El cambio se guarda solo para ese dia y no modifica el resto de la semana."
-          };
-        }
-        if (/hora.*extra|ampliar.*jornada|salir.*tarde/.test(query)) {
-          return {
-            view: "tasksView",
-            text: isCoordinator()
-              ? "En Ampliar jornada por dia selecciona trainer, fecha, nueva hora de salida y motivo. Tambien puedes aprobar o rechazar solicitudes pendientes."
-              : "En Ampliar jornada por dia selecciona fecha, hora de salida y motivo. El horario adicional se habilitara cuando Pablo apruebe la solicitud."
-          };
-        }
-        if (/reasign|otro trainer|no puedo/.test(query)) {
-          return {
-            view: "tasksView",
-            text: "Abre la tarea con Ver y usa Reasignar. Indica el motivo y elige una persona disponible. El movimiento quedara registrado en el historial para seguimiento de Pablo."
-          };
-        }
-        if (/producto|lanzamiento|info lg|tecnologia|hs|tv|av/.test(query)) {
-          return {
-            view: "infoView",
-            text: "En Info LG puedes consultar guias de producto y las publicaciones compartidas de HS, TV y AV. Cualquier integrante puede agregar o editar productos, tecnologias y lanzamientos."
-          };
-        }
-        if (/equipo|cadena|trainer|especialidad/.test(query)) {
-          return {
-            view: "teamView",
-            text: "En Equipo encontraras la ficha de cada trainer, sus cadenas asignadas, especialidad y avance de tareas."
-          };
-        }
-        if (/notificacion|aviso|recordatorio/.test(query)) {
-          return {
-            view: "tasksView",
-            text: "Pulsa Activar notificaciones en la parte superior y permite los avisos del navegador. Los recordatorios y nuevas tareas llegaran al celular cuando Android permita notificaciones de Chrome o de la app instalada."
-          };
-        }
-        if (/clave|contrasena|password|ingresar/.test(query)) {
-          return {
-            text: "En la pantalla de ingreso usa Olvide mi clave y escribe tu correo registrado. Pablo recibira la solicitud y podra generar una clave temporal."
-          };
-        }
-        return {
-          text: "Puedo ayudarte con: tareas de hoy, envio de sustentos, cambio de horario, break, horas extra, reasignaciones, notificaciones, Equipo e Info LG. Escribe una pregunta corta sobre lo que necesitas hacer."
-        };
-      }
-
-      function addAssistantMessage(role, text, viewId = "") {
-        const message = document.createElement("div");
-        message.className = `assistant-message ${role}`;
-        const body = document.createElement("div");
-        body.textContent = text;
-        message.appendChild(body);
-        if (role === "bot" && ALLOWED_VIEW_IDS.includes(viewId)) {
-          const action = document.createElement("button");
-          action.className = "small";
-          action.type = "button";
-          action.textContent = `Ir a ${viewId === "infoView" ? "Info LG" : viewId === "teamView" ? "Equipo" : "Tareas"}`;
-          action.addEventListener("click", () => {
-            activateView(viewId, { updateUrl: true, historyMode: "push", scroll: true });
-            render();
-            els.assistantDialog.close();
-          });
-          message.appendChild(action);
-        }
-        els.assistantMessages.appendChild(message);
-        els.assistantMessages.scrollTop = els.assistantMessages.scrollHeight;
-      }
-
-      function askAssistant(question) {
-        const value = clean(question);
-        if (!value) return;
-        addAssistantMessage("user", value);
-        const answer = assistantAnswer(value);
-        addAssistantMessage("bot", answer.text, answer.view);
       }
 
       async function resetUserPassword(userId, requestId = "") {
@@ -7409,51 +6715,13 @@
         }
       }
 
-      function readFileAsDataUrl(file, displayName = file?.name || "archivo") {
+      function readFileAsDataUrl(file) {
         return new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result);
-          reader.onerror = () => reject(new Error(`No se pudo leer ${displayName}.`));
+          reader.onerror = () => reject(new Error(`No se pudo leer ${file.name}.`));
           reader.readAsDataURL(file);
         });
-      }
-
-      async function readBlobAsBase64(blob, fileName) {
-        const dataUrl = await readFileAsDataUrl(blob, fileName);
-        const base64 = String(dataUrl).split(",")[1] || "";
-        if (!base64) throw new Error(`No se pudo preparar ${fileName}.`);
-        return base64;
-      }
-
-      function evidenceFileSignature(files = Array.from(els.evidenceFiles.files || [])) {
-        return files.map((file) => `${file.name}:${file.size}:${file.lastModified}`).join("|");
-      }
-
-      function evidenceDraftActive() {
-        return Boolean(
-          evidenceSubmitInFlight ||
-          selectedEvidenceTaskId ||
-          els.evidenceTask.value ||
-          els.evidenceFiles.files?.length ||
-          clean(els.evidenceStore.value) ||
-          clean(els.evidenceProduct.value) ||
-          clean(els.evidenceTrainingTopic.value) ||
-          clean(els.evidenceLinks.value) ||
-          clean(els.evidenceNotes.value)
-        );
-      }
-
-      function renderSelectedEvidenceFiles() {
-        const files = Array.from(els.evidenceFiles.files || []);
-        els.evidenceSelectedFiles.innerHTML = files
-          .map(
-            (file) => `
-              <span class="evidence-selected-file">
-                <span>${escapeHtml(file.name)}</span>
-                <span class="muted">${Math.max(1, Math.ceil(file.size / 1024))} KB</span>
-              </span>`
-          )
-          .join("");
       }
 
       function evidenceMimeType(extension, currentType = "") {
@@ -7462,8 +6730,6 @@
           jpeg: "image/jpeg",
           png: "image/png",
           webp: "image/webp",
-          heic: "image/heic",
-          heif: "image/heif",
           mp4: "video/mp4",
           mov: "video/quicktime",
           webm: "video/webm",
@@ -7489,58 +6755,57 @@
         if (file.size > MAX_EVIDENCE_FILE_BYTES) {
           throw new Error(`${file.name}: supera el maximo de 15 MB permitido por la nube.`);
         }
+        const originalDataUrl = await readFileAsDataUrl(file);
+        const base64 = String(originalDataUrl).split(",")[1] || "";
+        if (!base64 || base64.length > 21_000_000) {
+          throw new Error(`${file.name}: no se pudo preparar dentro del limite de 15 MB.`);
+        }
         const mimeType = evidenceMimeType(extension, file.type);
         return {
-          file,
+          fileData: `data:${mimeType};base64,${base64}`,
           fileName: file.name,
           mimeType,
-          totalBase64: 4 * Math.ceil(file.size / 3)
+          base64
         };
       }
 
       async function uploadPreparedEvidenceFile(taskId, prepared, onChunk) {
-        const fileId = id();
-        if (prepared.file.size <= EVIDENCE_DIRECT_FILE_BYTES) {
-          const base64 = await readBlobAsBase64(prepared.file, prepared.fileName);
-          return apiRequestWithRetry("/evidence/upload", {
+        if (prepared.base64.length <= 1_800_000) {
+          return apiRequest("/evidence/upload", {
             method: "POST",
             body: JSON.stringify({
               taskId,
-              fileId,
-              fileData: `data:${prepared.mimeType};base64,${base64}`,
+              fileData: prepared.fileData,
               fileName: prepared.fileName
             })
           });
         }
-        const chunks = Math.ceil(prepared.file.size / EVIDENCE_CHUNK_FILE_BYTES);
-        const initialized = await apiRequestWithRetry("/evidence/upload/init", {
+        const chunks = Math.ceil(prepared.base64.length / EVIDENCE_CHUNK_BASE64);
+        const initialized = await apiRequest("/evidence/upload/init", {
           method: "POST",
           body: JSON.stringify({
             taskId,
-            fileId,
             fileName: prepared.fileName,
             mimeType: prepared.mimeType,
-            totalBase64: prepared.totalBase64,
+            totalBase64: prepared.base64.length,
             chunkCount: chunks
           })
         });
         for (let chunkIndex = 0; chunkIndex < chunks; chunkIndex += 1) {
           onChunk?.(chunkIndex + 1, chunks);
-          const chunkBlob = prepared.file.slice(
-            chunkIndex * EVIDENCE_CHUNK_FILE_BYTES,
-            (chunkIndex + 1) * EVIDENCE_CHUNK_FILE_BYTES
-          );
-          const chunkBase64 = await readBlobAsBase64(chunkBlob, prepared.fileName);
-          await apiRequestWithRetry("/evidence/upload/chunk", {
+          await apiRequest("/evidence/upload/chunk", {
             method: "POST",
             body: JSON.stringify({
               fileId: initialized.fileId,
               chunkIndex,
-              chunkBase64
+              chunkBase64: prepared.base64.slice(
+                chunkIndex * EVIDENCE_CHUNK_BASE64,
+                (chunkIndex + 1) * EVIDENCE_CHUNK_BASE64
+              )
             })
           });
         }
-        return apiRequestWithRetry("/evidence/upload/complete", {
+        return apiRequest("/evidence/upload/complete", {
           method: "POST",
           body: JSON.stringify({
             fileId: initialized.fileId,
@@ -7642,8 +6907,6 @@
           state.activeUserId = "";
           state.users = [];
           state.tasks = [];
-          els.assistantMessages.innerHTML = "";
-          if (els.assistantDialog.open) els.assistantDialog.close();
           openTaskGroups.clear();
           openTaskDays.clear();
           openTrainerWeekDays.clear();
@@ -7661,27 +6924,6 @@
             window.alert(error.message || "No se pudieron activar las notificaciones.");
             updateNotificationButton();
           });
-        });
-
-        els.assistantButton.addEventListener("click", () => {
-          if (!els.assistantMessages.children.length) {
-            addAssistantMessage(
-              "bot",
-              `Hola, ${activeUser()?.name || "equipo"}. Puedo guiarte paso a paso para usar tareas, sustentos, horarios, Equipo e Info LG.`
-            );
-          }
-          els.assistantDialog.showModal();
-          els.assistantInput.focus();
-        });
-        els.closeAssistant.addEventListener("click", () => els.assistantDialog.close());
-        els.assistantSuggestions.querySelectorAll("button[data-question]").forEach((button) => {
-          button.addEventListener("click", () => askAssistant(button.dataset.question));
-        });
-        els.assistantForm.addEventListener("submit", (event) => {
-          event.preventDefault();
-          const question = els.assistantInput.value;
-          els.assistantInput.value = "";
-          askAssistant(question);
         });
 
         document.querySelectorAll(".tab").forEach((tab) => {
@@ -7823,6 +7065,7 @@
           if (success) els.renameTaskDialog.close();
         });
         els.closeTaskPreview.addEventListener("click", () => els.taskPreviewDialog.close());
+        els.taskPreviewDialog.addEventListener("close", restoreEvidenceFormHome);
         els.closeTaskHistory.addEventListener("click", () => els.taskHistoryDialog.close());
         els.taskPreviewHistory.addEventListener("click", () => {
           const taskId = previewedTaskId;
@@ -8062,9 +7305,8 @@
           }
         });
 
-        els.taskForm.addEventListener("submit", async (event) => {
+        els.taskForm.addEventListener("submit", (event) => {
           event.preventDefault();
-          if (taskCreateInFlight) return;
           if (!isCoordinator()) els.taskOwner.value = state.activeUserId;
           if (!els.taskOwner.value) {
             setMessage(els.taskMessage, "Primero registra un responsable activo.", "err");
@@ -8086,7 +7328,7 @@
             setMessage(els.taskMessage, "El responsable ya tiene otra tarea asignada en ese horario.", "err");
             return;
           }
-          const task = {
+          state.tasks.unshift({
             id: id(),
             title: clean(els.taskTitle.value),
             ownerId: els.taskOwner.value,
@@ -8111,31 +7353,12 @@
             ],
             evidence: [],
             reminders: []
-          };
-          taskCreateInFlight = true;
-          els.taskSubmitButton.disabled = true;
-          setMessage(els.taskMessage, "Guardando tarea en la nube...", "");
-          try {
-            const data = await apiRequest("/tasks/create", {
-              method: "POST",
-              body: JSON.stringify({ task })
-            });
-            applyCloudState(data.state);
-          } catch (error) {
-            const refreshed = await refreshStateFromServer({ quiet: true });
-            const saved = refreshed && state.tasks.some((item) => item.id === task.id);
-            if (!saved) {
-              setMessage(els.taskMessage, error.message || "No se pudo guardar la tarea.", "err");
-              return;
-            }
-          } finally {
-            taskCreateInFlight = false;
-            els.taskSubmitButton.disabled = false;
-          }
+          });
+          saveState();
           els.taskForm.reset();
           els.taskDueDate.value = nearestWorkingDay(todayIso);
+          setMessage(els.taskMessage, isCoordinator() ? "Tarea asignada correctamente." : "Tu tarea se agrego a la semana.", "ok");
           render();
-          setMessage(els.taskMessage, isCoordinator() ? "Tarea asignada y confirmada en la nube." : "Tu tarea se agrego y confirmo en la semana.", "ok");
         });
 
         els.taskStatusFilter.addEventListener("change", renderTasks);
@@ -8199,31 +7422,18 @@
 
         els.evidenceFiles.addEventListener("change", () => {
           els.evidenceFiles.setCustomValidity("");
-          rememberPendingEvidenceSubmission(null);
           setMessage(els.evidenceMessage, "", "");
-          const fileCount = els.evidenceFiles.files?.length || 0;
-          renderSelectedEvidenceFiles();
-          setEvidenceUploadProgress(
-            fileCount ? `${fileCount} archivo${fileCount === 1 ? "" : "s"} listo${fileCount === 1 ? "" : "s"} para subir.` : "",
-            0
-          );
         });
         els.evidenceFiles.addEventListener("invalid", () => {
           els.evidenceFiles.setCustomValidity("Debes adjuntar al menos una foto o archivo de sustento.");
           setMessage(els.evidenceMessage, "Debes adjuntar al menos una foto o archivo antes de enviar el sustento.", "err");
-          setEvidenceUploadProgress("Falta seleccionar una foto o archivo.", 0, "err");
         });
         els.evidenceTaskDate.addEventListener("change", () => {
-          rememberPendingEvidenceSubmission(null);
-          rememberEvidenceSelection("", els.evidenceTaskDate.value);
           renderEvidenceTaskPicker();
           renderEvidenceTrainingTopic();
           setMessage(els.evidenceMessage, "", "");
-          setEvidenceUploadProgress("", 0);
         });
         els.evidenceTask.addEventListener("change", () => {
-          rememberPendingEvidenceSubmission(null);
-          rememberEvidenceSelection(els.evidenceTask.value, els.evidenceTaskDate.value);
           renderEvidenceTrainingTopic();
           setMessage(els.evidenceMessage, "", "");
         });
@@ -8233,16 +7443,15 @@
 
         els.evidenceForm.addEventListener("submit", async (event) => {
           event.preventDefault();
-          if (els.evidenceSubmitButton.disabled || evidenceSubmitInFlight) return;
+          if (els.evidenceSubmitButton.disabled) return;
           const task = state.tasks.find((item) => item.id === els.evidenceTask.value);
           if (!task) {
             setMessage(els.evidenceMessage, "No hay tarea seleccionada.", "err");
-            setEvidenceUploadProgress("Selecciona una tarea antes de enviar.", 0, "err");
             return;
           }
+          const submittedInline = evidenceInlineTaskId === task.id || els.evidenceForm.classList.contains("inline-evidence-form");
           if (!taskAllowsEvidenceToday(task)) {
             setMessage(els.evidenceMessage, taskEvidenceDeadlineText(task), "err");
-            setEvidenceUploadProgress("El plazo de esta tarea no permite la carga.", 0, "err");
             renderEvidenceTrainingTopic();
             return;
           }
@@ -8252,7 +7461,6 @@
             links = parseEvidenceLinks(els.evidenceLinks.value);
           } catch (error) {
             setMessage(els.evidenceMessage, error.message, "err");
-            setEvidenceUploadProgress("Revisa los enlaces ingresados.", 0, "err");
             els.evidenceLinks.focus();
             return;
           }
@@ -8261,130 +7469,98 @@
             els.evidenceTrainingTopic.setCustomValidity("Indica el tema de la capacitacion.");
             els.evidenceTrainingTopic.reportValidity();
             setMessage(els.evidenceMessage, "El tema de la capacitacion es obligatorio para esta tarea.", "err");
-            setEvidenceUploadProgress("Falta completar el tema de la capacitacion.", 0, "err");
             return;
           }
           els.evidenceTrainingTopic.setCustomValidity("");
           const selectedFiles = Array.from(els.evidenceFiles.files || []);
-          const pendingForTask = pendingEvidenceSubmission?.taskId === task.id ? pendingEvidenceSubmission : null;
-          if (!selectedFiles.length && !pendingForTask) {
+          if (!selectedFiles.length) {
             els.evidenceFiles.setCustomValidity("Debes adjuntar al menos una foto o archivo de sustento.");
             els.evidenceFiles.reportValidity();
             setMessage(els.evidenceMessage, "Debes adjuntar al menos una foto o archivo antes de enviar el sustento.", "err");
-            setEvidenceUploadProgress("Falta seleccionar una foto o archivo.", 0, "err");
             return;
           }
           els.evidenceFiles.setCustomValidity("");
-          evidenceSubmitInFlight = true;
           els.evidenceSubmitButton.disabled = true;
-          els.evidenceSubmitButton.textContent = pendingForTask ? "Confirmando sustento..." : "Preparando archivos...";
-          setEvidenceUploadProgress(pendingForTask ? "Reintentando la confirmacion en la nube..." : "Preparando archivos para la nube...", pendingForTask ? 95 : 2);
+          els.evidenceSubmitButton.textContent = "Enviando...";
           if (selectedFiles.length > MAX_EVIDENCE_FILES) {
             setMessage(els.evidenceMessage, `Puedes adjuntar un maximo de ${MAX_EVIDENCE_FILES} archivos por sustento.`, "err");
-            setEvidenceUploadProgress(`Seleccionaste mas de ${MAX_EVIDENCE_FILES} archivos.`, 0, "err");
             els.evidenceSubmitButton.disabled = false;
             els.evidenceSubmitButton.textContent = "Enviar sustento";
-            evidenceSubmitInFlight = false;
             return;
           }
-          let uploadedFiles = pendingForTask?.evidence?.files || [];
-          let evidence = pendingForTask?.evidence || null;
-          if (!pendingForTask) {
-            setMessage(els.evidenceMessage, "Validando archivos...", "");
-            setEvidenceUploadProgress("Validando archivos...", 5);
-            uploadedFiles = [];
-            try {
-              for (let index = 0; index < selectedFiles.length; index += 1) {
-                const prepared = await prepareEvidenceFile(selectedFiles[index]);
-                setMessage(els.evidenceMessage, `Subiendo archivo ${index + 1} de ${selectedFiles.length}...`, "");
-                els.evidenceSubmitButton.textContent = `Subiendo ${index + 1} de ${selectedFiles.length}...`;
-                setEvidenceUploadProgress(
-                  `Archivo ${index + 1} de ${selectedFiles.length}: iniciando carga segura...`,
-                  10 + Math.round((index / selectedFiles.length) * 80)
-                );
-                const upload = await uploadPreparedEvidenceFile(task.id, prepared, (chunk, total) => {
-                  const percent = 10 + Math.round(((index + chunk / total) / selectedFiles.length) * 80);
-                  setMessage(
-                    els.evidenceMessage,
-                    `Subiendo archivo ${index + 1} de ${selectedFiles.length} | bloque ${chunk} de ${total}...`,
-                    ""
-                  );
-                  setEvidenceUploadProgress(
-                    `Archivo ${index + 1} de ${selectedFiles.length} | bloque ${chunk} de ${total} | ${percent}%`,
-                    percent
-                  );
-                });
-                uploadedFiles.push({
-                  id: upload.file.id,
-                  name: upload.file.name,
-                  mimeType: upload.file.mimeType
-                });
-              }
-            } catch (error) {
-              setMessage(els.evidenceMessage, `No se pudieron subir todos los archivos: ${error.message}`, "err");
-              setEvidenceUploadProgress(
-                `Carga interrumpida: ${error.message}. La tarea continuara marcada para volver a intentar.`,
-                0,
-                "err"
-              );
-              els.evidenceSubmitButton.disabled = false;
-              els.evidenceSubmitButton.textContent = "Reintentar carga";
-              evidenceSubmitInFlight = false;
-              return;
-            }
-            evidence = {
-              id: id(),
-              submittedById: state.activeUserId,
-              submittedAt: Date.now(),
-              store:
-                clean(els.evidenceStore.value) ||
-                (["PDP", "PDV"].includes(clean(task.category).toUpperCase()) ? "No especificada" : "No aplica"),
-              product: clean(els.evidenceProduct.value),
-              trainingTopic,
-              result: "Realizado",
-              notes,
-              links,
-              files: uploadedFiles,
-              review: "Pendiente"
-            };
-            evidence.cloudPath = cloudFolderForEvidence(evidence, task);
-            rememberPendingEvidenceSubmission({ taskId: task.id, fileSignature: evidenceFileSignature(selectedFiles), evidence });
-          }
-          els.evidenceSubmitButton.textContent = "Confirmando sustento...";
-          setEvidenceUploadProgress("Archivos cargados. Confirmando el sustento en la nube...", 95);
-          let recoveredAfterSyncError = false;
+          setMessage(els.evidenceMessage, "Validando archivos...", "");
+          let preparedFiles = [];
           try {
-            const data = await apiRequestWithRetry("/tasks/evidence", {
+            preparedFiles = await Promise.all(selectedFiles.map(prepareEvidenceFile));
+          } catch (error) {
+            setMessage(els.evidenceMessage, error.message, "err");
+            els.evidenceSubmitButton.disabled = false;
+            els.evidenceSubmitButton.textContent = "Enviar sustento";
+            return;
+          }
+          const uploadedFiles = [];
+          try {
+            for (let index = 0; index < preparedFiles.length; index += 1) {
+              const prepared = preparedFiles[index];
+              setMessage(els.evidenceMessage, `Subiendo archivo ${index + 1} de ${preparedFiles.length}...`, "");
+              const upload = await uploadPreparedEvidenceFile(task.id, prepared, (chunk, total) => {
+                setMessage(
+                  els.evidenceMessage,
+                  `Subiendo archivo ${index + 1} de ${preparedFiles.length} | bloque ${chunk} de ${total}...`,
+                  ""
+                );
+              });
+              uploadedFiles.push({
+                id: upload.file.id,
+                name: upload.file.name,
+                mimeType: upload.file.mimeType
+              });
+            }
+          } catch (error) {
+            setMessage(els.evidenceMessage, `No se pudieron subir todos los archivos: ${error.message}`, "err");
+            els.evidenceSubmitButton.disabled = false;
+            els.evidenceSubmitButton.textContent = "Enviar sustento";
+            return;
+          }
+          const evidence = {
+            id: id(),
+            submittedById: state.activeUserId,
+            submittedAt: Date.now(),
+            store:
+              clean(els.evidenceStore.value) ||
+              (["PDP", "PDV"].includes(clean(task.category).toUpperCase()) ? "No especificada" : "No aplica"),
+            product: clean(els.evidenceProduct.value),
+            trainingTopic,
+            result: "Realizado",
+            notes,
+            links,
+            files: uploadedFiles,
+            review: "Pendiente"
+          };
+          evidence.cloudPath = cloudFolderForEvidence(evidence, task);
+          try {
+            const data = await apiRequest("/tasks/evidence", {
               method: "POST",
               body: JSON.stringify({ taskId: task.id, evidence })
             });
             applyCloudState(data.state);
           } catch (error) {
-            const refreshed = await refreshStateFromServer({ quiet: true });
-            const savedTask = state.tasks.find((item) => item.id === task.id);
-            const savedEvidence = savedTask?.evidence?.some((item) => item.id === evidence.id);
-            if (!refreshed || !savedEvidence) {
-              setMessage(els.evidenceMessage, `El archivo se guardo, pero falta sincronizar el formulario: ${error.message}`, "err");
-              setEvidenceUploadProgress("Los archivos llegaron, pero falta confirmar el formulario. Pulsa Reintentar envio.", 95, "err");
-              els.evidenceSubmitButton.disabled = false;
-              els.evidenceSubmitButton.textContent = "Reintentar envio";
-              evidenceSubmitInFlight = false;
-              return;
-            }
-            recoveredAfterSyncError = true;
+            setMessage(els.evidenceMessage, `El archivo se guardo, pero falta sincronizar el formulario: ${error.message}`, "err");
+            els.evidenceSubmitButton.disabled = false;
+            els.evidenceSubmitButton.textContent = "Reintentar envio";
+            return;
           }
-          rememberPendingEvidenceSubmission(null);
           els.evidenceForm.reset();
           els.evidenceResult.value = "Realizado";
-          renderSelectedEvidenceFiles();
-          clearEvidenceSelection();
+          if (submittedInline) {
+            restoreEvidenceFormHome();
+            if (els.taskPreviewDialog.open) els.taskPreviewDialog.close();
+          }
           renderEvidenceTaskPicker();
           renderEvidenceTrainingTopic();
           els.evidenceSubmitButton.disabled = false;
           els.evidenceSubmitButton.textContent = "Enviar sustento";
-          evidenceSubmitInFlight = false;
-          const successMessage = `${recoveredAfterSyncError ? "Sustento confirmado en la nube" : "Sustento guardado"} con ${uploadedFiles.length} archivo${uploadedFiles.length === 1 ? "" : "s"}. Pablo debe aprobarlo para completar la tarea.`;
-          setEvidenceUploadProgress("Sustento guardado correctamente en la nube.", 100, "ok");
+          const successMessage = `Sustento guardado con ${uploadedFiles.length} archivo${uploadedFiles.length === 1 ? "" : "s"}. Pablo debe aprobarlo para completar la tarea.`;
           setMessage(els.evidenceMessage, "", "");
           activateView("tasksView", { updateUrl: true, historyMode: "replace" });
           render();
@@ -8413,36 +7589,6 @@
             await refreshStateFromServer();
           } catch (error) {
             setMessage(els.trainerMessage, error.message, "err");
-          }
-        });
-
-        els.lgUpdateFilter.addEventListener("change", renderLgUpdates);
-        els.cancelLgUpdateEdit.addEventListener("click", resetLgUpdateEditor);
-        els.lgUpdateForm.addEventListener("submit", async (event) => {
-          event.preventDefault();
-          els.saveLgUpdate.disabled = true;
-          setMessage(els.lgUpdateMessage, infoEditingId ? "Guardando cambios..." : "Publicando informacion...", "");
-          try {
-            const data = await apiRequest("/info/updates", {
-              method: "POST",
-              body: JSON.stringify({
-                action: "upsert",
-                id: infoEditingId,
-                line: els.lgUpdateLine.value,
-                type: els.lgUpdateType.value,
-                title: els.lgUpdateTitle.value,
-                product: els.lgUpdateProduct.value,
-                description: els.lgUpdateDescription.value
-              })
-            });
-            applyCloudState(data.state);
-            resetLgUpdateEditor();
-            renderProducts();
-            showToast("Info LG actualizada para todo el equipo.", "success");
-          } catch (error) {
-            setMessage(els.lgUpdateMessage, error.message || "No se pudo guardar Info LG.", "err");
-          } finally {
-            els.saveLgUpdate.disabled = false;
           }
         });
 
@@ -8492,37 +7638,17 @@
       }
 
       els.announcementTargetWrap.classList.add("hidden");
-      if (selectedEvidenceDate) els.evidenceTaskDate.value = selectedEvidenceDate;
       els.taskDueDate.value = nearestWorkingDay(todayIso);
       els.taskStartTime.value = WORKDAY_START;
       els.taskEndTime.value = "09:30";
       async function bootstrap() {
         addEventListeners();
         render();
-        if ("serviceWorker" in navigator) {
-          const reloadKey = `lgtask-controller-${APP_VERSION}`;
-          navigator.serviceWorker.addEventListener("controllerchange", () => {
-            if (sessionStorage.getItem(reloadKey)) return;
-            sessionStorage.setItem(reloadKey, "1");
-            if (activeViewId === "evidenceView" && evidenceDraftActive()) {
-              showToast("Actualizacion lista. Tu seleccion y el sustento en preparacion se mantendran sin recargar la pantalla.", "success");
-              return;
-            }
-            window.location.reload();
-          });
-        }
         await registerServiceWorker();
         await refreshStateFromServer();
         await syncNotificationSubscription().catch(() => {});
         window.setInterval(() => {
-          if (
-            state.activeUserId &&
-            !document.hidden &&
-            !syncInFlight &&
-            !evidenceSubmitInFlight &&
-            !taskCreateInFlight &&
-            !(activeViewId === "evidenceView" && evidenceDraftActive())
-          ) {
+          if (state.activeUserId && !document.hidden && !syncInFlight) {
             refreshStateFromServer().catch(() => {});
           }
         }, 5000);

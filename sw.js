@@ -1,4 +1,4 @@
-const CACHE_NAME = "lgtask-shell-v33";
+const CACHE_NAME = "lgtask-shell-v24";
 const APP_SHELL = [
   "/",
   "/index.html",
