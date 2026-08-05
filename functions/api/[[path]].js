@@ -3,7 +3,7 @@ const SESSION_DAYS = 14;
 const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb9775180ea780b71";
 
 const EMPTY_DATA = {
-  version: 23,
+  version: 24,
   workSettings: {
     breakStart: "12:30",
     breakEnd: "14:00"
@@ -96,7 +96,7 @@ export async function onRequest(context) {
       return json({ ok: false, message: "Solicitud no permitida." }, 403);
     }
 
-    if (route === "health" && request.method === "GET") return json({ ok: true, version: 23 });
+    if (route === "health" && request.method === "GET") return json({ ok: true, version: 24 });
     if (route === "auth/register" && request.method === "POST") return register(request, env.DB);
     if (route === "auth/login" && request.method === "POST") return login(request, env.DB);
     if (route === "auth/logout" && request.method === "POST") return logout(request, env.DB);
@@ -123,6 +123,7 @@ export async function onRequest(context) {
     if (evidenceFileMatch && request.method === "GET") return evidenceFile(env.DB, session.user, evidenceFileMatch[1]);
     if (route === "tasks/evidence" && request.method === "POST") return submitTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/create" && request.method === "POST") return createTask(request, env.DB, session.user, context);
+    if (route === "tasks/start" && request.method === "POST") return startTask(request, env.DB, session.user);
     if (route === "tasks/evidence-authorize" && request.method === "POST") return authorizeLateTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/review" && request.method === "POST") return reviewTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/delete" && request.method === "POST") return deleteTaskAndArchive(request, env.DB, session.user, context);
@@ -817,6 +818,28 @@ async function createTask(request, db, user, context) {
     }]);
     if (notifiedUsers.length) context.waitUntil(pushNotificationsForUsers(db, notifiedUsers));
   }
+  return stateResponse(db, user, data);
+}
+
+async function startTask(request, db, user) {
+  const body = await readJson(request);
+  const taskId = clean(body.taskId);
+  const data = await loadData(db);
+  const task = data.tasks.find((item) => clean(item.id) === taskId);
+  if (!task) return json({ ok: false, message: "La tarea ya no existe." }, 404);
+  if (clean(task.ownerId) !== user.id) {
+    return json({ ok: false, message: "Solo el responsable puede iniciar esta tarea." }, 403);
+  }
+  if (["En proceso", "Observada"].includes(task.status)) return stateResponse(db, user, data);
+  if (task.status !== "Pendiente") {
+    return json({ ok: false, message: "La tarea no se encuentra pendiente para iniciar." }, 409);
+  }
+
+  const startedAt = Date.now();
+  task.status = "En proceso";
+  task.history = Array.isArray(task.history) ? task.history : [];
+  task.history.push({ type: "Inicio", byId: user.id, at: startedAt });
+  await saveData(db, data);
   return stateResponse(db, user, data);
 }
 
@@ -2144,7 +2167,7 @@ async function loadData(db) {
     return {
       ...structuredClone(EMPTY_DATA),
       ...parsed,
-      version: 23,
+      version: 24,
       workSettings: normalizeWorkSettings(parsed.workSettings),
       breakSettingsByUser: normalizeBreakSettingsByUser(parsed.breakSettingsByUser),
       breakSettingsByUserDate: normalizeBreakSettingsByUserDate(parsed.breakSettingsByUserDate),
@@ -2161,7 +2184,7 @@ async function loadData(db) {
 
 async function saveData(db, data) {
   const payload = {
-    version: 23,
+    version: 24,
     workSettings: normalizeWorkSettings(data.workSettings),
     breakSettingsByUser: normalizeBreakSettingsByUser(data.breakSettingsByUser),
     breakSettingsByUserDate: normalizeBreakSettingsByUserDate(data.breakSettingsByUserDate),
