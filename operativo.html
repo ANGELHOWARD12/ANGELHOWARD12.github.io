@@ -129,6 +129,162 @@
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       }
 
+      .evidence-layout {
+        display: grid;
+        gap: 16px;
+      }
+
+      .evidence-task-picker {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+
+      .evidence-task-choice {
+        background: #f8fbff;
+        border: 2px solid var(--line);
+        border-radius: 8px;
+        color: var(--ink);
+        cursor: pointer;
+        display: grid;
+        gap: 5px;
+        min-width: 0;
+        padding: 11px;
+      }
+
+      .evidence-task-choice.selected {
+        background: var(--soft);
+        border-color: var(--blue);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      }
+
+      .evidence-task-choice.disabled {
+        cursor: not-allowed;
+        opacity: 0.65;
+      }
+
+      .evidence-task-choice input {
+        height: 1px;
+        margin: 0;
+        min-height: 0;
+        opacity: 0;
+        padding: 0;
+        position: absolute;
+        width: 1px;
+      }
+
+      .evidence-task-choice strong,
+      .evidence-task-choice span {
+        overflow-wrap: anywhere;
+      }
+
+      .upload-progress {
+        background: var(--soft);
+        border: 1px solid #b9cdfa;
+        border-radius: 8px;
+        color: var(--blue-dark);
+        display: grid;
+        gap: 8px;
+        padding: 11px;
+      }
+
+      .upload-progress progress {
+        accent-color: var(--blue);
+        height: 14px;
+        width: 100%;
+      }
+
+      .evidence-selected-files {
+        display: grid;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .evidence-selected-file {
+        align-items: center;
+        background: #f4f7fb;
+        border: 1px solid #d8e0ec;
+        border-radius: 6px;
+        display: flex;
+        gap: 8px;
+        justify-content: space-between;
+        min-width: 0;
+        padding: 8px 10px;
+      }
+
+      .evidence-selected-file span:first-child {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .upload-progress.is-error {
+        background: var(--red-soft);
+        border-color: #f2b8be;
+        color: var(--red);
+      }
+
+      .upload-progress.is-success {
+        background: var(--green-soft);
+        border-color: #a6dfc5;
+        color: var(--green);
+      }
+
+      .evidence-history-day,
+      .evidence-history-entry {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        display: block;
+        overflow: hidden;
+      }
+
+      .evidence-history-day > summary,
+      .evidence-history-entry > summary {
+        align-items: center;
+        cursor: pointer;
+        display: flex;
+        gap: 10px;
+        justify-content: space-between;
+        list-style: none;
+        min-width: 0;
+        padding: 12px;
+      }
+
+      .evidence-history-day > summary::-webkit-details-marker,
+      .evidence-history-entry > summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .evidence-history-day > summary::after,
+      .evidence-history-entry > summary::after {
+        color: var(--blue);
+        content: "+";
+        flex: 0 0 auto;
+        font-size: 20px;
+        font-weight: 900;
+      }
+
+      .evidence-history-day[open] > summary::after,
+      .evidence-history-entry[open] > summary::after {
+        content: "-";
+      }
+
+      .evidence-history-day-body,
+      .evidence-history-body {
+        border-top: 1px solid var(--line);
+        display: grid;
+        gap: 10px;
+        padding: 10px;
+      }
+
+      .evidence-history-summary {
+        display: grid;
+        gap: 4px;
+        min-width: 0;
+      }
+
       .panel,
       .metric,
       .date-card {
@@ -798,6 +954,17 @@
         padding: 10px;
       }
 
+      .trainer-task-card > .actions {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .trainer-task-card > .actions > button,
+      .trainer-task-card > .actions > .workflow-status {
+        max-width: 100%;
+      }
+
       .trainer-task-card.approved {
         border-left-color: var(--green);
       }
@@ -1033,6 +1200,77 @@
         background: var(--green-soft);
         border-color: #9fd8ba;
         color: var(--green);
+      }
+
+      .late-evidence-policy {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+
+      .late-evidence-policy-copy {
+        display: grid;
+        gap: 4px;
+        min-width: 0;
+      }
+
+      .policy-switch {
+        align-items: center;
+        cursor: pointer;
+        display: inline-flex;
+        flex: 0 0 auto;
+        gap: 10px;
+        min-height: 44px;
+      }
+
+      .policy-switch input {
+        height: 1px;
+        opacity: 0;
+        position: absolute;
+        width: 1px;
+      }
+
+      .policy-switch-track {
+        background: #cbd5e1;
+        border: 1px solid #aab7c7;
+        border-radius: 18px;
+        display: inline-flex;
+        height: 32px;
+        padding: 3px;
+        transition: background 160ms ease, border-color 160ms ease;
+        width: 58px;
+      }
+
+      .policy-switch-track::after {
+        background: #fff;
+        border-radius: 50%;
+        box-shadow: 0 2px 6px rgba(23, 32, 51, 0.24);
+        content: "";
+        height: 24px;
+        transition: transform 160ms ease;
+        width: 24px;
+      }
+
+      .policy-switch input:checked + .policy-switch-track {
+        background: var(--green);
+        border-color: var(--green);
+      }
+
+      .policy-switch input:checked + .policy-switch-track::after {
+        transform: translateX(26px);
+      }
+
+      .policy-switch input:focus-visible + .policy-switch-track {
+        outline: 3px solid rgba(37, 99, 235, 0.24);
+        outline-offset: 2px;
+      }
+
+      .policy-switch-state {
+        font-weight: 900;
+        min-width: 74px;
       }
 
       .history-list {
@@ -1492,6 +1730,155 @@
         padding: 12px;
       }
 
+      .team-profile-card {
+        border-left: 5px solid var(--blue);
+      }
+
+      .team-profile-card.is-reference {
+        border-left-color: var(--yellow);
+      }
+
+      .profile-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .profile-tag {
+        background: var(--soft);
+        border: 1px solid #bcd0f5;
+        border-radius: 999px;
+        color: var(--blue-dark);
+        font-size: 12px;
+        font-weight: 800;
+        padding: 5px 9px;
+      }
+
+      .lg-update-card {
+        border-left: 5px solid var(--red);
+      }
+
+      .lg-update-card[data-line="HS"] {
+        border-left-color: var(--green);
+      }
+
+      .lg-update-card[data-line="TV"] {
+        border-left-color: var(--blue);
+      }
+
+      .lg-update-card[data-line="AV"] {
+        border-left-color: var(--cyan);
+      }
+
+      .info-checklist {
+        margin-top: 16px;
+      }
+
+      .assistant-launch {
+        align-items: center;
+        background: var(--red);
+        border: 0;
+        border-radius: 999px;
+        bottom: 20px;
+        box-shadow: 0 14px 30px rgba(165, 0, 52, 0.3);
+        color: #fff;
+        display: inline-flex;
+        font-size: 14px;
+        font-weight: 900;
+        gap: 8px;
+        min-height: 48px;
+        padding: 0 18px;
+        position: fixed;
+        right: 20px;
+        z-index: 45;
+      }
+
+      .assistant-launch:hover {
+        background: #8f1f2b;
+        transform: translateY(-2px);
+      }
+
+      .assistant-dialog {
+        max-height: min(82vh, 720px);
+        max-width: 600px;
+        overflow: hidden;
+        padding: 0;
+      }
+
+      .assistant-shell {
+        display: grid;
+        grid-template-rows: auto minmax(180px, 1fr) auto auto;
+        max-height: min(82vh, 720px);
+      }
+
+      .assistant-header {
+        align-items: flex-start;
+        background: var(--red);
+        color: #fff;
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+        padding: 16px;
+      }
+
+      .assistant-header .muted {
+        color: #ffe7ea;
+      }
+
+      .assistant-header button {
+        background: #fff;
+        color: var(--red);
+      }
+
+      .assistant-messages {
+        background: #f8fbff;
+        display: grid;
+        gap: 10px;
+        overflow-y: auto;
+        padding: 14px;
+      }
+
+      .assistant-message {
+        border-radius: 8px;
+        line-height: 1.45;
+        max-width: 88%;
+        padding: 10px 12px;
+        white-space: pre-line;
+      }
+
+      .assistant-message.bot {
+        background: #fff;
+        border: 1px solid var(--line);
+        justify-self: start;
+      }
+
+      .assistant-message.user {
+        background: var(--blue);
+        color: #fff;
+        justify-self: end;
+      }
+
+      .assistant-suggestions {
+        border-top: 1px solid var(--line);
+        display: flex;
+        gap: 7px;
+        overflow-x: auto;
+        padding: 10px 14px;
+      }
+
+      .assistant-suggestions button {
+        flex: 0 0 auto;
+        white-space: nowrap;
+      }
+
+      .assistant-form {
+        border-top: 1px solid var(--line);
+        display: grid;
+        gap: 8px;
+        grid-template-columns: minmax(0, 1fr) auto;
+        padding: 12px 14px 14px;
+      }
+
       @media (max-width: 1060px) {
         .dashboard,
         .two-col {
@@ -1627,6 +2014,31 @@
         .login-grid,
         .form-grid,
         .feature-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .evidence-task-picker {
+          grid-template-columns: 1fr;
+        }
+
+        .evidence-history-entry > summary {
+          align-items: flex-start;
+          flex-wrap: wrap;
+        }
+
+        .assistant-launch {
+          bottom: calc(78px + env(safe-area-inset-bottom));
+          min-height: 44px;
+          padding: 0 14px;
+          right: 10px;
+        }
+
+        .assistant-dialog,
+        .assistant-shell {
+          max-height: 86vh;
+        }
+
+        .assistant-form {
           grid-template-columns: 1fr;
         }
 
@@ -2105,17 +2517,37 @@
       </section>
 
       <section id="evidenceView" class="view">
-        <div class="two-col">
-          <section class="panel stack">
+        <section id="lateEvidencePolicyPanel" class="panel late-evidence-policy hidden">
+          <div class="late-evidence-policy-copy">
+            <h2>Sustentos de dias anteriores</h2>
+            <p id="lateEvidencePolicyText" class="muted">La carga de fechas pasadas esta bloqueada para todos los trainers.</p>
+            <p id="lateEvidencePolicyMessage" class="message" aria-live="polite"></p>
+          </div>
+          <label class="policy-switch" for="lateEvidencePolicyToggle">
+            <input id="lateEvidencePolicyToggle" type="checkbox" role="switch" aria-label="Permitir sustentos de dias anteriores" />
+            <span class="policy-switch-track" aria-hidden="true"></span>
+            <span id="lateEvidencePolicyState" class="policy-switch-state">Apagado</span>
+          </label>
+        </section>
+        <div class="evidence-layout">
+          <section id="evidenceUploadPanel" class="panel stack">
             <div>
               <h2>Enviar sustento</h2>
-              <p class="muted">Carga foto y formulario basico para demostrar cumplimiento.</p>
+              <p class="muted">Selecciona el dia y marca una tarea que aun necesita sustento.</p>
             </div>
-            <form id="evidenceForm" class="form-grid">
-              <label class="wide">
-                Tarea
-                <select id="evidenceTask" required></select>
-              </label>
+            <div id="evidenceFormHome">
+              <form id="evidenceForm" class="form-grid">
+              <div id="evidenceTaskSelection" class="wide stack">
+                <label>
+                  Dia de la tarea
+                  <input id="evidenceTaskDate" type="date" />
+                </label>
+                <div class="stack">
+                  <strong>Tareas disponibles sin sustento</strong>
+                  <div id="evidenceTaskPicker" class="evidence-task-picker"></div>
+                </div>
+                <select id="evidenceTask" class="hidden" aria-hidden="true" tabindex="-1"></select>
+              </div>
               <label>
                 Tienda / PDP (opcional)
                 <input id="evidenceStore" type="text" placeholder="Nombre de tienda; dejalo vacio si no aplica" />
@@ -2138,9 +2570,9 @@
                   id="evidenceFiles"
                   type="file"
                   multiple
-                  required
-                  accept=".jpg,.jpeg,.png,.webp,.mp4,.mov,.webm,.m4v,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt"
+                  accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.mp4,.mov,.webm,.m4v,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt"
                 />
+                <span id="evidenceSelectedFiles" class="evidence-selected-files" aria-live="polite"></span>
               </label>
               <p class="muted wide">Debes adjuntar al menos un sustento. Puedes cargar hasta 8 fotos, videos o documentos de 15 MB cada uno y los originales conservan su calidad.</p>
               <label class="wide">
@@ -2152,22 +2584,34 @@
                 <textarea id="evidenceNotes" placeholder="Describe que se realizo, hallazgos, incidencias o acuerdos"></textarea>
               </label>
               <p id="evidenceDeadlineMessage" class="wide deadline-alert hidden" aria-live="polite"></p>
+              <div id="evidenceUploadProgress" class="wide upload-progress hidden" aria-live="polite">
+                <strong id="evidenceUploadProgressText">Preparando carga...</strong>
+                <progress id="evidenceUploadProgressBar" max="100" value="0">0%</progress>
+              </div>
               <button id="evidenceSubmitButton" class="primary wide" type="submit">Enviar sustento</button>
-            </form>
+              </form>
+            </div>
             <p id="evidenceMessage" class="message" aria-live="polite"></p>
           </section>
 
-          <aside class="panel stack">
-            <div>
-              <h2>Sustentos recibidos</h2>
-              <p class="muted">Pablo aprueba u observa los sustentos enviados.</p>
-            </div>
+          <details id="evidenceHistoryPanel" class="panel collapsible-panel">
+            <summary>
+              <div>
+                <h2>Sustentos enviados</h2>
+                <p class="muted">Organizados por dia y cerrados para ocupar menos espacio.</p>
+              </div>
+              <div class="actions">
+                <span id="evidenceHistoryCount" class="pill">0</span>
+                <span class="collapsible-symbol" aria-hidden="true">+</span>
+              </div>
+            </summary>
+            <div class="collapsible-panel-body stack">
             <div id="cloudPlanPanel" class="note">
               <strong>Nube LGTASK conectada</strong>
-              <p class="muted">Las fotos quedan protegidas en Cloudflare D1 y Pablo puede abrirlas desde esta pantalla.</p>
+              <p class="muted">Las fotos y archivos nuevos quedan protegidos en Cloudflare R2 y Pablo puede abrirlos desde esta pantalla.</p>
               <div class="cloud-path">LG Task Hub / Sustentos / trainer / fecha / tarea</div>
               <p class="muted">Cada archivo se registra por nombre de trainer, fecha y tarea.</p>
-              <button id="openCloudHistory" class="small" type="button">Abrir historial en la nube</button>
+              <button id="openCloudHistory" class="small" type="button">Actualizar historial</button>
             </div>
             <div id="evidenceFilters" class="form-grid">
               <label>
@@ -2190,7 +2634,8 @@
             <p class="helper">El Excel muestra las fotos dentro de cada hoja. El paquete completo tambien incluye Word, PDF, PowerPoint y los demas archivos originales.</p>
             <p id="evidenceExportMessage" class="message" aria-live="polite"></p>
             <div id="evidenceList" class="list"></div>
-          </aside>
+            </div>
+          </details>
         </div>
       </section>
 
@@ -2301,23 +2746,100 @@
 
       <section id="infoView" class="view">
         <div class="two-col">
-          <section class="panel">
+          <section class="panel stack">
             <h2>Informacion LG</h2>
-            <p class="muted">Consulta rapida para reforzar argumentos de producto.</p>
+            <p class="muted">Guias base para reforzar argumentos de producto.</p>
             <div id="productTabs" class="product-tabs"></div>
             <div id="productInfo" class="stack"></div>
           </section>
-          <aside class="panel stack">
-            <h2>Checklist de visita</h2>
-            <div class="item">
-              <strong>Antes de cerrar una tarea</strong>
-              <p class="muted">Verifica exhibicion, precio, disponibilidad, limpieza, material POP y evidencia fotografica.</p>
+          <section class="panel stack">
+            <div>
+              <h2>Productos y lanzamientos</h2>
+              <p class="muted">Cualquier integrante puede agregar o actualizar informacion compartida de HS, TV y AV.</p>
             </div>
-            <div id="quizBox" class="stack"></div>
-          </aside>
+            <form id="lgUpdateForm" class="form-grid">
+              <label>
+                Linea
+                <select id="lgUpdateLine" required>
+                  <option>HS</option>
+                  <option>TV</option>
+                  <option>AV</option>
+                </select>
+              </label>
+              <label>
+                Tipo de informacion
+                <select id="lgUpdateType" required>
+                  <option>Producto</option>
+                  <option>Lanzamiento</option>
+                  <option>Tecnologia</option>
+                  <option>Argumento de venta</option>
+                </select>
+              </label>
+              <label class="wide">
+                Titulo
+                <input id="lgUpdateTitle" type="text" maxlength="140" placeholder="Ej. Nueva lavadora WashTower" required />
+              </label>
+              <label class="wide">
+                Producto o modelo
+                <input id="lgUpdateProduct" type="text" maxlength="120" placeholder="Ej. OLED evo G6" />
+              </label>
+              <label class="wide">
+                Informacion
+                <textarea id="lgUpdateDescription" maxlength="2000" placeholder="Beneficios, tecnologias, disponibilidad y argumentos importantes" required></textarea>
+              </label>
+              <div class="actions wide">
+                <button id="saveLgUpdate" class="primary" type="submit">Publicar informacion</button>
+                <button id="cancelLgUpdateEdit" class="ghost hidden" type="button">Cancelar edicion</button>
+              </div>
+              <p id="lgUpdateMessage" class="message wide" aria-live="polite"></p>
+            </form>
+            <label>
+              Filtrar publicaciones
+              <select id="lgUpdateFilter">
+                <option value="all">Todas las lineas</option>
+                <option>HS</option>
+                <option>TV</option>
+                <option>AV</option>
+              </select>
+            </label>
+            <div id="lgUpdatesList" class="list"></div>
+          </section>
         </div>
+        <aside class="panel stack info-checklist">
+          <h2>Checklist de visita</h2>
+          <div class="item">
+            <strong>Antes de cerrar una tarea</strong>
+            <p class="muted">Verifica exhibicion, precio, disponibilidad, limpieza, material POP y evidencia fotografica.</p>
+          </div>
+          <div id="quizBox" class="stack"></div>
+        </aside>
       </section>
     </main>
+
+    <button id="assistantButton" class="assistant-launch hidden" type="button" aria-haspopup="dialog">IA Ayuda</button>
+
+    <dialog id="assistantDialog" class="assistant-dialog">
+      <div class="assistant-shell">
+        <header class="assistant-header">
+          <div>
+            <h2>Asistente LGTASK</h2>
+            <p class="muted">Guia inteligente gratuita, sin consumo de API.</p>
+          </div>
+          <button id="closeAssistant" class="small" type="button" aria-label="Cerrar asistente">Cerrar</button>
+        </header>
+        <div id="assistantMessages" class="assistant-messages" aria-live="polite"></div>
+        <div id="assistantSuggestions" class="assistant-suggestions">
+          <button class="small" type="button" data-question="Como subo un sustento">Subir sustento</button>
+          <button class="small" type="button" data-question="Como muevo una tarea">Mover tarea</button>
+          <button class="small" type="button" data-question="Como cambio mi break">Cambiar break</button>
+          <button class="small" type="button" data-question="Que tareas tengo hoy">Mis tareas de hoy</button>
+        </div>
+        <form id="assistantForm" class="assistant-form">
+          <input id="assistantInput" type="text" maxlength="300" placeholder="Pregunta como usar LGTASK" aria-label="Pregunta para el asistente" required />
+          <button class="primary" type="submit">Preguntar</button>
+        </form>
+      </div>
+    </dialog>
 
     <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
 
@@ -2547,9 +3069,14 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
+      const APP_VERSION = 23;
       const MAX_EVIDENCE_FILES = 8;
       const MAX_EVIDENCE_FILE_BYTES = 15_000_000;
-      const EVIDENCE_CHUNK_BASE64 = 750_000;
+      const EVIDENCE_DIRECT_FILE_BYTES = 300_000;
+      const EVIDENCE_CHUNK_FILE_BYTES = 600_000;
+      const EVIDENCE_SELECTION_TASK_KEY = "lgtask-evidence-task-v1";
+      const EVIDENCE_SELECTION_DATE_KEY = "lgtask-evidence-date-v1";
+      const EVIDENCE_PENDING_SUBMISSION_KEY = "lgtask-evidence-pending-v1";
       const NOTIFICATION_TASKS_KEY = "lgtask-notified-tasks-v1";
       const ALLOWED_VIEW_IDS = ["tasksView", "evidenceView", "teamView", "announcementsView", "infoView"];
       const EVIDENCE_FILE_EXTENSIONS = new Set([
@@ -2557,6 +3084,8 @@
         "jpeg",
         "png",
         "webp",
+        "heic",
+        "heif",
         "mp4",
         "mov",
         "webm",
@@ -2597,7 +3126,7 @@
       ];
 
       const initialState = {
-        version: 14,
+        version: 23,
         activeUserId: "",
         selectedProduct: "oled",
         selectedWeekStart: "",
@@ -2617,7 +3146,10 @@
         deletedTasks: [],
         announcements: [],
         supportRequests: [],
-        dailyMotivations: []
+        dailyMotivations: [],
+        lgUpdates: [],
+        lateEvidenceUploadsEnabled: false,
+        lateEvidencePolicyHistory: []
       };
 
       const products = [
@@ -2687,12 +3219,35 @@
         }
       ];
 
+      const TEAM_PROFILE_DEFAULTS = [
+        { name: "DANNY DIOS", aliases: ["DANNY DIOS"], chains: ["Plaza Vea", "Hiraoka"], specialty: "Trainer retail" },
+        { name: "CAROLINA PALACIOS", aliases: ["CAROLINA PALACIOS"], chains: ["Metro", "Oechsle", "Conecta"], specialty: "Trainer retail" },
+        { name: "ANGEL CARRENO", aliases: ["ANGEL CARRENO"], chains: ["Coolbox"], specialty: "Especialista AV" },
+        { name: "HAROLD MONTORO", aliases: ["HAROLD MONTORO"], chains: ["Estilos", "Ripley", "Credivargas"], specialty: "Trainer retail" },
+        { name: "ANTONIO GONZALES", aliases: ["ANTONIO GONZALES", "ANTONIO VIDAL"], chains: ["Integra", "Sodimac", "Rubi"], specialty: "Trainer retail" },
+        { name: "ELOY NIETO", aliases: ["ELOY NIETO"], chains: [], specialty: "ULG" },
+        { name: "BRYAN TAPIA", aliases: ["BRYAN TAPIA"], chains: [], specialty: "New Hired" },
+        { name: "GIANPIERO VASQUEZ", aliases: ["GIANPIERO VASQUEZ"], chains: [], specialty: "Asesor ULG" }
+      ];
+
       let state = loadState();
       let syncTimer = 0;
       let syncInFlight = null;
       let syncQueued = false;
       let stateRevision = 0;
       let serviceWorkerRegistration = null;
+      let evidenceSubmitInFlight = false;
+      let evidenceOpenInFlight = false;
+      let pendingEvidenceSubmission = (() => {
+        try {
+          return JSON.parse(sessionStorage.getItem(EVIDENCE_PENDING_SUBMISSION_KEY) || "null");
+        } catch {
+          return null;
+        }
+      })();
+      let selectedEvidenceTaskId = sessionStorage.getItem(EVIDENCE_SELECTION_TASK_KEY) || "";
+      let selectedEvidenceDate = sessionStorage.getItem(EVIDENCE_SELECTION_DATE_KEY) || "";
+      let taskCreateInFlight = false;
       let notificationCheckInFlight = null;
       let toastTimer = 0;
       let activePreviewObjectUrl = "";
@@ -2702,13 +3257,16 @@
       let breakEditorKey = "";
       let overtimeEditorKey = "";
       let previewedTaskId = "";
+      let notificationAudioContext = null;
       let historyTaskId = "";
       let lateEvidenceTaskId = "";
-      let selectedEvidenceTaskId = "";
+      let infoEditingId = "";
       const openTaskGroups = new Set();
       const openTaskDays = new Set();
       const openTrainerWeekDays = new Set();
       const openDeletedTaskDays = new Set();
+      const openEvidenceDays = new Set();
+      const openEvidenceEntries = new Set();
       let activeViewId = ALLOWED_VIEW_IDS.includes(new URLSearchParams(window.location.search).get("view"))
         ? new URLSearchParams(window.location.search).get("view")
         : "tasksView";
@@ -2822,7 +3380,17 @@
         taskList: document.querySelector("#taskList"),
         deletedTasksPanel: document.querySelector("#deletedTasksPanel"),
         deletedTasksList: document.querySelector("#deletedTasksList"),
+        lateEvidencePolicyPanel: document.querySelector("#lateEvidencePolicyPanel"),
+        lateEvidencePolicyToggle: document.querySelector("#lateEvidencePolicyToggle"),
+        lateEvidencePolicyState: document.querySelector("#lateEvidencePolicyState"),
+        lateEvidencePolicyText: document.querySelector("#lateEvidencePolicyText"),
+        lateEvidencePolicyMessage: document.querySelector("#lateEvidencePolicyMessage"),
+        evidenceUploadPanel: document.querySelector("#evidenceUploadPanel"),
+        evidenceFormHome: document.querySelector("#evidenceFormHome"),
         evidenceForm: document.querySelector("#evidenceForm"),
+        evidenceTaskSelection: document.querySelector("#evidenceTaskSelection"),
+        evidenceTaskDate: document.querySelector("#evidenceTaskDate"),
+        evidenceTaskPicker: document.querySelector("#evidenceTaskPicker"),
         evidenceTask: document.querySelector("#evidenceTask"),
         evidenceStore: document.querySelector("#evidenceStore"),
         evidenceProduct: document.querySelector("#evidenceProduct"),
@@ -2830,11 +3398,17 @@
         evidenceTrainingTopic: document.querySelector("#evidenceTrainingTopic"),
         evidenceResult: document.querySelector("#evidenceResult"),
         evidenceFiles: document.querySelector("#evidenceFiles"),
+        evidenceSelectedFiles: document.querySelector("#evidenceSelectedFiles"),
         evidenceLinks: document.querySelector("#evidenceLinks"),
         evidenceNotes: document.querySelector("#evidenceNotes"),
         evidenceDeadlineMessage: document.querySelector("#evidenceDeadlineMessage"),
+        evidenceUploadProgress: document.querySelector("#evidenceUploadProgress"),
+        evidenceUploadProgressText: document.querySelector("#evidenceUploadProgressText"),
+        evidenceUploadProgressBar: document.querySelector("#evidenceUploadProgressBar"),
         evidenceSubmitButton: document.querySelector("#evidenceSubmitButton"),
         evidenceMessage: document.querySelector("#evidenceMessage"),
+        evidenceHistoryPanel: document.querySelector("#evidenceHistoryPanel"),
+        evidenceHistoryCount: document.querySelector("#evidenceHistoryCount"),
         cloudPlanPanel: document.querySelector("#cloudPlanPanel"),
         openCloudHistory: document.querySelector("#openCloudHistory"),
         evidenceFilters: document.querySelector("#evidenceFilters"),
@@ -2950,6 +3524,24 @@
         productTabs: document.querySelector("#productTabs"),
         productInfo: document.querySelector("#productInfo"),
         quizBox: document.querySelector("#quizBox"),
+        lgUpdateForm: document.querySelector("#lgUpdateForm"),
+        lgUpdateLine: document.querySelector("#lgUpdateLine"),
+        lgUpdateType: document.querySelector("#lgUpdateType"),
+        lgUpdateTitle: document.querySelector("#lgUpdateTitle"),
+        lgUpdateProduct: document.querySelector("#lgUpdateProduct"),
+        lgUpdateDescription: document.querySelector("#lgUpdateDescription"),
+        saveLgUpdate: document.querySelector("#saveLgUpdate"),
+        cancelLgUpdateEdit: document.querySelector("#cancelLgUpdateEdit"),
+        lgUpdateMessage: document.querySelector("#lgUpdateMessage"),
+        lgUpdateFilter: document.querySelector("#lgUpdateFilter"),
+        lgUpdatesList: document.querySelector("#lgUpdatesList"),
+        assistantButton: document.querySelector("#assistantButton"),
+        assistantDialog: document.querySelector("#assistantDialog"),
+        closeAssistant: document.querySelector("#closeAssistant"),
+        assistantMessages: document.querySelector("#assistantMessages"),
+        assistantSuggestions: document.querySelector("#assistantSuggestions"),
+        assistantForm: document.querySelector("#assistantForm"),
+        assistantInput: document.querySelector("#assistantInput"),
         toastRegion: document.querySelector("#toastRegion")
       };
 
@@ -3038,7 +3630,7 @@
       }
 
       function normalizeState(nextState) {
-        nextState.version = 14;
+        nextState.version = 23;
         nextState.users = nextState.users?.length ? nextState.users : structuredClone(initialState.users);
         nextState.registrationRequests = nextState.registrationRequests || [];
         nextState.passwordRecoveryRequests = nextState.passwordRecoveryRequests || [];
@@ -3077,6 +3669,15 @@
         nextState.announcements = nextState.announcements || [];
         nextState.supportRequests = nextState.supportRequests || [];
         nextState.dailyMotivations = nextState.dailyMotivations || [];
+        nextState.lgUpdates = (nextState.lgUpdates || []).map((item) => ({
+          ...item,
+          line: ["HS", "TV", "AV"].includes(item.line) ? item.line : "HS",
+          type: ["Producto", "Lanzamiento", "Tecnologia", "Argumento de venta"].includes(item.type) ? item.type : "Producto"
+        }));
+        nextState.lateEvidenceUploadsEnabled = Boolean(nextState.lateEvidenceUploadsEnabled);
+        nextState.lateEvidencePolicyHistory = Array.isArray(nextState.lateEvidencePolicyHistory)
+          ? nextState.lateEvidencePolicyHistory.slice(0, 100)
+          : [];
         nextState.selectedWeekStart = nextState.selectedWeekStart || weekStartIso(todayIso);
         nextState.selectedCoordinatorDate = nextState.selectedCoordinatorDate || nearestWorkingDay(todayIso);
         return nextState;
@@ -3104,18 +3705,47 @@
       }
 
       async function apiRequest(path, options = {}) {
-        const response = await fetch(`${API_BASE}${path}`, {
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-          ...options
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          const error = new Error(data.message || `No se pudo conectar con la nube (HTTP ${response.status}).`);
-          error.status = response.status;
+        const { timeoutMs = 45_000, ...fetchOptions } = options;
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          const response = await fetch(`${API_BASE}${path}`, {
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json", ...(fetchOptions.headers || {}) },
+            ...fetchOptions,
+            signal: fetchOptions.signal || controller.signal
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            const error = new Error(data.message || `No se pudo conectar con la nube (HTTP ${response.status}).`);
+            error.status = response.status;
+            throw error;
+          }
+          return data;
+        } catch (error) {
+          if (error.name === "AbortError") {
+            const timeoutError = new Error("La nube demoro demasiado en responder. LGTASK volvera a intentarlo automaticamente.");
+            timeoutError.status = 0;
+            throw timeoutError;
+          }
           throw error;
+        } finally {
+          window.clearTimeout(timeout);
         }
-        return data;
+      }
+
+      async function apiRequestWithRetry(path, options = {}, attempts = 3) {
+        let lastError;
+        for (let attempt = 1; attempt <= attempts; attempt += 1) {
+          try {
+            return await apiRequest(path, options);
+          } catch (error) {
+            lastError = error;
+            if (attempt >= attempts || (error.status && error.status < 500)) throw error;
+            await new Promise((resolve) => window.setTimeout(resolve, attempt * 500));
+          }
+        }
+        throw lastError;
       }
 
       function urlBase64ToUint8Array(value) {
@@ -3128,8 +3758,9 @@
       async function registerServiceWorker() {
         if (!("serviceWorker" in navigator)) return null;
         try {
-          await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+          await navigator.serviceWorker.register(`/sw.js?v=${APP_VERSION}`, { scope: "/", updateViaCache: "none" });
           serviceWorkerRegistration = await navigator.serviceWorker.ready;
+          await serviceWorkerRegistration.update().catch(() => {});
           return serviceWorkerRegistration;
         } catch (error) {
           console.error("No se pudo registrar el modo app", error);
@@ -3154,6 +3785,54 @@
           : Notification.permission === "denied"
             ? "Avisos bloqueados"
             : "Activar notificaciones";
+      }
+
+      async function prepareNotificationAudio() {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return null;
+        if (!notificationAudioContext) notificationAudioContext = new AudioContextClass();
+        if (notificationAudioContext.state === "suspended") {
+          try {
+            await notificationAudioContext.resume();
+          } catch {
+            return null;
+          }
+        }
+        return notificationAudioContext;
+      }
+
+      async function playNotificationTone() {
+        const context = await prepareNotificationAudio();
+        if (!context) return;
+        const start = context.currentTime + 0.02;
+        [880, 1175, 1568].forEach((frequency, index) => {
+          const oscillator = context.createOscillator();
+          const gain = context.createGain();
+          const noteStart = start + index * 0.16;
+          oscillator.type = "sine";
+          oscillator.frequency.setValueAtTime(frequency, noteStart);
+          gain.gain.setValueAtTime(0.0001, noteStart);
+          gain.gain.exponentialRampToValueAtTime(0.16, noteStart + 0.025);
+          gain.gain.exponentialRampToValueAtTime(0.0001, noteStart + 0.13);
+          oscillator.connect(gain).connect(context.destination);
+          oscillator.start(noteStart);
+          oscillator.stop(noteStart + 0.14);
+        });
+      }
+
+      function notificationDisplayOptions(notification = {}) {
+        return {
+          body: notification.body || "Tienes una actualizacion pendiente.",
+          icon: "/icons/lgtask-192.png",
+          badge: "/icons/lgtask-96.png",
+          tag: notification.id || `lgtask-${Date.now()}`,
+          renotify: true,
+          requireInteraction: true,
+          vibrate: [180, 90, 180, 90, 360],
+          silent: false,
+          timestamp: Date.now(),
+          data: { url: notification.url || "/?view=tasksView" }
+        };
       }
 
       async function enableNotifications() {
@@ -3190,13 +3869,15 @@
           }
         }
         await updateNotificationButton();
-        await registration.showNotification("LGTASK conectado", {
-          body: "Recibiras avisos de tareas asignadas y recordatorios.",
-          icon: "/icons/lgtask-192.png",
-          badge: "/icons/lgtask-96.png",
-          tag: "lgtask-ready",
-          data: { url: "/?view=tasksView" }
-        });
+        await playNotificationTone();
+        await registration.showNotification(
+          "LGTASK conectado",
+          notificationDisplayOptions({
+            id: "lgtask-ready",
+            body: "Recibiras avisos visibles de tareas asignadas y recordatorios.",
+            url: "/?view=tasksView"
+          })
+        );
         await checkPendingNotifications();
       }
 
@@ -3235,15 +3916,13 @@
           const registration = serviceWorkerRegistration || (await registerServiceWorker());
           if (!registration) return;
           const data = await apiRequest("/notifications/pending");
-          for (const notification of data.notifications || []) {
-            await registration.showNotification(notification.title || "LGTASK", {
-              body: notification.body || "Tienes una actualizacion pendiente.",
-              icon: "/icons/lgtask-192.png",
-              badge: "/icons/lgtask-96.png",
-              tag: notification.id,
-              renotify: true,
-              data: { url: notification.url || "/?view=tasksView" }
-            });
+          const notifications = data.notifications || [];
+          if (notifications.length) {
+            await playNotificationTone();
+            showToast(`${notifications.length} ${notifications.length === 1 ? "notificacion nueva" : "notificaciones nuevas"}.`, "success");
+          }
+          for (const notification of notifications) {
+            await registration.showNotification(notification.title || "LGTASK", notificationDisplayOptions(notification));
           }
         })()
           .catch((error) => console.error("No se pudieron consultar los avisos", error))
@@ -3362,6 +4041,22 @@
       function setMessage(element, text, type = "") {
         element.textContent = text;
         element.className = `message ${type}`.trim();
+        if (type === "err" && text && (element === els.evidenceMessage || element === els.taskMessage)) {
+          showToast(text, "error");
+          if (element === els.evidenceMessage) {
+            window.requestAnimationFrame(() => element.scrollIntoView({ behavior: "smooth", block: "nearest" }));
+          }
+        }
+      }
+
+      function setEvidenceUploadProgress(text = "", percent = 0, type = "") {
+        const value = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
+        els.evidenceUploadProgress.classList.toggle("hidden", !text);
+        els.evidenceUploadProgress.classList.toggle("is-error", type === "err");
+        els.evidenceUploadProgress.classList.toggle("is-success", type === "ok");
+        els.evidenceUploadProgressText.textContent = text;
+        els.evidenceUploadProgressBar.value = value;
+        els.evidenceUploadProgressBar.textContent = `${value}%`;
       }
 
       function fillSelect(select, options, selected = "") {
@@ -3841,7 +4536,13 @@
       }
 
       function taskAllowsEvidenceToday(task) {
-        return Boolean(task && (task.dueDate === dateIsoInLima(Date.now()) || lateEvidenceAuthorizationActive(task)));
+        const platformToday = dateIsoInLima(Date.now());
+        return Boolean(
+          task &&
+            (task.dueDate === platformToday ||
+              (task.dueDate < platformToday && state.lateEvidenceUploadsEnabled) ||
+              lateEvidenceAuthorizationActive(task))
+        );
       }
 
       function taskMissingEvidence(task) {
@@ -3855,6 +4556,9 @@
         }
         const platformToday = dateIsoInLima(Date.now());
         if (task.dueDate < platformToday) {
+          if (state.lateEvidenceUploadsEnabled) {
+            return "Pablo habilito la carga de sustentos para dias anteriores. Puedes enviar la evidencia ahora.";
+          }
           return "El plazo para subir sustentos de esta tarea ha finalizado. Las evidencias deben registrarse el mismo dia de la ejecucion.";
         }
         if (task.dueDate > platformToday) {
@@ -4917,12 +5621,24 @@
         }
       }
 
+      function renderLateEvidencePolicy() {
+        if (!els.lateEvidencePolicyPanel) return;
+        const enabled = Boolean(state.lateEvidenceUploadsEnabled);
+        els.lateEvidencePolicyToggle.checked = enabled;
+        els.lateEvidencePolicyState.textContent = enabled ? "Encendido" : "Apagado";
+        els.lateEvidencePolicyText.textContent = enabled
+          ? "Los trainers pueden subir sustentos de tareas anteriores hasta que Pablo apague este permiso."
+          : "La carga de fechas pasadas esta bloqueada para todos los trainers.";
+      }
+
       function render() {
         const user = activeUser();
         const logged = Boolean(user);
         els.loginScreen.classList.toggle("hidden", logged);
         els.appHeader.classList.toggle("hidden", !logged);
         els.appShell.classList.toggle("hidden", !logged);
+        els.assistantButton.classList.toggle("hidden", !logged);
+        if (!logged && els.assistantDialog.open) els.assistantDialog.close();
 
         if (!logged) return;
 
@@ -4944,6 +5660,7 @@
         els.coordinatorAnnouncementPanel.classList.toggle("hidden", !isCoordinator());
         els.cloudPlanPanel.classList.toggle("hidden", !isCoordinator());
         els.evidenceFilters.classList.toggle("hidden", !isCoordinator());
+        els.lateEvidencePolicyPanel.classList.toggle("hidden", !isCoordinator());
         els.editMotivation.classList.toggle("hidden", !isCoordinator());
         if (!isCoordinator()) els.motivationForm.classList.add("hidden");
         els.taskFormTitle.textContent = isCoordinator() ? "Asignar tarea" : "Agregar mi tarea";
@@ -4966,6 +5683,7 @@
           renderTasks();
           renderDeletedTasks();
         } else if (activeViewId === "evidenceView") {
+          renderLateEvidencePolicy();
           renderEvidence();
         } else if (activeViewId === "teamView") {
           renderTeam();
@@ -5142,6 +5860,83 @@
         renderOvertimeRequests();
       }
 
+      function evidenceCandidateTasks(dateValue = els.evidenceTaskDate.value) {
+        if (isCoordinator()) return [];
+        return state.tasks
+          .filter(
+            (task) =>
+              task.ownerId === state.activeUserId &&
+              task.dueDate === dateValue &&
+              (task.status === "En proceso" || task.status === "Observada")
+          )
+          .sort((left, right) => (left.startTime || WORKDAY_START).localeCompare(right.startTime || WORKDAY_START));
+      }
+
+      function rememberEvidenceSelection(taskId = "", dateValue = els.evidenceTaskDate.value) {
+        selectedEvidenceTaskId = taskId;
+        selectedEvidenceDate = dateValue || todayIso;
+        if (selectedEvidenceTaskId) sessionStorage.setItem(EVIDENCE_SELECTION_TASK_KEY, selectedEvidenceTaskId);
+        else sessionStorage.removeItem(EVIDENCE_SELECTION_TASK_KEY);
+        sessionStorage.setItem(EVIDENCE_SELECTION_DATE_KEY, selectedEvidenceDate);
+      }
+
+      function clearEvidenceSelection() {
+        selectedEvidenceTaskId = "";
+        selectedEvidenceDate = "";
+        sessionStorage.removeItem(EVIDENCE_SELECTION_TASK_KEY);
+        sessionStorage.removeItem(EVIDENCE_SELECTION_DATE_KEY);
+      }
+
+      function rememberPendingEvidenceSubmission(submission) {
+        pendingEvidenceSubmission = submission || null;
+        if (pendingEvidenceSubmission) {
+          sessionStorage.setItem(EVIDENCE_PENDING_SUBMISSION_KEY, JSON.stringify(pendingEvidenceSubmission));
+        } else {
+          sessionStorage.removeItem(EVIDENCE_PENDING_SUBMISSION_KEY);
+        }
+      }
+
+      function renderEvidenceTaskPicker(preferredTaskId = "") {
+        if (!els.evidenceTaskDate.value) els.evidenceTaskDate.value = selectedEvidenceDate || todayIso;
+        const tasks = evidenceCandidateTasks(els.evidenceTaskDate.value);
+        const requestedTaskId = preferredTaskId || selectedEvidenceTaskId || els.evidenceTask.value;
+        const selectedTaskId = tasks.some((task) => task.id === requestedTaskId)
+          ? requestedTaskId
+          : tasks.find((task) => taskAllowsEvidenceToday(task))?.id || "";
+        rememberEvidenceSelection(selectedTaskId, els.evidenceTaskDate.value);
+        fillSelect(
+          els.evidenceTask,
+          tasks.map((task) => ({ value: task.id, label: task.title })),
+          selectedTaskId
+        );
+        els.evidenceTaskPicker.innerHTML = tasks.length
+          ? tasks
+              .map((task) => {
+                const allowed = taskAllowsEvidenceToday(task);
+                const selected = task.id === selectedTaskId;
+                const statusText = task.status === "Observada" ? "Requiere correccion" : "Sin sustento enviado";
+                return `
+                  <label class="evidence-task-choice ${selected ? "selected" : ""} ${allowed ? "" : "disabled"}">
+                    <input type="radio" name="evidenceTaskChoice" value="${escapeHtml(task.id)}" ${selected ? "checked" : ""} ${allowed ? "" : "disabled"} />
+                    <strong>${escapeHtml(task.title)}</strong>
+                    <span>${escapeHtml(taskTimeLabel(task))} | ${escapeHtml(statusText)}</span>
+                    ${allowed ? "" : `<span class="muted">${escapeHtml(taskEvidenceDeadlineText(task))}</span>`}
+                  </label>`;
+              })
+              .join("")
+          : emptyState("No hay tareas disponibles este dia", "Inicia una tarea pendiente o selecciona otro dia.");
+        els.evidenceTaskPicker.querySelectorAll('input[name="evidenceTaskChoice"]').forEach((input) => {
+          input.addEventListener("change", () => {
+            rememberPendingEvidenceSubmission(null);
+            rememberEvidenceSelection(input.value, els.evidenceTaskDate.value);
+            els.evidenceTask.value = input.value;
+            renderEvidenceTaskPicker(input.value);
+            renderEvidenceTrainingTopic();
+            setMessage(els.evidenceMessage, "", "");
+          });
+        });
+      }
+
       function refreshSelects() {
         const trainerOptions = trainers().map((trainer) => ({ value: trainer.id, label: `${trainer.name} - ${trainer.zone}` }));
         const taskPeople = isCoordinator() ? assignableUsers() : [activeUser()].filter(Boolean);
@@ -5154,25 +5949,7 @@
           els.evidenceTrainerFilter.value || "all"
         );
 
-        const availableTasks = state.tasks
-          .filter(
-            (task) =>
-              !isCoordinator() &&
-              task.ownerId === state.activeUserId &&
-              (task.status === "En proceso" || task.status === "Observada")
-          )
-          .map((task) => ({
-            value: task.id,
-            label: `${task.title} (${formatDate(task.dueDate)} | ${taskTimeLabel(task)})${taskAllowsEvidenceToday(task) ? "" : " | Plazo no disponible"}`
-          }));
-        const preferredEvidenceTaskId = selectedEvidenceTaskId || els.evidenceTask.value;
-        fillSelect(els.evidenceTask, availableTasks, preferredEvidenceTaskId);
-        if (availableTasks.some((task) => task.value === preferredEvidenceTaskId)) {
-          els.evidenceTask.value = preferredEvidenceTaskId;
-          selectedEvidenceTaskId = preferredEvidenceTaskId;
-        } else if (selectedEvidenceTaskId) {
-          selectedEvidenceTaskId = "";
-        }
+        renderEvidenceTaskPicker(els.evidenceTask.value);
         els.taskDueDate.removeAttribute("min");
         els.taskDueDate.value = els.taskDueDate.value || nearestWorkingDay(todayIso);
         renderTaskAvailability(els.taskStartTime.value, els.taskEndTime.value);
@@ -5595,28 +6372,14 @@
         });
       }
 
-      function openEvidenceForTask(task) {
-        selectedEvidenceTaskId = task.id;
-        if (els.taskPreviewDialog.open) els.taskPreviewDialog.close();
-        activateView("evidenceView", { updateUrl: true, historyMode: "push", scroll: true });
-        render();
-        els.evidenceTask.value = task.id;
-        renderEvidenceTrainingTopic();
-        els.evidenceStore.focus();
-      }
-
       function selectedEvidenceTask() {
-        const taskId = selectedEvidenceTaskId || els.evidenceTask.value;
-        return state.tasks.find((task) => task.id === taskId);
-      }
-
-      function evidenceDraftInProgress() {
-        return Boolean(!isCoordinator() && activeViewId === "evidenceView" && selectedEvidenceTaskId);
+        return state.tasks.find((task) => task.id === els.evidenceTask.value);
       }
 
       function renderEvidenceTrainingTopic() {
         const task = selectedEvidenceTask();
         const isTraining = clean(task?.category).toLowerCase() === "entrenamiento";
+        const hasPendingConfirmation = Boolean(task && pendingEvidenceSubmission?.taskId === task.id);
         els.evidenceTrainingTopicWrap.classList.toggle("hidden", !isTraining);
         els.evidenceTrainingTopic.required = isTraining;
         if (!isTraining) els.evidenceTrainingTopic.value = "";
@@ -5627,15 +6390,51 @@
         els.evidenceFiles.disabled = Boolean(task && !allowed);
         els.evidenceLinks.disabled = Boolean(task && !allowed);
         els.evidenceSubmitButton.disabled = !task || !allowed;
+        if (!evidenceSubmitInFlight) {
+          els.evidenceSubmitButton.textContent = hasPendingConfirmation ? "Confirmar sustento guardado" : "Enviar sustento";
+          if (hasPendingConfirmation) {
+            setEvidenceUploadProgress("Los archivos ya estan en la nube. Pulsa confirmar para finalizar el sustento.", 95);
+          }
+        }
       }
 
-      function startTask(task) {
+      async function startTask(task) {
         if (!task || task.status !== "Pendiente" || task.ownerId !== state.activeUserId) return;
         task.history = task.history || [];
         task.history.push({ type: "Inicio", byId: state.activeUserId, at: Date.now() });
         task.status = "En proceso";
         saveState();
         render();
+        window.clearTimeout(syncTimer);
+        syncTimer = 0;
+        try {
+          await syncState();
+        } catch (error) {
+          showToast(`La tarea se inicio, pero falta sincronizar: ${error.message}`, "error");
+        }
+      }
+
+      async function openEvidenceModuleForTask(task) {
+        if (!task || task.ownerId !== state.activeUserId || isCoordinator() || evidenceOpenInFlight) return;
+        evidenceOpenInFlight = true;
+        rememberEvidenceSelection(task.id, task.dueDate);
+        els.evidenceTaskDate.value = task.dueDate;
+        window.clearTimeout(syncTimer);
+        syncTimer = 0;
+        try {
+          if (syncInFlight) await syncInFlight;
+          await syncState();
+          rememberEvidenceSelection(task.id, task.dueDate);
+          activateView("evidenceView", { updateUrl: true, historyMode: "push" });
+          render();
+          renderEvidenceTaskPicker(task.id);
+          renderEvidenceTrainingTopic();
+          window.requestAnimationFrame(() => els.evidenceUploadPanel.scrollIntoView({ behavior: "smooth", block: "start" }));
+        } catch (error) {
+          showToast(`No se pudo preparar la tarea para el sustento: ${error.message}`, "error");
+        } finally {
+          evidenceOpenInFlight = false;
+        }
       }
 
       function renderTrainerTaskActions(container, task) {
@@ -5661,16 +6460,21 @@
           startButton.className = "primary";
           startButton.type = "button";
           startButton.textContent = "Iniciar";
-          startButton.addEventListener("click", () => startTask(task));
+          startButton.addEventListener("click", async () => {
+            startButton.disabled = true;
+            startButton.textContent = "Iniciando...";
+            await startTask(task);
+          });
           container.appendChild(startButton);
-        } else if (task.status === "En proceso" || task.status === "Observada") {
+        }
+        if (task.status === "En proceso" || task.status === "Observada") {
           const evidenceButton = document.createElement("button");
+          const evidenceAllowed = taskAllowsEvidenceToday(task);
           evidenceButton.className = "primary";
           evidenceButton.type = "button";
-          evidenceButton.textContent = taskAllowsEvidenceToday(task) ? "Enviar sustento" : "Sustento no disponible";
-          evidenceButton.disabled = !taskAllowsEvidenceToday(task);
-          evidenceButton.title = taskEvidenceDeadlineText(task);
-          if (taskAllowsEvidenceToday(task)) evidenceButton.addEventListener("click", () => openEvidenceForTask(task));
+          evidenceButton.textContent = evidenceAllowed ? "Enviar sustento" : "Sustento no disponible";
+          evidenceButton.disabled = !evidenceAllowed;
+          evidenceButton.addEventListener("click", () => openEvidenceModuleForTask(task));
           container.appendChild(evidenceButton);
         }
         renderScheduleControl(container, task);
@@ -5728,7 +6532,7 @@
                 <span class="muted">${escapeHtml(task.category)}${task.product ? ` | ${escapeHtml(task.product)}` : ""}</span>
                 <div class="actions"></div>
               `;
-              renderViewTaskControl(card.querySelector(".actions"), task);
+              renderTrainerTaskActions(card.querySelector(".actions"), task);
               wrap.appendChild(card);
             });
           }
@@ -5777,6 +6581,7 @@
         window.history.pushState({}, "", url);
         activeViewId = "evidenceView";
         activateView("evidenceView");
+        els.evidenceHistoryPanel.open = true;
         render();
         window.requestAnimationFrame(() => {
           els.evidenceList.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -5886,6 +6691,14 @@
           render();
           showToast("Carga tardia habilitada por un solo envio durante el dia de hoy.", "success");
         } catch (error) {
+          const refreshed = await refreshStateFromServer({ quiet: true });
+          const savedTask = state.tasks.find((task) => task.id === taskId);
+          if (refreshed && lateEvidenceAuthorizationActive(savedTask)) {
+            els.lateEvidenceDialog.close();
+            render();
+            showToast("Carga tardia guardada. El aviso se completara en segundo plano.", "success");
+            return;
+          }
           setMessage(els.lateEvidenceMessage, error.message || "No se pudo guardar la autorizacion.", "err");
         } finally {
           els.confirmLateEvidence.disabled = false;
@@ -6050,6 +6863,8 @@
       }
 
       function renderEvidence() {
+        els.evidenceUploadPanel.classList.toggle("hidden", isCoordinator());
+        if (!isCoordinator()) renderEvidenceTaskPicker(els.evidenceTask.value);
         let allEvidence = relevantTasks()
           .flatMap((task) => (task.evidence || []).map((evidence) => ({ ...evidence, task })))
           .sort((a, b) => b.submittedAt - a.submittedAt);
@@ -6078,6 +6893,8 @@
         }
 
         els.evidenceList.innerHTML = "";
+        els.evidenceHistoryCount.textContent = String(allEvidence.length);
+        if (linkedFileId || linkedEvidenceId) els.evidenceHistoryPanel.open = true;
         if (!allEvidence.length) {
           els.evidenceList.innerHTML = emptyState(
             "No hay sustentos para este filtro",
@@ -6086,79 +6903,117 @@
           return;
         }
 
+        const byDay = new Map();
         allEvidence.forEach((entry) => {
-          const card = document.createElement("article");
-          card.className = "item";
-          const files = evidenceFilesForEntry(entry);
-          const links = Array.isArray(entry.links) ? entry.links : [];
-          const filesMarkup = files
-            .map((file, fileIndex) => {
-              const fileUrl = originalEvidenceFileUrl(file);
-              const image = file.mimeType.startsWith("image/");
-              return `
-                <div class="evidence-file-row">
-                  <strong>${escapeHtml(file.name)}</strong>
-                  <span class="muted">${escapeHtml(file.mimeType)}</span>
-                  ${image ? `<img class="evidence-photo" loading="lazy" src="${escapeHtml(fileUrl)}" alt="${escapeHtml(file.name)}" />` : ""}
-                  <div class="actions">
-                    <button class="small preview-evidence-file" type="button" data-file-index="${fileIndex}">Ver archivo original</button>
-                    <a class="small" href="${escapeHtml(fileUrl)}" download="${escapeHtml(file.name)}">Descargar original</a>
-                  </div>
-                </div>
-              `;
-            })
-            .join("");
-          card.innerHTML = `
-            <div class="title-row">
-              <h3>${escapeHtml(entry.task.title)}</h3>
-              <span class="pill ${entry.review === "Aprobado" ? "approved" : entry.review === "Observado" || entry.review === "Rechazado" ? "observed" : "review"}">${escapeHtml(evidenceReviewLabel(entry.review))}</span>
-            </div>
-            <div class="meta">
-              <span>Trainer: ${escapeHtml(userName(entry.submittedById))}</span>
-              <span>PDV: ${escapeHtml(entry.store)}</span>
-              <span>Resultado: ${escapeHtml(evidenceResultLabel(entry.result))}</span>
-              <span>${formatDateTime(entry.submittedAt)}</span>
-            </div>
-            ${entry.product ? `<p><strong>Producto:</strong> ${escapeHtml(entry.product)}</p>` : ""}
-            ${entry.trainingTopic ? `<p><strong>Tema de la capacitacion:</strong> ${escapeHtml(entry.trainingTopic)}</p>` : ""}
-            ${entry.notes ? `<p>${escapeHtml(entry.notes)}</p>` : ""}
-            ${entry.reviewNote ? `<div class="note"><strong>Observacion de Pablo:</strong><p>${escapeHtml(entry.reviewNote)}</p></div>` : ""}
-            ${links.length ? `<div class="actions">${links.map((link) => `<a class="small" href="${escapeHtml(link)}" target="_blank" rel="noopener">Abrir enlace</a>`).join("")}</div>` : ""}
-            <div class="cloud-path">${escapeHtml(cloudFolderForEvidence(entry, entry.task))}</div>
-            ${files.length ? `<div class="evidence-cloud-badge">${files.length} archivo${files.length === 1 ? "" : "s"} protegido${files.length === 1 ? "" : "s"} en la nube LGTASK</div>` : ""}
-            ${files.length ? `<div class="evidence-file-list">${filesMarkup}</div>` : `<p class="muted">Sustento sin archivo adjunto.</p>`}
+          const dayKey = dateIsoInLima(entry.submittedAt);
+          if (!byDay.has(dayKey)) byDay.set(dayKey, []);
+          byDay.get(dayKey).push(entry);
+        });
+
+        [...byDay.entries()].forEach(([dayKey, entries]) => {
+          const day = document.createElement("details");
+          day.className = "evidence-history-day";
+          const hasLinkedEntry = entries.some((entry) => entry.id === linkedEvidenceId || evidenceFilesForEntry(entry).some((file) => file.id === linkedFileId));
+          day.open = hasLinkedEntry || openEvidenceDays.has(dayKey);
+          day.innerHTML = `
+            <summary>
+              <strong>${escapeHtml(formatShortDate(dayKey))}</strong>
+              <span class="pill">${entries.length} ${entries.length === 1 ? "sustento" : "sustentos"}</span>
+            </summary>
+            <div class="evidence-history-day-body"></div>
           `;
-
-          const latestEvidence = entry.task.evidence?.at(-1);
-          const canReview =
-            isCoordinator() &&
-            latestEvidence?.id === entry.id &&
-            entry.review === "Pendiente" &&
-            entry.task.status === "En revision";
-          if (canReview) {
-            const actions = document.createElement("div");
-            actions.className = "actions";
-            const approveButton = document.createElement("button");
-            approveButton.className = "primary";
-            approveButton.type = "button";
-            approveButton.textContent = "Aprobar y completar";
-            approveButton.addEventListener("click", () => reviewTask(entry.task.id, "Cumplida"));
-            const rejectButton = document.createElement("button");
-            rejectButton.className = "danger";
-            rejectButton.type = "button";
-            rejectButton.textContent = "Rechazar";
-            rejectButton.addEventListener("click", () => reviewTask(entry.task.id, "Observada"));
-            actions.append(approveButton, rejectButton);
-            card.appendChild(actions);
-          }
-
-          card.querySelectorAll(".preview-evidence-file").forEach((button) => {
-            button.addEventListener("click", () => {
-              const file = files[Number(button.dataset.fileIndex)];
-              openEvidenceFilePreview(file).catch(() => {});
-            });
+          day.addEventListener("toggle", () => {
+            if (day.open) openEvidenceDays.add(dayKey);
+            else openEvidenceDays.delete(dayKey);
           });
-          els.evidenceList.appendChild(card);
+          const dayBody = day.querySelector(".evidence-history-day-body");
+
+          entries.forEach((entry) => {
+            const files = evidenceFilesForEntry(entry);
+            const links = Array.isArray(entry.links) ? entry.links : [];
+            const isLinked = entry.id === linkedEvidenceId || files.some((file) => file.id === linkedFileId);
+            const filesMarkup = files
+              .map((file, fileIndex) => {
+                const fileUrl = originalEvidenceFileUrl(file);
+                const image = file.mimeType.startsWith("image/");
+                return `
+                  <div class="evidence-file-row">
+                    <strong>${escapeHtml(file.name)}</strong>
+                    <span class="muted">${escapeHtml(file.mimeType)}</span>
+                    ${image ? `<img class="evidence-photo" loading="lazy" src="${escapeHtml(fileUrl)}" alt="${escapeHtml(file.name)}" />` : ""}
+                    <div class="actions">
+                      <button class="small preview-evidence-file" type="button" data-file-index="${fileIndex}">Ver archivo original</button>
+                      <a class="small" href="${escapeHtml(fileUrl)}" download="${escapeHtml(file.name)}">Descargar original</a>
+                    </div>
+                  </div>
+                `;
+              })
+              .join("");
+            const entryDetails = document.createElement("details");
+            entryDetails.className = "evidence-history-entry";
+            entryDetails.open = isLinked || openEvidenceEntries.has(entry.id);
+            entryDetails.innerHTML = `
+              <summary>
+                <span class="evidence-history-summary">
+                  <strong>${escapeHtml(entry.task.title)}</strong>
+                  <span class="muted">${escapeHtml(userName(entry.submittedById))} | ${formatDateTime(entry.submittedAt)} | ${files.length} archivo${files.length === 1 ? "" : "s"}</span>
+                </span>
+                <span class="pill ${entry.review === "Aprobado" ? "approved" : entry.review === "Observado" || entry.review === "Rechazado" ? "observed" : "review"}">${escapeHtml(evidenceReviewLabel(entry.review))}</span>
+              </summary>
+              <div class="evidence-history-body">
+                <div class="meta">
+                  <span>Trainer: ${escapeHtml(userName(entry.submittedById))}</span>
+                  <span>PDP: ${escapeHtml(entry.store)}</span>
+                  <span>Resultado: ${escapeHtml(evidenceResultLabel(entry.result))}</span>
+                  <span>${formatDateTime(entry.submittedAt)}</span>
+                </div>
+                ${entry.product ? `<p><strong>Producto:</strong> ${escapeHtml(entry.product)}</p>` : ""}
+                ${entry.trainingTopic ? `<p><strong>Tema de la capacitacion:</strong> ${escapeHtml(entry.trainingTopic)}</p>` : ""}
+                ${entry.notes ? `<p>${escapeHtml(entry.notes)}</p>` : ""}
+                ${entry.reviewNote ? `<div class="note"><strong>Observacion de Pablo:</strong><p>${escapeHtml(entry.reviewNote)}</p></div>` : ""}
+                ${links.length ? `<div class="actions">${links.map((link) => `<a class="small" href="${escapeHtml(link)}" target="_blank" rel="noopener">Abrir enlace</a>`).join("")}</div>` : ""}
+                <div class="cloud-path">${escapeHtml(cloudFolderForEvidence(entry, entry.task))}</div>
+                ${files.length ? `<div class="evidence-cloud-badge">${files.length} archivo${files.length === 1 ? "" : "s"} protegido${files.length === 1 ? "" : "s"} en la nube LGTASK</div>` : ""}
+                ${files.length ? `<div class="evidence-file-list">${filesMarkup}</div>` : `<p class="muted">Sustento sin archivo adjunto.</p>`}
+              </div>
+            `;
+            entryDetails.addEventListener("toggle", () => {
+              if (entryDetails.open) openEvidenceEntries.add(entry.id);
+              else openEvidenceEntries.delete(entry.id);
+            });
+
+            const latestEvidence = entry.task.evidence?.at(-1);
+            const canReview =
+              isCoordinator() &&
+              latestEvidence?.id === entry.id &&
+              entry.review === "Pendiente" &&
+              entry.task.status === "En revision";
+            if (canReview) {
+              const actions = document.createElement("div");
+              actions.className = "actions";
+              const approveButton = document.createElement("button");
+              approveButton.className = "primary";
+              approveButton.type = "button";
+              approveButton.textContent = "Aprobar y completar";
+              approveButton.addEventListener("click", () => reviewTask(entry.task.id, "Cumplida"));
+              const rejectButton = document.createElement("button");
+              rejectButton.className = "danger";
+              rejectButton.type = "button";
+              rejectButton.textContent = "Rechazar";
+              rejectButton.addEventListener("click", () => reviewTask(entry.task.id, "Observada"));
+              actions.append(approveButton, rejectButton);
+              entryDetails.querySelector(".evidence-history-body").appendChild(actions);
+            }
+
+            entryDetails.querySelectorAll(".preview-evidence-file").forEach((button) => {
+              button.addEventListener("click", () => {
+                const file = files[Number(button.dataset.fileIndex)];
+                openEvidenceFilePreview(file).catch(() => {});
+              });
+            });
+            dayBody.appendChild(entryDetails);
+          });
+          els.evidenceList.appendChild(day);
         });
 
         if (linkedFile && linkedFileId !== lastAutoOpenedFileId) {
@@ -6167,6 +7022,24 @@
             openEvidenceFilePreview(linkedFile, { syncUrl: false }).catch(() => {});
           });
         }
+      }
+
+      function teamProfileForName(name) {
+        const normalized = normalizedUserName(name);
+        return TEAM_PROFILE_DEFAULTS.find((profile) => profile.aliases.includes(normalized)) || null;
+      }
+
+      function teamProfileMarkup(profile) {
+        const chains = profile?.chains || [];
+        return `
+          <div class="profile-tags">
+            ${chains.length ? chains.map((chain) => `<span class="profile-tag">${escapeHtml(chain)}</span>`).join("") : `<span class="profile-tag">Sin cadena fija</span>`}
+          </div>
+          <div class="note">
+            <strong>Funcion / especialidad</strong>
+            <p>${escapeHtml(profile?.specialty || "Trainer LG")}</p>
+          </div>
+        `;
       }
 
       function renderTeam() {
@@ -6217,13 +7090,24 @@
         renderPasswordRecoveryRequests();
 
         els.teamList.innerHTML = "";
-        const visibleUsers = isCoordinator() ? state.users.filter((user) => user.status === "Activo") : [activeUser()].filter(Boolean);
+        const activeUsers = state.users.filter((user) => user.status === "Activo");
+        const visibleUsers = isCoordinator() ? activeUsers : activeUsers.filter((user) => user.role === "Trainer");
+        const matchedProfiles = new Set();
         visibleUsers
+          .sort((left, right) => {
+            const leftProfile = teamProfileForName(left.name);
+            const rightProfile = teamProfileForName(right.name);
+            const leftIndex = leftProfile ? TEAM_PROFILE_DEFAULTS.indexOf(leftProfile) : TEAM_PROFILE_DEFAULTS.length;
+            const rightIndex = rightProfile ? TEAM_PROFILE_DEFAULTS.indexOf(rightProfile) : TEAM_PROFILE_DEFAULTS.length;
+            return leftIndex - rightIndex || left.name.localeCompare(right.name);
+          })
           .forEach((user) => {
             const assigned = state.tasks.filter((task) => task.ownerId === user.id);
             const completed = assigned.filter((task) => task.status === "Cumplida").length;
+            const profile = teamProfileForName(user.name);
+            if (profile) matchedProfiles.add(profile.name);
             const card = document.createElement("article");
-            card.className = "item";
+            card.className = "item team-profile-card";
             card.innerHTML = `
               <div class="title-row">
                 <h3>${escapeHtml(user.name)}</h3>
@@ -6231,10 +7115,11 @@
               </div>
               <div class="meta">
                 <span>${escapeHtml(user.zone)}</span>
-                <span>${escapeHtml(user.email)}</span>
+                ${isCoordinator() || user.id === state.activeUserId ? `<span>${escapeHtml(user.email)}</span>` : ""}
                 <span>${completed}/${assigned.length} tareas cumplidas</span>
-                <span>Clave actual: protegida</span>
+                ${isCoordinator() || user.id === state.activeUserId ? `<span>Clave actual: protegida</span>` : ""}
               </div>
+              ${user.role === "Trainer" ? teamProfileMarkup(profile) : `<div class="note"><strong>Coordinacion</strong><p>Gestion y seguimiento del equipo de trainers.</p></div>`}
               ${
                 isCoordinator()
                   ? `<div class="note">
@@ -6243,7 +7128,9 @@
                       ${user.passwordResetTemp ? `<p><strong>Clave temporal:</strong> ${escapeHtml(user.passwordResetTemp)}</p>` : ""}
                     </div>
                     <div class="actions"></div>`
-                  : `<div class="note"><strong>Mi acceso</strong><p class="muted">Si olvidas tu clave, usa Olvide mi clave en la pantalla de ingreso.</p></div>`
+                  : user.id === state.activeUserId
+                    ? `<div class="note"><strong>Mi acceso</strong><p class="muted">Si olvidas tu clave, usa Olvide mi clave en la pantalla de ingreso.</p></div>`
+                    : ""
               }
             `;
             const actions = card.querySelector(".actions");
@@ -6274,6 +7161,20 @@
             }
             els.teamList.appendChild(card);
           });
+
+        TEAM_PROFILE_DEFAULTS.filter((profile) => !matchedProfiles.has(profile.name)).forEach((profile) => {
+          const card = document.createElement("article");
+          card.className = "item team-profile-card is-reference";
+          card.innerHTML = `
+            <div class="title-row">
+              <h3>${escapeHtml(profile.name)}</h3>
+              <span class="pill pending">Perfil informativo</span>
+            </div>
+            ${teamProfileMarkup(profile)}
+            <p class="muted">La ficha esta visible para el equipo. Se vinculara automaticamente cuando el nombre del acceso coincida.</p>
+          `;
+          els.teamList.appendChild(card);
+        });
       }
 
       function renderPasswordRecoveryRequests() {
@@ -6362,6 +7263,90 @@
         });
       }
 
+      function resetLgUpdateEditor() {
+        infoEditingId = "";
+        els.lgUpdateForm.reset();
+        els.lgUpdateLine.value = "HS";
+        els.lgUpdateType.value = "Producto";
+        els.saveLgUpdate.textContent = "Publicar informacion";
+        els.cancelLgUpdateEdit.classList.add("hidden");
+        setMessage(els.lgUpdateMessage, "", "");
+      }
+
+      function editLgUpdate(item) {
+        infoEditingId = item.id;
+        els.lgUpdateLine.value = item.line;
+        els.lgUpdateType.value = item.type;
+        els.lgUpdateTitle.value = item.title;
+        els.lgUpdateProduct.value = item.product || "";
+        els.lgUpdateDescription.value = item.description;
+        els.saveLgUpdate.textContent = "Guardar cambios";
+        els.cancelLgUpdateEdit.classList.remove("hidden");
+        setMessage(els.lgUpdateMessage, `Editando: ${item.title}`, "");
+        els.lgUpdateForm.scrollIntoView({ behavior: "smooth", block: "start" });
+        els.lgUpdateTitle.focus();
+      }
+
+      async function removeLgUpdate(item) {
+        if (!window.confirm(`Eliminar la informacion "${item.title}" de Info LG?`)) return;
+        try {
+          const data = await apiRequest("/info/updates", {
+            method: "POST",
+            body: JSON.stringify({ action: "delete", id: item.id })
+          });
+          applyCloudState(data.state);
+          if (infoEditingId === item.id) resetLgUpdateEditor();
+          renderProducts();
+          showToast("Informacion eliminada de Info LG.", "success");
+        } catch (error) {
+          setMessage(els.lgUpdateMessage, error.message || "No se pudo eliminar la informacion.", "err");
+        }
+      }
+
+      function renderLgUpdates() {
+        const filter = els.lgUpdateFilter.value || "all";
+        const updates = (state.lgUpdates || [])
+          .filter((item) => filter === "all" || item.line === filter)
+          .sort((left, right) => Number(right.updatedAt || right.createdAt || 0) - Number(left.updatedAt || left.createdAt || 0));
+        els.lgUpdatesList.innerHTML = "";
+        if (!updates.length) {
+          els.lgUpdatesList.innerHTML = emptyState("No hay publicaciones en esta linea", "Agrega el primer producto, tecnologia o lanzamiento para compartirlo con el equipo.");
+          return;
+        }
+        updates.forEach((item) => {
+          const card = document.createElement("article");
+          card.className = "item lg-update-card";
+          card.dataset.line = item.line;
+          card.innerHTML = `
+            <div class="title-row">
+              <h3>${escapeHtml(item.title)}</h3>
+              <span class="pill">${escapeHtml(item.line)}</span>
+              <span class="pill medium">${escapeHtml(item.type)}</span>
+            </div>
+            ${item.product ? `<p><strong>Producto / modelo:</strong> ${escapeHtml(item.product)}</p>` : ""}
+            <p>${escapeHtml(item.description)}</p>
+            <div class="meta">
+              <span>Actualizado por ${escapeHtml(item.updatedByName || item.createdByName || "Equipo LG")}</span>
+              <span>${formatDateTime(item.updatedAt || item.createdAt)}</span>
+            </div>
+            <div class="actions"></div>
+          `;
+          const actions = card.querySelector(".actions");
+          const editButton = document.createElement("button");
+          editButton.className = "small";
+          editButton.type = "button";
+          editButton.textContent = "Editar";
+          editButton.addEventListener("click", () => editLgUpdate(item));
+          const deleteButton = document.createElement("button");
+          deleteButton.className = "danger small";
+          deleteButton.type = "button";
+          deleteButton.textContent = "Eliminar";
+          deleteButton.addEventListener("click", () => removeLgUpdate(item));
+          actions.append(editButton, deleteButton);
+          els.lgUpdatesList.appendChild(card);
+        });
+      }
+
       function renderProducts() {
         els.productTabs.innerHTML = "";
         products.forEach((product) => {
@@ -6410,6 +7395,117 @@
             result.textContent = button.dataset.answer === product.quiz.answer ? "Correcto. Usa ese argumento en tienda." : `Respuesta correcta: ${product.quiz.answer}`;
           });
         });
+        renderLgUpdates();
+      }
+
+      function assistantText(value) {
+        return clean(value)
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase();
+      }
+
+      function assistantAnswer(question) {
+        const query = assistantText(question);
+        const todayTasks = state.tasks
+          .filter((task) => task.ownerId === state.activeUserId && task.dueDate === todayIso)
+          .sort((left, right) => (left.startTime || WORKDAY_START).localeCompare(right.startTime || WORKDAY_START));
+        if (/tarea.*hoy|hoy.*tarea|que.*tengo/.test(query)) {
+          return {
+            view: "tasksView",
+            text: todayTasks.length
+              ? `Hoy tienes ${todayTasks.length} tarea${todayTasks.length === 1 ? "" : "s"}:\n${todayTasks.map((task) => `${task.startTime}-${task.endTime} | ${task.title} | ${taskStatusLabel(task.status)}`).join("\n")}`
+              : "Hoy no tienes tareas asignadas. Puedes agregar una desde Tareas usando el formulario Agregar mi tarea."
+          };
+        }
+        if (/sustento|evidencia|foto|archivo/.test(query)) {
+          return {
+            view: "tasksView",
+            text: "Para enviar un sustento: pulsa Iniciar directamente en la tarjeta y luego Enviar sustento. LGTASK abrira el formulario con la tarea seleccionada. Adjunta al menos una foto o archivo, completa los datos y confirma el envio. La tarea quedara En revision hasta que Pablo la apruebe."
+          };
+        }
+        if (/mover|reprogram|cambiar.*hora|horario.*tarea/.test(query)) {
+          return {
+            view: "tasksView",
+            text: "Abre la tarea con Ver y selecciona Mover horario. LGTASK mostrara solamente los bloques disponibles y bloqueara cruces con tareas, jornada o break."
+          };
+        }
+        if (/break|descanso|almuerzo/.test(query)) {
+          return {
+            view: "tasksView",
+            text: "En Tareas abre Mi break por dia, elige la fecha, la duracion y uno de los horarios libres. El cambio se guarda solo para ese dia y no modifica el resto de la semana."
+          };
+        }
+        if (/hora.*extra|ampliar.*jornada|salir.*tarde/.test(query)) {
+          return {
+            view: "tasksView",
+            text: isCoordinator()
+              ? "En Ampliar jornada por dia selecciona trainer, fecha, nueva hora de salida y motivo. Tambien puedes aprobar o rechazar solicitudes pendientes."
+              : "En Ampliar jornada por dia selecciona fecha, hora de salida y motivo. El horario adicional se habilitara cuando Pablo apruebe la solicitud."
+          };
+        }
+        if (/reasign|otro trainer|no puedo/.test(query)) {
+          return {
+            view: "tasksView",
+            text: "Abre la tarea con Ver y usa Reasignar. Indica el motivo y elige una persona disponible. El movimiento quedara registrado en el historial para seguimiento de Pablo."
+          };
+        }
+        if (/producto|lanzamiento|info lg|tecnologia|hs|tv|av/.test(query)) {
+          return {
+            view: "infoView",
+            text: "En Info LG puedes consultar guias de producto y las publicaciones compartidas de HS, TV y AV. Cualquier integrante puede agregar o editar productos, tecnologias y lanzamientos."
+          };
+        }
+        if (/equipo|cadena|trainer|especialidad/.test(query)) {
+          return {
+            view: "teamView",
+            text: "En Equipo encontraras la ficha de cada trainer, sus cadenas asignadas, especialidad y avance de tareas."
+          };
+        }
+        if (/notificacion|aviso|recordatorio/.test(query)) {
+          return {
+            view: "tasksView",
+            text: "Pulsa Activar notificaciones en la parte superior y permite los avisos del navegador. Los recordatorios y nuevas tareas llegaran al celular cuando Android permita notificaciones de Chrome o de la app instalada."
+          };
+        }
+        if (/clave|contrasena|password|ingresar/.test(query)) {
+          return {
+            text: "En la pantalla de ingreso usa Olvide mi clave y escribe tu correo registrado. Pablo recibira la solicitud y podra generar una clave temporal."
+          };
+        }
+        return {
+          text: "Puedo ayudarte con: tareas de hoy, envio de sustentos, cambio de horario, break, horas extra, reasignaciones, notificaciones, Equipo e Info LG. Escribe una pregunta corta sobre lo que necesitas hacer."
+        };
+      }
+
+      function addAssistantMessage(role, text, viewId = "") {
+        const message = document.createElement("div");
+        message.className = `assistant-message ${role}`;
+        const body = document.createElement("div");
+        body.textContent = text;
+        message.appendChild(body);
+        if (role === "bot" && ALLOWED_VIEW_IDS.includes(viewId)) {
+          const action = document.createElement("button");
+          action.className = "small";
+          action.type = "button";
+          action.textContent = `Ir a ${viewId === "infoView" ? "Info LG" : viewId === "teamView" ? "Equipo" : "Tareas"}`;
+          action.addEventListener("click", () => {
+            activateView(viewId, { updateUrl: true, historyMode: "push", scroll: true });
+            render();
+            els.assistantDialog.close();
+          });
+          message.appendChild(action);
+        }
+        els.assistantMessages.appendChild(message);
+        els.assistantMessages.scrollTop = els.assistantMessages.scrollHeight;
+      }
+
+      function askAssistant(question) {
+        const value = clean(question);
+        if (!value) return;
+        addAssistantMessage("user", value);
+        const answer = assistantAnswer(value);
+        addAssistantMessage("bot", answer.text, answer.view);
       }
 
       async function resetUserPassword(userId, requestId = "") {
@@ -6433,13 +7529,51 @@
         }
       }
 
-      function readFileAsDataUrl(file) {
+      function readFileAsDataUrl(file, displayName = file?.name || "archivo") {
         return new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result);
-          reader.onerror = () => reject(new Error(`No se pudo leer ${file.name}.`));
+          reader.onerror = () => reject(new Error(`No se pudo leer ${displayName}.`));
           reader.readAsDataURL(file);
         });
+      }
+
+      async function readBlobAsBase64(blob, fileName) {
+        const dataUrl = await readFileAsDataUrl(blob, fileName);
+        const base64 = String(dataUrl).split(",")[1] || "";
+        if (!base64) throw new Error(`No se pudo preparar ${fileName}.`);
+        return base64;
+      }
+
+      function evidenceFileSignature(files = Array.from(els.evidenceFiles.files || [])) {
+        return files.map((file) => `${file.name}:${file.size}:${file.lastModified}`).join("|");
+      }
+
+      function evidenceDraftActive() {
+        return Boolean(
+          evidenceSubmitInFlight ||
+          selectedEvidenceTaskId ||
+          els.evidenceTask.value ||
+          els.evidenceFiles.files?.length ||
+          clean(els.evidenceStore.value) ||
+          clean(els.evidenceProduct.value) ||
+          clean(els.evidenceTrainingTopic.value) ||
+          clean(els.evidenceLinks.value) ||
+          clean(els.evidenceNotes.value)
+        );
+      }
+
+      function renderSelectedEvidenceFiles() {
+        const files = Array.from(els.evidenceFiles.files || []);
+        els.evidenceSelectedFiles.innerHTML = files
+          .map(
+            (file) => `
+              <span class="evidence-selected-file">
+                <span>${escapeHtml(file.name)}</span>
+                <span class="muted">${Math.max(1, Math.ceil(file.size / 1024))} KB</span>
+              </span>`
+          )
+          .join("");
       }
 
       function evidenceMimeType(extension, currentType = "") {
@@ -6448,6 +7582,8 @@
           jpeg: "image/jpeg",
           png: "image/png",
           webp: "image/webp",
+          heic: "image/heic",
+          heif: "image/heif",
           mp4: "video/mp4",
           mov: "video/quicktime",
           webm: "video/webm",
@@ -6473,57 +7609,58 @@
         if (file.size > MAX_EVIDENCE_FILE_BYTES) {
           throw new Error(`${file.name}: supera el maximo de 15 MB permitido por la nube.`);
         }
-        const originalDataUrl = await readFileAsDataUrl(file);
-        const base64 = String(originalDataUrl).split(",")[1] || "";
-        if (!base64 || base64.length > 21_000_000) {
-          throw new Error(`${file.name}: no se pudo preparar dentro del limite de 15 MB.`);
-        }
         const mimeType = evidenceMimeType(extension, file.type);
         return {
-          fileData: `data:${mimeType};base64,${base64}`,
+          file,
           fileName: file.name,
           mimeType,
-          base64
+          totalBase64: 4 * Math.ceil(file.size / 3)
         };
       }
 
       async function uploadPreparedEvidenceFile(taskId, prepared, onChunk) {
-        if (prepared.base64.length <= 1_800_000) {
-          return apiRequest("/evidence/upload", {
+        const fileId = id();
+        if (prepared.file.size <= EVIDENCE_DIRECT_FILE_BYTES) {
+          const base64 = await readBlobAsBase64(prepared.file, prepared.fileName);
+          return apiRequestWithRetry("/evidence/upload", {
             method: "POST",
             body: JSON.stringify({
               taskId,
-              fileData: prepared.fileData,
+              fileId,
+              fileData: `data:${prepared.mimeType};base64,${base64}`,
               fileName: prepared.fileName
             })
           });
         }
-        const chunks = Math.ceil(prepared.base64.length / EVIDENCE_CHUNK_BASE64);
-        const initialized = await apiRequest("/evidence/upload/init", {
+        const chunks = Math.ceil(prepared.file.size / EVIDENCE_CHUNK_FILE_BYTES);
+        const initialized = await apiRequestWithRetry("/evidence/upload/init", {
           method: "POST",
           body: JSON.stringify({
             taskId,
+            fileId,
             fileName: prepared.fileName,
             mimeType: prepared.mimeType,
-            totalBase64: prepared.base64.length,
+            totalBase64: prepared.totalBase64,
             chunkCount: chunks
           })
         });
         for (let chunkIndex = 0; chunkIndex < chunks; chunkIndex += 1) {
           onChunk?.(chunkIndex + 1, chunks);
-          await apiRequest("/evidence/upload/chunk", {
+          const chunkBlob = prepared.file.slice(
+            chunkIndex * EVIDENCE_CHUNK_FILE_BYTES,
+            (chunkIndex + 1) * EVIDENCE_CHUNK_FILE_BYTES
+          );
+          const chunkBase64 = await readBlobAsBase64(chunkBlob, prepared.fileName);
+          await apiRequestWithRetry("/evidence/upload/chunk", {
             method: "POST",
             body: JSON.stringify({
               fileId: initialized.fileId,
               chunkIndex,
-              chunkBase64: prepared.base64.slice(
-                chunkIndex * EVIDENCE_CHUNK_BASE64,
-                (chunkIndex + 1) * EVIDENCE_CHUNK_BASE64
-              )
+              chunkBase64
             })
           });
         }
-        return apiRequest("/evidence/upload/complete", {
+        return apiRequestWithRetry("/evidence/upload/complete", {
           method: "POST",
           body: JSON.stringify({
             fileId: initialized.fileId,
@@ -6625,11 +7762,12 @@
           state.activeUserId = "";
           state.users = [];
           state.tasks = [];
+          els.assistantMessages.innerHTML = "";
+          if (els.assistantDialog.open) els.assistantDialog.close();
           openTaskGroups.clear();
           openTaskDays.clear();
           openTrainerWeekDays.clear();
           openDeletedTaskDays.clear();
-          selectedEvidenceTaskId = "";
           activeViewId = "tasksView";
           activateView("tasksView", { updateUrl: true });
           els.loginEmail.value = "";
@@ -6645,9 +7783,60 @@
           });
         });
 
+        els.lateEvidencePolicyToggle.addEventListener("change", async () => {
+          if (!isCoordinator()) {
+            els.lateEvidencePolicyToggle.checked = Boolean(state.lateEvidenceUploadsEnabled);
+            return;
+          }
+          const enabled = els.lateEvidencePolicyToggle.checked;
+          els.lateEvidencePolicyToggle.disabled = true;
+          setMessage(els.lateEvidencePolicyMessage, "Guardando permiso...", "");
+          try {
+            const data = await apiRequest("/settings/late-evidence", {
+              method: "POST",
+              body: JSON.stringify({ enabled })
+            });
+            applyCloudState(data.state);
+            render();
+            setMessage(
+              els.lateEvidencePolicyMessage,
+              enabled
+                ? "Permiso encendido. Los trainers ya pueden cargar sustentos de fechas anteriores."
+                : "Permiso apagado. Las fechas anteriores vuelven a estar bloqueadas.",
+              "ok"
+            );
+            showToast(enabled ? "Sustentos anteriores habilitados." : "Sustentos anteriores bloqueados.", "success");
+          } catch (error) {
+            renderLateEvidencePolicy();
+            setMessage(els.lateEvidencePolicyMessage, error.message, "err");
+          } finally {
+            els.lateEvidencePolicyToggle.disabled = false;
+          }
+        });
+
+        els.assistantButton.addEventListener("click", () => {
+          if (!els.assistantMessages.children.length) {
+            addAssistantMessage(
+              "bot",
+              `Hola, ${activeUser()?.name || "equipo"}. Puedo guiarte paso a paso para usar tareas, sustentos, horarios, Equipo e Info LG.`
+            );
+          }
+          els.assistantDialog.showModal();
+          els.assistantInput.focus();
+        });
+        els.closeAssistant.addEventListener("click", () => els.assistantDialog.close());
+        els.assistantSuggestions.querySelectorAll("button[data-question]").forEach((button) => {
+          button.addEventListener("click", () => askAssistant(button.dataset.question));
+        });
+        els.assistantForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const question = els.assistantInput.value;
+          els.assistantInput.value = "";
+          askAssistant(question);
+        });
+
         document.querySelectorAll(".tab").forEach((tab) => {
           tab.addEventListener("click", () => {
-            if (tab.dataset.view !== "evidenceView") selectedEvidenceTaskId = "";
             activateView(tab.dataset.view, { updateUrl: true, historyMode: "push", scroll: true });
             render();
           });
@@ -7024,8 +8213,9 @@
           }
         });
 
-        els.taskForm.addEventListener("submit", (event) => {
+        els.taskForm.addEventListener("submit", async (event) => {
           event.preventDefault();
+          if (taskCreateInFlight) return;
           if (!isCoordinator()) els.taskOwner.value = state.activeUserId;
           if (!els.taskOwner.value) {
             setMessage(els.taskMessage, "Primero registra un responsable activo.", "err");
@@ -7047,7 +8237,7 @@
             setMessage(els.taskMessage, "El responsable ya tiene otra tarea asignada en ese horario.", "err");
             return;
           }
-          state.tasks.unshift({
+          const task = {
             id: id(),
             title: clean(els.taskTitle.value),
             ownerId: els.taskOwner.value,
@@ -7072,12 +8262,31 @@
             ],
             evidence: [],
             reminders: []
-          });
-          saveState();
+          };
+          taskCreateInFlight = true;
+          els.taskSubmitButton.disabled = true;
+          setMessage(els.taskMessage, "Guardando tarea en la nube...", "");
+          try {
+            const data = await apiRequest("/tasks/create", {
+              method: "POST",
+              body: JSON.stringify({ task })
+            });
+            applyCloudState(data.state);
+          } catch (error) {
+            const refreshed = await refreshStateFromServer({ quiet: true });
+            const saved = refreshed && state.tasks.some((item) => item.id === task.id);
+            if (!saved) {
+              setMessage(els.taskMessage, error.message || "No se pudo guardar la tarea.", "err");
+              return;
+            }
+          } finally {
+            taskCreateInFlight = false;
+            els.taskSubmitButton.disabled = false;
+          }
           els.taskForm.reset();
           els.taskDueDate.value = nearestWorkingDay(todayIso);
-          setMessage(els.taskMessage, isCoordinator() ? "Tarea asignada correctamente." : "Tu tarea se agrego a la semana.", "ok");
           render();
+          setMessage(els.taskMessage, isCoordinator() ? "Tarea asignada y confirmada en la nube." : "Tu tarea se agrego y confirmo en la semana.", "ok");
         });
 
         els.taskStatusFilter.addEventListener("change", renderTasks);
@@ -7101,6 +8310,7 @@
           els.evidenceDateTo.value = "";
           lastAutoOpenedFileId = "";
           clearEvidenceDeepLink();
+          els.evidenceHistoryPanel.open = true;
           activateView("evidenceView", { updateUrl: true });
           renderEvidence();
           window.requestAnimationFrame(() => {
@@ -7139,16 +8349,32 @@
         els.exportEvidencePackage.addEventListener("click", exportEvidencePackage);
 
         els.evidenceFiles.addEventListener("change", () => {
-          selectedEvidenceTaskId = els.evidenceTask.value || selectedEvidenceTaskId;
           els.evidenceFiles.setCustomValidity("");
+          rememberPendingEvidenceSubmission(null);
           setMessage(els.evidenceMessage, "", "");
+          const fileCount = els.evidenceFiles.files?.length || 0;
+          renderSelectedEvidenceFiles();
+          setEvidenceUploadProgress(
+            fileCount ? `${fileCount} archivo${fileCount === 1 ? "" : "s"} listo${fileCount === 1 ? "" : "s"} para subir.` : "",
+            0
+          );
         });
         els.evidenceFiles.addEventListener("invalid", () => {
           els.evidenceFiles.setCustomValidity("Debes adjuntar al menos una foto o archivo de sustento.");
           setMessage(els.evidenceMessage, "Debes adjuntar al menos una foto o archivo antes de enviar el sustento.", "err");
+          setEvidenceUploadProgress("Falta seleccionar una foto o archivo.", 0, "err");
+        });
+        els.evidenceTaskDate.addEventListener("change", () => {
+          rememberPendingEvidenceSubmission(null);
+          rememberEvidenceSelection("", els.evidenceTaskDate.value);
+          renderEvidenceTaskPicker();
+          renderEvidenceTrainingTopic();
+          setMessage(els.evidenceMessage, "", "");
+          setEvidenceUploadProgress("", 0);
         });
         els.evidenceTask.addEventListener("change", () => {
-          selectedEvidenceTaskId = els.evidenceTask.value;
+          rememberPendingEvidenceSubmission(null);
+          rememberEvidenceSelection(els.evidenceTask.value, els.evidenceTaskDate.value);
           renderEvidenceTrainingTopic();
           setMessage(els.evidenceMessage, "", "");
         });
@@ -7158,14 +8384,16 @@
 
         els.evidenceForm.addEventListener("submit", async (event) => {
           event.preventDefault();
-          if (els.evidenceSubmitButton.disabled) return;
+          if (els.evidenceSubmitButton.disabled || evidenceSubmitInFlight) return;
           const task = state.tasks.find((item) => item.id === els.evidenceTask.value);
           if (!task) {
             setMessage(els.evidenceMessage, "No hay tarea seleccionada.", "err");
+            setEvidenceUploadProgress("Selecciona una tarea antes de enviar.", 0, "err");
             return;
           }
           if (!taskAllowsEvidenceToday(task)) {
             setMessage(els.evidenceMessage, taskEvidenceDeadlineText(task), "err");
+            setEvidenceUploadProgress("El plazo de esta tarea no permite la carga.", 0, "err");
             renderEvidenceTrainingTopic();
             return;
           }
@@ -7175,6 +8403,7 @@
             links = parseEvidenceLinks(els.evidenceLinks.value);
           } catch (error) {
             setMessage(els.evidenceMessage, error.message, "err");
+            setEvidenceUploadProgress("Revisa los enlaces ingresados.", 0, "err");
             els.evidenceLinks.focus();
             return;
           }
@@ -7183,94 +8412,131 @@
             els.evidenceTrainingTopic.setCustomValidity("Indica el tema de la capacitacion.");
             els.evidenceTrainingTopic.reportValidity();
             setMessage(els.evidenceMessage, "El tema de la capacitacion es obligatorio para esta tarea.", "err");
+            setEvidenceUploadProgress("Falta completar el tema de la capacitacion.", 0, "err");
             return;
           }
           els.evidenceTrainingTopic.setCustomValidity("");
           const selectedFiles = Array.from(els.evidenceFiles.files || []);
-          if (!selectedFiles.length) {
+          const pendingForTask = pendingEvidenceSubmission?.taskId === task.id ? pendingEvidenceSubmission : null;
+          if (!selectedFiles.length && !pendingForTask) {
             els.evidenceFiles.setCustomValidity("Debes adjuntar al menos una foto o archivo de sustento.");
             els.evidenceFiles.reportValidity();
             setMessage(els.evidenceMessage, "Debes adjuntar al menos una foto o archivo antes de enviar el sustento.", "err");
+            setEvidenceUploadProgress("Falta seleccionar una foto o archivo.", 0, "err");
             return;
           }
           els.evidenceFiles.setCustomValidity("");
+          evidenceSubmitInFlight = true;
           els.evidenceSubmitButton.disabled = true;
-          els.evidenceSubmitButton.textContent = "Enviando...";
+          els.evidenceSubmitButton.textContent = pendingForTask ? "Confirmando sustento..." : "Preparando archivos...";
+          setEvidenceUploadProgress(pendingForTask ? "Reintentando la confirmacion en la nube..." : "Preparando archivos para la nube...", pendingForTask ? 95 : 2);
           if (selectedFiles.length > MAX_EVIDENCE_FILES) {
             setMessage(els.evidenceMessage, `Puedes adjuntar un maximo de ${MAX_EVIDENCE_FILES} archivos por sustento.`, "err");
+            setEvidenceUploadProgress(`Seleccionaste mas de ${MAX_EVIDENCE_FILES} archivos.`, 0, "err");
             els.evidenceSubmitButton.disabled = false;
             els.evidenceSubmitButton.textContent = "Enviar sustento";
+            evidenceSubmitInFlight = false;
             return;
           }
-          setMessage(els.evidenceMessage, "Validando archivos...", "");
-          let preparedFiles = [];
-          try {
-            preparedFiles = await Promise.all(selectedFiles.map(prepareEvidenceFile));
-          } catch (error) {
-            setMessage(els.evidenceMessage, error.message, "err");
-            els.evidenceSubmitButton.disabled = false;
-            els.evidenceSubmitButton.textContent = "Enviar sustento";
-            return;
-          }
-          const uploadedFiles = [];
-          try {
-            for (let index = 0; index < preparedFiles.length; index += 1) {
-              const prepared = preparedFiles[index];
-              setMessage(els.evidenceMessage, `Subiendo archivo ${index + 1} de ${preparedFiles.length}...`, "");
-              const upload = await uploadPreparedEvidenceFile(task.id, prepared, (chunk, total) => {
-                setMessage(
-                  els.evidenceMessage,
-                  `Subiendo archivo ${index + 1} de ${preparedFiles.length} | bloque ${chunk} de ${total}...`,
-                  ""
+          let uploadedFiles = pendingForTask?.evidence?.files || [];
+          let evidence = pendingForTask?.evidence || null;
+          if (!pendingForTask) {
+            setMessage(els.evidenceMessage, "Validando archivos...", "");
+            setEvidenceUploadProgress("Validando archivos...", 5);
+            uploadedFiles = [];
+            try {
+              for (let index = 0; index < selectedFiles.length; index += 1) {
+                const prepared = await prepareEvidenceFile(selectedFiles[index]);
+                setMessage(els.evidenceMessage, `Subiendo archivo ${index + 1} de ${selectedFiles.length}...`, "");
+                els.evidenceSubmitButton.textContent = `Subiendo ${index + 1} de ${selectedFiles.length}...`;
+                setEvidenceUploadProgress(
+                  `Archivo ${index + 1} de ${selectedFiles.length}: iniciando carga segura...`,
+                  10 + Math.round((index / selectedFiles.length) * 80)
                 );
-              });
-              uploadedFiles.push({
-                id: upload.file.id,
-                name: upload.file.name,
-                mimeType: upload.file.mimeType
-              });
+                const upload = await uploadPreparedEvidenceFile(task.id, prepared, (chunk, total) => {
+                  const percent = 10 + Math.round(((index + chunk / total) / selectedFiles.length) * 80);
+                  setMessage(
+                    els.evidenceMessage,
+                    `Subiendo archivo ${index + 1} de ${selectedFiles.length} | bloque ${chunk} de ${total}...`,
+                    ""
+                  );
+                  setEvidenceUploadProgress(
+                    `Archivo ${index + 1} de ${selectedFiles.length} | bloque ${chunk} de ${total} | ${percent}%`,
+                    percent
+                  );
+                });
+                uploadedFiles.push({
+                  id: upload.file.id,
+                  name: upload.file.name,
+                  mimeType: upload.file.mimeType
+                });
+              }
+            } catch (error) {
+              setMessage(els.evidenceMessage, `No se pudieron subir todos los archivos: ${error.message}`, "err");
+              setEvidenceUploadProgress(
+                `Carga interrumpida: ${error.message}. La tarea continuara marcada para volver a intentar.`,
+                0,
+                "err"
+              );
+              els.evidenceSubmitButton.disabled = false;
+              els.evidenceSubmitButton.textContent = "Reintentar carga";
+              evidenceSubmitInFlight = false;
+              return;
             }
-          } catch (error) {
-            setMessage(els.evidenceMessage, `No se pudieron subir todos los archivos: ${error.message}`, "err");
-            els.evidenceSubmitButton.disabled = false;
-            els.evidenceSubmitButton.textContent = "Enviar sustento";
-            return;
+            evidence = {
+              id: id(),
+              submittedById: state.activeUserId,
+              submittedAt: Date.now(),
+              store:
+                clean(els.evidenceStore.value) ||
+                (["PDP", "PDV"].includes(clean(task.category).toUpperCase()) ? "No especificada" : "No aplica"),
+              product: clean(els.evidenceProduct.value),
+              trainingTopic,
+              result: "Realizado",
+              notes,
+              links,
+              files: uploadedFiles,
+              review: "Pendiente"
+            };
+            evidence.cloudPath = cloudFolderForEvidence(evidence, task);
+            rememberPendingEvidenceSubmission({ taskId: task.id, fileSignature: evidenceFileSignature(selectedFiles), evidence });
           }
-          const evidence = {
-            id: id(),
-            submittedById: state.activeUserId,
-            submittedAt: Date.now(),
-            store:
-              clean(els.evidenceStore.value) ||
-              (["PDP", "PDV"].includes(clean(task.category).toUpperCase()) ? "No especificada" : "No aplica"),
-            product: clean(els.evidenceProduct.value),
-            trainingTopic,
-            result: "Realizado",
-            notes,
-            links,
-            files: uploadedFiles,
-            review: "Pendiente"
-          };
-          evidence.cloudPath = cloudFolderForEvidence(evidence, task);
+          els.evidenceSubmitButton.textContent = "Confirmando sustento...";
+          setEvidenceUploadProgress("Archivos cargados. Confirmando el sustento en la nube...", 95);
+          let recoveredAfterSyncError = false;
           try {
-            const data = await apiRequest("/tasks/evidence", {
+            const data = await apiRequestWithRetry("/tasks/evidence", {
               method: "POST",
               body: JSON.stringify({ taskId: task.id, evidence })
             });
             applyCloudState(data.state);
           } catch (error) {
-            setMessage(els.evidenceMessage, `El archivo se guardo, pero falta sincronizar el formulario: ${error.message}`, "err");
-            els.evidenceSubmitButton.disabled = false;
-            els.evidenceSubmitButton.textContent = "Reintentar envio";
-            return;
+            const refreshed = await refreshStateFromServer({ quiet: true });
+            const savedTask = state.tasks.find((item) => item.id === task.id);
+            const savedEvidence = savedTask?.evidence?.some((item) => item.id === evidence.id);
+            if (!refreshed || !savedEvidence) {
+              setMessage(els.evidenceMessage, `El archivo se guardo, pero falta sincronizar el formulario: ${error.message}`, "err");
+              setEvidenceUploadProgress("Los archivos llegaron, pero falta confirmar el formulario. Pulsa Reintentar envio.", 95, "err");
+              els.evidenceSubmitButton.disabled = false;
+              els.evidenceSubmitButton.textContent = "Reintentar envio";
+              evidenceSubmitInFlight = false;
+              return;
+            }
+            recoveredAfterSyncError = true;
           }
-          selectedEvidenceTaskId = "";
+          rememberPendingEvidenceSubmission(null);
           els.evidenceForm.reset();
           els.evidenceResult.value = "Realizado";
+          renderSelectedEvidenceFiles();
+          clearEvidenceSelection();
+          renderEvidenceTaskPicker();
           renderEvidenceTrainingTopic();
           els.evidenceSubmitButton.disabled = false;
           els.evidenceSubmitButton.textContent = "Enviar sustento";
-          const successMessage = `Sustento guardado con ${uploadedFiles.length} archivo${uploadedFiles.length === 1 ? "" : "s"}. Pablo debe aprobarlo para completar la tarea.`;
+          evidenceSubmitInFlight = false;
+          const successMessage = `${recoveredAfterSyncError ? "Sustento confirmado en la nube" : "Sustento guardado"} con ${uploadedFiles.length} archivo${uploadedFiles.length === 1 ? "" : "s"}. Pablo debe aprobarlo para completar la tarea.`;
+          setEvidenceUploadProgress("Sustento guardado correctamente en la nube.", 100, "ok");
+          setMessage(els.evidenceMessage, "", "");
           activateView("tasksView", { updateUrl: true, historyMode: "replace" });
           render();
           showToast(successMessage, "success");
@@ -7298,6 +8564,36 @@
             await refreshStateFromServer();
           } catch (error) {
             setMessage(els.trainerMessage, error.message, "err");
+          }
+        });
+
+        els.lgUpdateFilter.addEventListener("change", renderLgUpdates);
+        els.cancelLgUpdateEdit.addEventListener("click", resetLgUpdateEditor);
+        els.lgUpdateForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          els.saveLgUpdate.disabled = true;
+          setMessage(els.lgUpdateMessage, infoEditingId ? "Guardando cambios..." : "Publicando informacion...", "");
+          try {
+            const data = await apiRequest("/info/updates", {
+              method: "POST",
+              body: JSON.stringify({
+                action: "upsert",
+                id: infoEditingId,
+                line: els.lgUpdateLine.value,
+                type: els.lgUpdateType.value,
+                title: els.lgUpdateTitle.value,
+                product: els.lgUpdateProduct.value,
+                description: els.lgUpdateDescription.value
+              })
+            });
+            applyCloudState(data.state);
+            resetLgUpdateEditor();
+            renderProducts();
+            showToast("Info LG actualizada para todo el equipo.", "success");
+          } catch (error) {
+            setMessage(els.lgUpdateMessage, error.message || "No se pudo guardar Info LG.", "err");
+          } finally {
+            els.saveLgUpdate.disabled = false;
           }
         });
 
@@ -7347,17 +8643,37 @@
       }
 
       els.announcementTargetWrap.classList.add("hidden");
+      if (selectedEvidenceDate) els.evidenceTaskDate.value = selectedEvidenceDate;
       els.taskDueDate.value = nearestWorkingDay(todayIso);
       els.taskStartTime.value = WORKDAY_START;
       els.taskEndTime.value = "09:30";
       async function bootstrap() {
         addEventListeners();
         render();
+        if ("serviceWorker" in navigator) {
+          const reloadKey = `lgtask-controller-${APP_VERSION}`;
+          navigator.serviceWorker.addEventListener("controllerchange", () => {
+            if (sessionStorage.getItem(reloadKey)) return;
+            sessionStorage.setItem(reloadKey, "1");
+            if (activeViewId === "evidenceView" && evidenceDraftActive()) {
+              showToast("Actualizacion lista. Tu seleccion y el sustento en preparacion se mantendran sin recargar la pantalla.", "success");
+              return;
+            }
+            window.location.reload();
+          });
+        }
         await registerServiceWorker();
         await refreshStateFromServer();
         await syncNotificationSubscription().catch(() => {});
         window.setInterval(() => {
-          if (state.activeUserId && !document.hidden && !syncInFlight && !evidenceDraftInProgress()) {
+          if (
+            state.activeUserId &&
+            !document.hidden &&
+            !syncInFlight &&
+            !evidenceSubmitInFlight &&
+            !taskCreateInFlight &&
+            !(activeViewId === "evidenceView" && evidenceDraftActive())
+          ) {
             refreshStateFromServer().catch(() => {});
           }
         }, 5000);

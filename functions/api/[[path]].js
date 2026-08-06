@@ -11,7 +11,7 @@ let microsoftTokenCache = { token: "", expiresAt: 0 };
 let schemaReady = false;
 
 const EMPTY_DATA = {
-  version: 14,
+  version: 23,
   workSettings: {
     breakStart: "12:30",
     breakEnd: "14:00"
@@ -26,7 +26,10 @@ const EMPTY_DATA = {
   deletedTasks: [],
   announcements: [],
   supportRequests: [],
-  dailyMotivations: []
+  dailyMotivations: [],
+  lgUpdates: [],
+  lateEvidenceUploadsEnabled: false,
+  lateEvidencePolicyHistory: []
 };
 
 const WORKDAY_START = "08:30";
@@ -44,6 +47,8 @@ const ALLOWED_FILE_EXTENSIONS = new Set([
   "jpeg",
   "png",
   "webp",
+  "heic",
+  "heif",
   "mp4",
   "mov",
   "webm",
@@ -62,6 +67,8 @@ const ALLOWED_FILE_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
+  "image/heic",
+  "image/heif",
   "video/mp4",
   "video/quicktime",
   "video/webm",
@@ -100,7 +107,7 @@ export async function onRequest(context) {
       return json({ ok: false, message: "Solicitud no permitida." }, 403);
     }
 
-    if (route === "health" && request.method === "GET") return json({ ok: true, version: 14 });
+    if (route === "health" && request.method === "GET") return json({ ok: true, version: 23 });
     if (route === "auth/register" && request.method === "POST") return register(request, env.DB);
     if (route === "auth/login" && request.method === "POST") return login(request, env.DB);
     if (route === "auth/logout" && request.method === "POST") return logout(request, env.DB);
@@ -126,6 +133,7 @@ export async function onRequest(context) {
     const evidenceFileMatch = route.match(/^evidence\/([^/]+)\/(?:file|photo)$/);
     if (evidenceFileMatch && request.method === "GET") return evidenceFile(env.DB, session.user, evidenceFileMatch[1], env);
     if (route === "tasks/evidence" && request.method === "POST") return submitTaskEvidence(request, env.DB, session.user, context);
+    if (route === "tasks/create" && request.method === "POST") return createTask(request, env.DB, session.user, context);
     if (route === "tasks/evidence-authorize" && request.method === "POST") return authorizeLateTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/review" && request.method === "POST") return reviewTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/delete" && request.method === "POST") return deleteTaskAndArchive(request, env.DB, session.user, context, env);
@@ -134,6 +142,10 @@ export async function onRequest(context) {
     if (route === "schedule/overtime-review" && request.method === "POST") return reviewOvertimeSchedule(request, env.DB, session.user, context);
     if (route === "state" && request.method === "GET") return getState(env.DB, session.user, context);
     if (route === "state" && request.method === "PUT") return putState(request, env.DB, session.user, context);
+    if (route === "settings/late-evidence" && request.method === "POST") {
+      return setLateEvidencePolicy(request, env.DB, session.user, context);
+    }
+    if (route === "info/updates" && request.method === "POST") return saveInfoUpdate(request, env.DB, session.user);
     if (route === "admin/users" && request.method === "POST") return createUser(request, env.DB, session.user);
     if (route === "admin/reset-password" && request.method === "POST") return resetPassword(request, env.DB, session.user);
 
@@ -403,6 +415,96 @@ async function getState(db, user, context) {
   return stateResponse(db, user, data);
 }
 
+async function setLateEvidencePolicy(request, db, user, context) {
+  if (user.role !== "Coordinador") {
+    return json({ ok: false, message: "Solo Pablo puede cambiar el permiso de sustentos anteriores." }, 403);
+  }
+  const body = await readJson(request);
+  if (typeof body.enabled !== "boolean") {
+    return json({ ok: false, message: "Selecciona si la carga de sustentos anteriores debe estar encendida o apagada." }, 400);
+  }
+
+  const data = await loadData(db);
+  const enabled = body.enabled;
+  const changedAt = Date.now();
+  data.lateEvidenceUploadsEnabled = enabled;
+  data.lateEvidencePolicyHistory = Array.isArray(data.lateEvidencePolicyHistory)
+    ? data.lateEvidencePolicyHistory
+    : [];
+  data.lateEvidencePolicyHistory.unshift({
+    enabled,
+    byId: user.id,
+    byName: user.name,
+    at: changedAt
+  });
+  data.lateEvidencePolicyHistory = data.lateEvidencePolicyHistory.slice(0, 100);
+  await saveData(db, data);
+
+  const trainers = await db.prepare("SELECT id FROM users WHERE role = 'Trainer' AND status = 'Activo'").all();
+  const notifiedUsers = await queueNotifications(
+    db,
+    (trainers.results || []).map((trainer) => ({
+      userId: trainer.id,
+      title: enabled ? "Sustentos anteriores habilitados" : "Sustentos anteriores bloqueados",
+      body: enabled
+        ? "Pablo habilito temporalmente la carga de evidencias para tareas de dias anteriores."
+        : "La carga de evidencias vuelve a estar disponible solamente para las tareas del dia.",
+      url: "/?view=evidenceView",
+      sourceKey: `late-evidence-policy:${enabled ? "on" : "off"}:${changedAt}:${trainer.id}`
+    }))
+  );
+  if (notifiedUsers.length) context.waitUntil(pushNotificationsForUsers(db, notifiedUsers));
+  return stateResponse(db, user, data);
+}
+
+async function saveInfoUpdate(request, db, user) {
+  const body = await readJson(request);
+  const data = await loadData(db);
+  const action = clean(body.action) || "upsert";
+  const itemId = clean(body.id);
+
+  if (action === "delete") {
+    if (!itemId || !data.lgUpdates.some((item) => item.id === itemId)) {
+      return json({ ok: false, message: "La publicacion de Info LG ya no existe." }, 404);
+    }
+    data.lgUpdates = data.lgUpdates.filter((item) => item.id !== itemId);
+    await saveData(db, data);
+    return stateResponse(db, user, data);
+  }
+
+  const line = ["HS", "TV", "AV"].includes(body.line) ? body.line : "";
+  const type = ["Producto", "Lanzamiento", "Tecnologia", "Argumento de venta"].includes(body.type) ? body.type : "";
+  const title = clean(body.title).slice(0, 140);
+  const product = clean(body.product).slice(0, 120);
+  const description = clean(body.description).slice(0, 2000);
+  if (!line || !type || title.length < 3 || description.length < 5) {
+    return json({ ok: false, message: "Completa linea, tipo, titulo e informacion antes de publicar." }, 400);
+  }
+
+  const now = Date.now();
+  const existingIndex = itemId ? data.lgUpdates.findIndex((item) => item.id === itemId) : -1;
+  const existing = existingIndex >= 0 ? data.lgUpdates[existingIndex] : null;
+  const nextItem = {
+    id: existing?.id || crypto.randomUUID(),
+    line,
+    type,
+    title,
+    product,
+    description,
+    createdById: existing?.createdById || user.id,
+    createdByName: existing?.createdByName || user.name,
+    createdAt: existing?.createdAt || now,
+    updatedById: user.id,
+    updatedByName: user.name,
+    updatedAt: now
+  };
+  if (existingIndex >= 0) data.lgUpdates[existingIndex] = nextItem;
+  else data.lgUpdates.unshift(nextItem);
+  data.lgUpdates = normalizeLgUpdates(data.lgUpdates).slice(0, 500);
+  await saveData(db, data);
+  return stateResponse(db, user, data);
+}
+
 async function notificationConfig(db) {
   const keys = await ensureVapidKeys(db);
   return json({ ok: true, publicKey: keys.publicKey });
@@ -533,12 +635,19 @@ function lateEvidenceAuthorizationActive(task, today = dateIsoInLima(Date.now())
   return Boolean(authorization?.enabled && clean(authorization.validDate) === today);
 }
 
-function taskAllowsEvidenceUpload(task, today = dateIsoInLima(Date.now())) {
-  return Boolean(task && (clean(task.dueDate) === today || lateEvidenceAuthorizationActive(task, today)));
+function taskAllowsEvidenceUpload(task, today = dateIsoInLima(Date.now()), allowPreviousDays = false) {
+  const dueDate = clean(task?.dueDate);
+  return Boolean(
+    task &&
+      (dueDate === today ||
+        (dueDate < today && Boolean(allowPreviousDays)) ||
+        lateEvidenceAuthorizationActive(task, today))
+  );
 }
 
-function evidenceUploadWindowError(task, today = dateIsoInLima(Date.now())) {
+function evidenceUploadWindowError(task, today = dateIsoInLima(Date.now()), allowPreviousDays = false) {
   if (clean(task?.dueDate) < today) {
+    if (allowPreviousDays) return "La carga de sustentos anteriores esta habilitada por Pablo.";
     return "El plazo para subir sustentos de esta tarea ha finalizado. Las evidencias deben registrarse el mismo dia de la ejecucion.";
   }
   if (clean(task?.dueDate) > today) return "El sustento solo puede registrarse el dia programado para la tarea.";
@@ -827,7 +936,9 @@ async function uploadEvidence(request, db, user, env) {
   if (user.role !== "Coordinador" && task.ownerId !== user.id) {
     return json({ ok: false, message: "No puedes subir sustentos para esa tarea." }, 403);
   }
-  if (!taskAllowsEvidenceUpload(task)) return json({ ok: false, message: evidenceUploadWindowError(task) }, 409);
+  if (!taskAllowsEvidenceUpload(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled)) {
+    return json({ ok: false, message: evidenceUploadWindowError(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled) }, 409);
+  }
 
   const fileId = crypto.randomUUID();
   const fileName = clean(body.fileName).replace(/[\\/:*?"<>|]/g, "-").slice(0, 120) || "archivo-sustento";
@@ -879,7 +990,9 @@ async function initEvidenceUpload(request, db, user) {
   if (user.role !== "Coordinador" && task.ownerId !== user.id) {
     return json({ ok: false, message: "No puedes subir sustentos para esa tarea." }, 403);
   }
-  if (!taskAllowsEvidenceUpload(task)) return json({ ok: false, message: evidenceUploadWindowError(task) }, 409);
+  if (!taskAllowsEvidenceUpload(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled)) {
+    return json({ ok: false, message: evidenceUploadWindowError(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled) }, 409);
+  }
 
   const fileName = clean(body.fileName).replace(/[\\/:*?"<>|]/g, "-").slice(0, 120) || "archivo-sustento";
   const extension = fileName.includes(".") ? fileName.split(".").pop().toLowerCase() : "";
@@ -921,8 +1034,13 @@ async function uploadEvidenceChunk(request, db, user) {
   }
   const data = await loadData(db);
   const task = data.tasks.find((item) => clean(item.id) === clean(row.task_id));
-  if (!task || !taskAllowsEvidenceUpload(task)) {
-    return json({ ok: false, message: task ? evidenceUploadWindowError(task) : "La tarea ya no existe." }, task ? 409 : 404);
+  if (!task || !taskAllowsEvidenceUpload(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled)) {
+    return json({
+      ok: false,
+      message: task
+        ? evidenceUploadWindowError(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled)
+        : "La tarea ya no existe."
+    }, task ? 409 : 404);
   }
   if (
     !Number.isInteger(chunkIndex) ||
@@ -952,8 +1070,13 @@ async function completeEvidenceUpload(request, db, user, env) {
   }
   const data = await loadData(db);
   const task = data.tasks.find((item) => clean(item.id) === clean(row.task_id));
-  if (!task || !taskAllowsEvidenceUpload(task)) {
-    return json({ ok: false, message: task ? evidenceUploadWindowError(task) : "La tarea ya no existe." }, task ? 409 : 404);
+  if (!task || !taskAllowsEvidenceUpload(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled)) {
+    return json({
+      ok: false,
+      message: task
+        ? evidenceUploadWindowError(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled)
+        : "La tarea ya no existe."
+    }, task ? 409 : 404);
   }
   const summary = await db
     .prepare("SELECT COUNT(*) AS chunks, COALESCE(SUM(LENGTH(chunk_base64)), 0) AS total FROM evidence_file_chunks WHERE file_id = ?")
@@ -1038,6 +1161,89 @@ async function evidenceFile(db, user, fileId, env) {
   });
 }
 
+async function createTask(request, db, user, context) {
+  const body = await readJson(request);
+  const submitted = body.task || {};
+  const taskId = clean(submitted.id) || crypto.randomUUID();
+  const title = clean(submitted.title).slice(0, 140);
+  const ownerId = user.role === "Coordinador" ? clean(submitted.ownerId) : user.id;
+  const dueDate = clean(submitted.dueDate);
+  const startTime = clean(submitted.startTime);
+  const endTime = clean(submitted.endTime);
+  if (!title || title.length < 2) return json({ ok: false, message: "Escribe el nombre de la tarea." }, 400);
+
+  const owner = await db
+    .prepare("SELECT id, name, role, status FROM users WHERE id = ? AND status = 'Activo'")
+    .bind(ownerId)
+    .first();
+  if (!owner) return json({ ok: false, message: "El responsable ya no esta activo." }, 400);
+  if (user.role !== "Coordinador" && clean(owner.id) !== user.id) {
+    return json({ ok: false, message: "Solo puedes crear tareas para tu propio usuario." }, 403);
+  }
+
+  const data = await loadData(db);
+  const existing = data.tasks.find((task) => clean(task.id) === taskId);
+  if (existing) {
+    if (clean(existing.createdById) !== user.id || clean(existing.ownerId) !== ownerId) {
+      return json({ ok: false, message: "El identificador de la tarea ya esta en uso." }, 409);
+    }
+    return stateResponse(db, user, data);
+  }
+  if (
+    !validWorkSchedule(
+      dueDate,
+      startTime,
+      endTime,
+      breakSettingsForUser(data, ownerId, dueDate),
+      owner.name,
+      workScheduleEndForUser(data, ownerId, dueDate, owner.name)
+    )
+  ) {
+    const scheduleEnd = workScheduleEndForUser(data, ownerId, dueDate, owner.name);
+    const schedule = breakSettingsForUser(data, ownerId, dueDate);
+    return json({
+      ok: false,
+      message: `El horario no esta disponible. Jornada hasta ${scheduleEnd}${new Date(`${dueDate}T12:00:00Z`).getUTCDay() === 6 ? " sin break" : ` y break ${schedule.breakStart}-${schedule.breakEnd}`}.`
+    }, 409);
+  }
+  if (hasTaskConflict(data.tasks, ownerId, dueDate, startTime, endTime)) {
+    return json({ ok: false, message: "Ese horario ya esta ocupado por otra tarea." }, 409);
+  }
+
+  const createdAt = Date.now();
+  const task = {
+    id: taskId,
+    title,
+    ownerId,
+    createdById: user.id,
+    category: normalizeTaskCategory(submitted.category),
+    priority: ["Alta", "Media", "Baja"].includes(submitted.priority) ? submitted.priority : "Media",
+    dueDate,
+    startTime,
+    endTime,
+    product: clean(submitted.product).slice(0, 120) || "GENERAL",
+    description: clean(submitted.description).slice(0, 1500),
+    status: "Pendiente",
+    createdAt,
+    history: [{ type: "Asignacion", toId: ownerId, byId: user.id, reason: "Tarea creada", at: createdAt }],
+    evidence: [],
+    reminders: []
+  };
+  data.tasks.unshift(task);
+  await saveData(db, data);
+  if (ownerId !== user.id) {
+    const notifiedUsers = await queueNotifications(db, [{
+      userId: ownerId,
+      title: "Nueva tarea asignada",
+      body: `${title} | ${dueDate} ${startTime}-${endTime}`,
+      url: `/?view=tasksView&task=${encodeURIComponent(taskId)}`,
+      sourceKey: `task:create:${taskId}:${ownerId}`
+    }]);
+    if (notifiedUsers.length) context.waitUntil(pushNotificationsForUsers(db, notifiedUsers));
+  }
+  return stateResponse(db, user, data);
+}
+
 async function submitTaskEvidence(request, db, user, context) {
   const body = await readJson(request, 1_000_000);
   const taskId = clean(body.taskId);
@@ -1051,7 +1257,9 @@ async function submitTaskEvidence(request, db, user, context) {
   if (task.status === "Cumplida") {
     return json({ ok: false, message: "La tarea ya fue aprobada y completada." }, 409);
   }
-  if (!taskAllowsEvidenceUpload(task)) return json({ ok: false, message: evidenceUploadWindowError(task) }, 409);
+  if (!taskAllowsEvidenceUpload(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled)) {
+    return json({ ok: false, message: evidenceUploadWindowError(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled) }, 409);
+  }
 
   const result = "Realizado";
   const notes = clean(submittedEvidence.notes).slice(0, 3000);
@@ -1108,9 +1316,23 @@ async function submitTaskEvidence(request, db, user, context) {
     return stateResponse(db, user, data);
   }
   const submittedAt = Date.now();
-  const lateAuthorization = clean(task.dueDate) !== dateIsoInLima(submittedAt) && lateEvidenceAuthorizationActive(task)
-    ? { ...task.lateEvidenceAuthorization }
+  const submittedDate = dateIsoInLima(submittedAt);
+  const isLateSubmission = clean(task.dueDate) < submittedDate;
+  const individualLateAuthorization = isLateSubmission && lateEvidenceAuthorizationActive(task)
+    ? { ...task.lateEvidenceAuthorization, scope: "individual" }
     : null;
+  const latestGlobalPolicy = Array.isArray(data.lateEvidencePolicyHistory)
+    ? data.lateEvidencePolicyHistory.find((entry) => entry?.enabled)
+    : null;
+  const lateAuthorization = individualLateAuthorization || (isLateSubmission && data.lateEvidenceUploadsEnabled
+    ? {
+        enabled: true,
+        scope: "global",
+        reason: "Carga de sustentos anteriores habilitada por Pablo",
+        authorizedById: clean(latestGlobalPolicy?.byId),
+        authorizedAt: Number(latestGlobalPolicy?.at || submittedAt)
+      }
+    : null);
   const evidence = {
     id: evidenceId,
     submittedById: user.id,
@@ -1131,13 +1353,15 @@ async function submitTaskEvidence(request, db, user, context) {
   task.status = "En revision";
   task.blockedReason = "";
   task.blockedAt = 0;
-  if (lateAuthorization) {
+  if (individualLateAuthorization) {
     task.lateEvidenceAuthorization = {
       ...task.lateEvidenceAuthorization,
       enabled: false,
       usedAt: submittedAt,
       usedEvidenceId: evidenceId
     };
+  }
+  if (lateAuthorization) {
     task.history.push({
       type: "SustentoTardio",
       byId: user.id,
@@ -2316,6 +2540,27 @@ function normalizedUserName(value) {
     .toUpperCase();
 }
 
+function normalizeLgUpdates(items) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter((item) => clean(item?.id) && clean(item?.title) && clean(item?.description))
+    .map((item) => ({
+      id: clean(item.id),
+      line: ["HS", "TV", "AV"].includes(item.line) ? item.line : "HS",
+      type: ["Producto", "Lanzamiento", "Tecnologia", "Argumento de venta"].includes(item.type) ? item.type : "Producto",
+      title: clean(item.title).slice(0, 140),
+      product: clean(item.product).slice(0, 120),
+      description: clean(item.description).slice(0, 2000),
+      createdById: clean(item.createdById),
+      createdByName: clean(item.createdByName),
+      createdAt: Number(item.createdAt || 0),
+      updatedById: clean(item.updatedById),
+      updatedByName: clean(item.updatedByName),
+      updatedAt: Number(item.updatedAt || item.createdAt || 0)
+    }))
+    .slice(0, 500);
+}
+
 function baseWorkdayEnd(dateValue, userName = "") {
   const day = new Date(`${dateValue}T12:00:00Z`).getUTCDay();
   const dannySaturday = day === 6 && normalizedUserName(userName) === "DANNY DIOS";
@@ -2375,14 +2620,19 @@ async function loadData(db) {
     return {
       ...structuredClone(EMPTY_DATA),
       ...parsed,
-      version: 14,
+      version: 23,
       workSettings: normalizeWorkSettings(parsed.workSettings),
       breakSettingsByUser: normalizeBreakSettingsByUser(parsed.breakSettingsByUser),
       breakSettingsByUserDate: normalizeBreakSettingsByUserDate(parsed.breakSettingsByUserDate),
       workScheduleByUserDate: normalizeWorkScheduleByUserDate(parsed.workScheduleByUserDate),
       overtimeRequests: normalizeOvertimeRequests(parsed.overtimeRequests),
       tasks: (parsed.tasks || []).map((task) => ({ ...task, category: normalizeTaskCategory(task.category) })),
-      deletedTasks: (parsed.deletedTasks || []).map((task) => ({ ...task, category: normalizeTaskCategory(task.category) }))
+      deletedTasks: (parsed.deletedTasks || []).map((task) => ({ ...task, category: normalizeTaskCategory(task.category) })),
+      lgUpdates: normalizeLgUpdates(parsed.lgUpdates),
+      lateEvidenceUploadsEnabled: Boolean(parsed.lateEvidenceUploadsEnabled),
+      lateEvidencePolicyHistory: Array.isArray(parsed.lateEvidencePolicyHistory)
+        ? parsed.lateEvidencePolicyHistory.slice(0, 100)
+        : []
     };
   } catch {
     return structuredClone(EMPTY_DATA);
@@ -2391,7 +2641,7 @@ async function loadData(db) {
 
 async function saveData(db, data) {
   const payload = {
-    version: 14,
+    version: 23,
     workSettings: normalizeWorkSettings(data.workSettings),
     breakSettingsByUser: normalizeBreakSettingsByUser(data.breakSettingsByUser),
     breakSettingsByUserDate: normalizeBreakSettingsByUserDate(data.breakSettingsByUserDate),
@@ -2403,7 +2653,12 @@ async function saveData(db, data) {
     deletedTasks: data.deletedTasks || [],
     announcements: data.announcements || [],
     supportRequests: data.supportRequests || [],
-    dailyMotivations: data.dailyMotivations || []
+    dailyMotivations: data.dailyMotivations || [],
+    lgUpdates: normalizeLgUpdates(data.lgUpdates),
+    lateEvidenceUploadsEnabled: Boolean(data.lateEvidenceUploadsEnabled),
+    lateEvidencePolicyHistory: Array.isArray(data.lateEvidencePolicyHistory)
+      ? data.lateEvidencePolicyHistory.slice(0, 100)
+      : []
   };
   await db.prepare("UPDATE app_data SET data = ?, updated_at = ? WHERE id = 1").bind(JSON.stringify(payload), Date.now()).run();
 }
