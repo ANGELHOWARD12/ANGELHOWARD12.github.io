@@ -2,8 +2,13 @@ const SESSION_COOKIE = "lg_session";
 const SESSION_DAYS = 14;
 const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb9775180ea780b71";
 const MICROSOFT_STORAGE_PROVIDER = "onedrive";
+const R2_STORAGE_PROVIDER = "r2";
+const MAINTENANCE_INTERVAL_MS = 12 * 60 * 60 * 1000;
+const ABANDONED_UPLOAD_TTL_MS = 24 * 60 * 60 * 1000;
+const DELIVERED_NOTIFICATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
 let microsoftTokenCache = { token: "", expiresAt: 0 };
+let schemaReady = false;
 
 const EMPTY_DATA = {
   version: 14,
@@ -86,6 +91,7 @@ export async function onRequest(context) {
 
   try {
     await ensureSchema(env.DB);
+    scheduleMaintenance(env.DB, env, context);
     const url = new URL(request.url);
     const route = url.pathname.replace(/^\/(?:api|cloud)\/?/, "");
 
@@ -139,6 +145,7 @@ export async function onRequest(context) {
 }
 
 async function ensureSchema(db) {
+  if (schemaReady) return;
   await db.batch([
     db.prepare(`CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -227,6 +234,68 @@ async function ensureSchema(db) {
     db.prepare("CREATE INDEX IF NOT EXISTS idx_notification_subscriptions_user ON notification_subscriptions(user_id)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_user_notifications_pending ON user_notifications(user_id, delivered_at)")
   ]);
+  schemaReady = true;
+}
+
+function scheduleMaintenance(db, env, context) {
+  context.waitUntil(
+    runMaintenance(db, env).catch((error) => {
+      console.error("LGTASK maintenance", error);
+    })
+  );
+}
+
+async function runMaintenance(db, env) {
+  const now = Date.now();
+  const claim = await db
+    .prepare(
+      `INSERT INTO app_settings (key, value, updated_at) VALUES ('storage_maintenance', 'running', ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+       WHERE app_settings.updated_at < ?`
+    )
+    .bind(now, now - MAINTENANCE_INTERVAL_MS)
+    .run();
+  if (Number(claim?.meta?.changes || 0) === 0) return;
+
+  const abandonedCutoff = now - ABANDONED_UPLOAD_TTL_MS;
+  const notificationCutoff = now - DELIVERED_NOTIFICATION_TTL_MS;
+  const unreferencedFileIds = `
+    SELECT ef.id FROM evidence_files ef
+    WHERE ef.created_at < ?
+      AND NOT EXISTS (
+        SELECT 1
+        FROM app_data a,
+             json_each(a.data, '$.tasks') task,
+             json_each(task.value, '$.evidence') evidence,
+             json_each(evidence.value, '$.files') file
+        WHERE a.id = 1 AND json_extract(file.value, '$.id') = ef.id
+      )`;
+
+  const abandonedStoredItems = await db
+    .prepare(
+      `SELECT storage.provider, storage.drive_id, storage.drive_item_id
+       FROM evidence_storage storage
+       INNER JOIN evidence_files files ON files.id = storage.file_id
+       WHERE files.id IN (${unreferencedFileIds})`
+    )
+    .bind(abandonedCutoff)
+    .all();
+  if (abandonedStoredItems.results?.length) {
+    await deleteExternalEvidenceItems(env, abandonedStoredItems.results);
+  }
+
+  await db.batch([
+    db.prepare(`DELETE FROM evidence_file_chunks WHERE file_id IN (${unreferencedFileIds})`).bind(abandonedCutoff),
+    db.prepare(`DELETE FROM evidence_storage WHERE file_id IN (${unreferencedFileIds})`).bind(abandonedCutoff),
+    db.prepare(`DELETE FROM evidence_files WHERE id IN (${unreferencedFileIds})`).bind(abandonedCutoff),
+    db.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(now),
+    db.prepare("DELETE FROM user_notifications WHERE delivered_at > 0 AND created_at < ?").bind(notificationCutoff)
+  ]);
+
+  await db
+    .prepare("UPDATE app_settings SET value = 'complete', updated_at = ? WHERE key = 'storage_maintenance'")
+    .bind(Date.now())
+    .run();
 }
 
 async function register(request, db) {
@@ -607,6 +676,80 @@ async function sha256Bytes(bytes) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+function r2StorageEnabled(env) {
+  return Boolean(env.EVIDENCE_BUCKET);
+}
+
+function externalStorageProvider(env) {
+  if (r2StorageEnabled(env)) return R2_STORAGE_PROVIDER;
+  if (microsoftStorageEnabled(env)) return MICROSOFT_STORAGE_PROVIDER;
+  return "";
+}
+
+async function uploadEvidenceToR2(env, db, task, file, fileBase64) {
+  if (!r2StorageEnabled(env)) throw new Error("R2 storage is not configured");
+  const owner = await db.prepare("SELECT name FROM users WHERE id = ?").bind(clean(task.ownerId)).first();
+  const trainerName = oneDriveSafeName(owner?.name, "Trainer");
+  const dueDate = oneDriveSafeName(task.dueDate, dateIsoInLima(Date.now()), 20);
+  const taskName = oneDriveSafeName(task.title, "Tarea");
+  const storedName = oneDriveSafeName(`${clean(file.id).slice(0, 8)} - ${file.fileName}`, "sustento", 120);
+  const parentPath = `LGTASK Sustentos / ${trainerName} / ${dueDate} / ${taskName}`;
+  const objectKey = `sustentos/${trainerName}/${dueDate}/${taskName}/${storedName}`;
+  const bytes = decodeEvidenceBase64(fileBase64);
+
+  await env.EVIDENCE_BUCKET.put(objectKey, bytes, {
+    httpMetadata: { contentType: file.mimeType },
+    customMetadata: { fileId: clean(file.id), taskId: clean(task.id), ownerId: clean(task.ownerId) }
+  });
+  try {
+    await db
+      .prepare(
+        `INSERT OR REPLACE INTO evidence_storage
+         (file_id, provider, drive_id, drive_item_id, parent_path, size_bytes, sha256, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        file.id,
+        R2_STORAGE_PROVIDER,
+        "EVIDENCE_BUCKET",
+        objectKey,
+        parentPath,
+        bytes.byteLength,
+        await sha256Bytes(bytes),
+        Date.now()
+      )
+      .run();
+  } catch (error) {
+    await env.EVIDENCE_BUCKET.delete(objectKey);
+    throw error;
+  }
+  return objectKey;
+}
+
+async function r2FileResponse(env, storage, row) {
+  if (!r2StorageEnabled(env)) {
+    return json({ ok: false, message: "El almacenamiento R2 no esta configurado." }, 503);
+  }
+  const object = await env.EVIDENCE_BUCKET.get(clean(storage.drive_item_id));
+  if (!object) return json({ ok: false, message: "Archivo no encontrado en R2." }, 404);
+  const safeName = String(row.file_name || "sustento.jpg").replace(/["\r\n]/g, "-");
+  const disposition =
+    String(row.mime_type).startsWith("image/") ||
+    String(row.mime_type).startsWith("video/") ||
+    row.mime_type === "application/pdf"
+      ? "inline"
+      : "attachment";
+  const headers = new Headers({
+    "Content-Type": row.mime_type,
+    "Content-Disposition": `${disposition}; filename="${safeName}"`,
+    "Cache-Control": "private, max-age=300",
+    "Content-Length": String(object.size),
+    "X-Content-Type-Options": "nosniff"
+  });
+  if (object.httpEtag) headers.set("ETag", object.httpEtag);
+  return new Response(object.body, { status: 200, headers });
+}
+
 async function uploadEvidenceToOneDrive(env, db, task, file, fileBase64) {
   const owner = await db.prepare("SELECT name FROM users WHERE id = ?").bind(clean(task.ownerId)).first();
   const trainerName = oneDriveSafeName(owner?.name, "Trainer");
@@ -699,26 +842,25 @@ async function uploadEvidence(request, db, user, env) {
   }
 
   const createdAt = Date.now();
-  const useMicrosoft = microsoftStorageEnabled(env);
+  const storageProvider = externalStorageProvider(env);
   await db
     .prepare(
       "INSERT INTO evidence_files (id, task_id, owner_id, submitted_by_id, file_name, mime_type, photo_base64, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     )
-    .bind(fileId, task.id, task.ownerId, user.id, fileName, mimeType, useMicrosoft ? "" : fileMatch[2], createdAt)
+    .bind(fileId, task.id, task.ownerId, user.id, fileName, mimeType, storageProvider ? "" : fileMatch[2], createdAt)
     .run();
-  if (useMicrosoft) {
+  if (storageProvider) {
     try {
-      await uploadEvidenceToOneDrive(
-        env,
-        db,
-        task,
-        { id: fileId, fileName, mimeType },
-        fileMatch[2]
-      );
+      const file = { id: fileId, fileName, mimeType };
+      if (storageProvider === R2_STORAGE_PROVIDER) {
+        await uploadEvidenceToR2(env, db, task, file, fileMatch[2]);
+      } else {
+        await uploadEvidenceToOneDrive(env, db, task, file, fileMatch[2]);
+      }
     } catch (error) {
       await db.prepare("DELETE FROM evidence_files WHERE id = ?").bind(fileId).run();
-      console.error("OneDrive evidence upload", error);
-      return json({ ok: false, message: "No se pudo guardar el archivo en OneDrive. Intenta nuevamente." }, 503);
+      console.error("External evidence upload", error);
+      return json({ ok: false, message: "No se pudo guardar el archivo en la nube. Intenta nuevamente." }, 503);
     }
   }
 
@@ -825,24 +967,24 @@ async function completeEvidenceUpload(request, db, user, env) {
   ) {
     return json({ ok: false, message: "Faltan bloques del archivo. Intenta subirlo nuevamente." }, 400);
   }
-  if (microsoftStorageEnabled(env)) {
+  const storageProvider = externalStorageProvider(env);
+  if (storageProvider) {
     const chunks = await db
       .prepare("SELECT chunk_base64 FROM evidence_file_chunks WHERE file_id = ? ORDER BY chunk_index ASC")
       .bind(fileId)
       .all();
     const fileBase64 = (chunks.results || []).map((item) => item.chunk_base64).join("");
     try {
-      await uploadEvidenceToOneDrive(
-        env,
-        db,
-        task,
-        { id: row.id, fileName: row.file_name, mimeType: row.mime_type },
-        fileBase64
-      );
+      const file = { id: row.id, fileName: row.file_name, mimeType: row.mime_type };
+      if (storageProvider === R2_STORAGE_PROVIDER) {
+        await uploadEvidenceToR2(env, db, task, file, fileBase64);
+      } else {
+        await uploadEvidenceToOneDrive(env, db, task, file, fileBase64);
+      }
       await db.prepare("DELETE FROM evidence_file_chunks WHERE file_id = ?").bind(fileId).run();
     } catch (error) {
-      console.error("OneDrive chunked evidence upload", error);
-      return json({ ok: false, message: "No se pudo guardar el archivo en OneDrive. La carga puede reintentarse." }, 503);
+      console.error("External chunked evidence upload", error);
+      return json({ ok: false, message: "No se pudo guardar el archivo en la nube. La carga puede reintentarse." }, 503);
     }
   }
   return json({
@@ -864,6 +1006,7 @@ async function evidenceFile(db, user, fileId, env) {
   if (!allowed) return json({ ok: false, message: "No tienes acceso a este archivo." }, 403);
 
   const storage = await db.prepare("SELECT * FROM evidence_storage WHERE file_id = ?").bind(row.id).first();
+  if (storage?.provider === R2_STORAGE_PROVIDER) return r2FileResponse(env, storage, row);
   if (storage?.provider === MICROSOFT_STORAGE_PROVIDER) return oneDriveFileResponse(env, storage, row);
 
   let fileBase64 = row.photo_base64 || "";
@@ -1170,15 +1313,32 @@ async function deleteOneDriveEvidenceItems(env, items) {
   }
 }
 
+async function deleteR2EvidenceItems(env, items) {
+  if (!r2StorageEnabled(env) || !items.length) return;
+  const keys = items.map((item) => clean(item.drive_item_id)).filter(Boolean);
+  if (!keys.length) return;
+  try {
+    await env.EVIDENCE_BUCKET.delete(keys);
+  } catch (error) {
+    console.error("R2 evidence deletion", error);
+  }
+}
+
+async function deleteExternalEvidenceItems(env, items) {
+  const r2Items = items.filter((item) => item.provider === R2_STORAGE_PROVIDER);
+  const oneDriveItems = items.filter((item) => item.provider === MICROSOFT_STORAGE_PROVIDER);
+  await Promise.all([deleteR2EvidenceItems(env, r2Items), deleteOneDriveEvidenceItems(env, oneDriveItems)]);
+}
+
 async function deleteTaskEvidenceFiles(db, taskId, env, context) {
   const storedItems = await db
     .prepare(
-      `SELECT storage.drive_id, storage.drive_item_id
+      `SELECT storage.provider, storage.drive_id, storage.drive_item_id
        FROM evidence_storage storage
        INNER JOIN evidence_files files ON files.id = storage.file_id
-       WHERE files.task_id = ? AND storage.provider = ?`
+       WHERE files.task_id = ?`
     )
-    .bind(taskId, MICROSOFT_STORAGE_PROVIDER)
+    .bind(taskId)
     .all();
   await db
     .prepare("DELETE FROM evidence_file_chunks WHERE file_id IN (SELECT id FROM evidence_files WHERE task_id = ?)")
@@ -1190,7 +1350,7 @@ async function deleteTaskEvidenceFiles(db, taskId, env, context) {
     .run();
   await db.prepare("DELETE FROM evidence_files WHERE task_id = ?").bind(taskId).run();
   if (storedItems.results?.length) {
-    context.waitUntil(deleteOneDriveEvidenceItems(env, storedItems.results));
+    context.waitUntil(deleteExternalEvidenceItems(env, storedItems.results));
   }
 }
 
