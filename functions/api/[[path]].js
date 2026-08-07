@@ -4,8 +4,10 @@ const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb
 const MICROSOFT_STORAGE_PROVIDER = "onedrive";
 const R2_STORAGE_PROVIDER = "r2";
 const MAINTENANCE_INTERVAL_MS = 12 * 60 * 60 * 1000;
-const ABANDONED_UPLOAD_TTL_MS = 24 * 60 * 60 * 1000;
+const ABANDONED_UPLOAD_TTL_MS = 6 * 60 * 60 * 1000;
 const DELIVERED_NOTIFICATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+const UNDELIVERED_NOTIFICATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const MAINTENANCE_SETTING_KEY = "storage_maintenance_r2_direct_v1";
 const OBSERVER_ACCESS_LEVEL = "observer";
 const OBSERVER_EMAIL = "giuliana.parra@lgtask.local";
 
@@ -44,6 +46,7 @@ const BREAK_END = "14:00";
 const MAX_FILE_BASE64 = 1_800_000;
 const MAX_FILE_TOTAL_BASE64 = 21_000_000;
 const MAX_FILE_CHUNK_BASE64 = 900_000;
+const MAX_FILE_BYTES = 15_000_000;
 const ALLOWED_FILE_EXTENSIONS = new Set([
   "jpg",
   "jpeg",
@@ -134,6 +137,10 @@ export async function onRequest(context) {
     }
     if (route === "notifications/pending" && request.method === "GET") {
       return pendingNotifications(env.DB, session.user);
+    }
+    if (route === "storage/status" && request.method === "GET") return storageStatus(env.DB, session.user, env);
+    if (route === "evidence/upload/r2" && request.method === "POST") {
+      return uploadEvidenceDirectToR2(request, env.DB, session.user, env);
     }
     if (route === "evidence/upload" && request.method === "POST") return uploadEvidence(request, env.DB, session.user, env);
     if (route === "evidence/upload/init" && request.method === "POST") return initEvidenceUpload(request, env.DB, session.user);
@@ -282,16 +289,17 @@ async function runMaintenance(db, env) {
   const now = Date.now();
   const claim = await db
     .prepare(
-      `INSERT INTO app_settings (key, value, updated_at) VALUES ('storage_maintenance', 'running', ?)
+      `INSERT INTO app_settings (key, value, updated_at) VALUES (?, 'running', ?)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
        WHERE app_settings.updated_at < ?`
     )
-    .bind(now, now - MAINTENANCE_INTERVAL_MS)
+    .bind(MAINTENANCE_SETTING_KEY, now, now - MAINTENANCE_INTERVAL_MS)
     .run();
   if (Number(claim?.meta?.changes || 0) === 0) return;
 
   const abandonedCutoff = now - ABANDONED_UPLOAD_TTL_MS;
   const notificationCutoff = now - DELIVERED_NOTIFICATION_TTL_MS;
+  const undeliveredNotificationCutoff = now - UNDELIVERED_NOTIFICATION_TTL_MS;
   const unreferencedFileIds = `
     SELECT ef.id FROM evidence_files ef
     WHERE ef.created_at < ?
@@ -318,17 +326,103 @@ async function runMaintenance(db, env) {
   }
 
   await db.batch([
+    db.prepare("DELETE FROM evidence_file_chunks WHERE file_id IN (SELECT file_id FROM evidence_storage)"),
+    db.prepare("DELETE FROM evidence_file_chunks WHERE file_id NOT IN (SELECT id FROM evidence_files)"),
     db.prepare(`DELETE FROM evidence_file_chunks WHERE file_id IN (${unreferencedFileIds})`).bind(abandonedCutoff),
     db.prepare(`DELETE FROM evidence_storage WHERE file_id IN (${unreferencedFileIds})`).bind(abandonedCutoff),
     db.prepare(`DELETE FROM evidence_files WHERE id IN (${unreferencedFileIds})`).bind(abandonedCutoff),
     db.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(now),
-    db.prepare("DELETE FROM user_notifications WHERE delivered_at > 0 AND created_at < ?").bind(notificationCutoff)
+    db.prepare("DELETE FROM user_notifications WHERE delivered_at > 0 AND created_at < ?").bind(notificationCutoff),
+    db.prepare("DELETE FROM user_notifications WHERE delivered_at = 0 AND created_at < ?").bind(undeliveredNotificationCutoff)
   ]);
 
   await db
-    .prepare("UPDATE app_settings SET value = 'complete', updated_at = ? WHERE key = 'storage_maintenance'")
-    .bind(Date.now())
+    .prepare("UPDATE app_settings SET value = 'complete', updated_at = ? WHERE key = ?")
+    .bind(Date.now(), MAINTENANCE_SETTING_KEY)
     .run();
+}
+
+async function storageStatus(db, user, env) {
+  if (user.role !== "Coordinador" && !isObserverUser(user)) {
+    return json({ ok: false, message: "Solo administracion puede consultar el almacenamiento." }, 403);
+  }
+
+  const counts = await db
+    .prepare(
+      `SELECT
+         (SELECT COUNT(*) FROM evidence_files) AS evidence_files,
+         (SELECT COUNT(*) FROM evidence_storage) AS stored_files,
+         (SELECT COUNT(*) FROM evidence_file_chunks) AS temporary_chunks,
+         (SELECT COALESCE(SUM(LENGTH(photo_base64)), 0) FROM evidence_files) AS legacy_base64_bytes,
+         (SELECT COALESCE(SUM(LENGTH(chunk_base64)), 0) FROM evidence_file_chunks) AS temporary_base64_bytes,
+         (SELECT COALESCE(LENGTH(data), 0) FROM app_data WHERE id = 1) AS app_data_bytes,
+         (SELECT COUNT(*) FROM sessions WHERE expires_at < ?) AS expired_sessions,
+         (SELECT COUNT(*) FROM user_notifications WHERE delivered_at > 0 AND created_at < ?) AS old_notifications`
+    )
+    .bind(Date.now(), Date.now() - DELIVERED_NOTIFICATION_TTL_MS)
+    .first();
+
+  let pageCount = 0;
+  let pageSize = 0;
+  let freePages = 0;
+  try {
+    pageCount = Number((await db.prepare("PRAGMA page_count").first())?.page_count || 0);
+    pageSize = Number((await db.prepare("PRAGMA page_size").first())?.page_size || 0);
+    freePages = Number((await db.prepare("PRAGMA freelist_count").first())?.freelist_count || 0);
+  } catch (error) {
+    console.error("D1 storage diagnostics", error);
+  }
+
+  let r2Objects = 0;
+  let r2Bytes = 0;
+  let r2Complete = true;
+  if (r2StorageEnabled(env)) {
+    let cursor;
+    let pages = 0;
+    do {
+      const listed = await env.EVIDENCE_BUCKET.list({ limit: 1000, cursor });
+      r2Objects += listed.objects.length;
+      r2Bytes += listed.objects.reduce((total, item) => total + Number(item.size || 0), 0);
+      cursor = listed.truncated ? listed.cursor : undefined;
+      pages += 1;
+      if (pages >= 100 && cursor) {
+        r2Complete = false;
+        break;
+      }
+    } while (cursor);
+  }
+
+  const maintenance = await db
+    .prepare("SELECT value, updated_at FROM app_settings WHERE key = ?")
+    .bind(MAINTENANCE_SETTING_KEY)
+    .first();
+  return json({
+    ok: true,
+    storage: {
+      d1: {
+        evidenceFiles: Number(counts?.evidence_files || 0),
+        storedFiles: Number(counts?.stored_files || 0),
+        temporaryChunks: Number(counts?.temporary_chunks || 0),
+        legacyBase64Bytes: Number(counts?.legacy_base64_bytes || 0),
+        temporaryBase64Bytes: Number(counts?.temporary_base64_bytes || 0),
+        appDataBytes: Number(counts?.app_data_bytes || 0),
+        databaseBytes: pageCount && pageSize ? pageCount * pageSize : 0,
+        reusableBytes: freePages && pageSize ? freePages * pageSize : 0,
+        expiredSessions: Number(counts?.expired_sessions || 0),
+        oldNotifications: Number(counts?.old_notifications || 0)
+      },
+      r2: {
+        enabled: r2StorageEnabled(env),
+        objects: r2Objects,
+        bytes: r2Bytes,
+        complete: r2Complete
+      },
+      maintenance: {
+        state: clean(maintenance?.value) || "pending",
+        updatedAt: Number(maintenance?.updated_at || 0)
+      }
+    }
+  });
 }
 
 async function register(request, db) {
@@ -819,8 +913,7 @@ function externalStorageProvider(env) {
   return "";
 }
 
-async function uploadEvidenceToR2(env, db, task, file, fileBase64) {
-  if (!r2StorageEnabled(env)) throw new Error("R2 storage is not configured");
+async function r2EvidenceDescriptor(db, task, file) {
   const owner = await db.prepare("SELECT name FROM users WHERE id = ?").bind(clean(task.ownerId)).first();
   const trainerName = oneDriveSafeName(owner?.name, "Trainer");
   const dueDate = oneDriveSafeName(task.dueDate, dateIsoInLima(Date.now()), 20);
@@ -828,6 +921,12 @@ async function uploadEvidenceToR2(env, db, task, file, fileBase64) {
   const storedName = oneDriveSafeName(`${clean(file.id).slice(0, 8)} - ${file.fileName}`, "sustento", 120);
   const parentPath = `LGTASK Sustentos / ${trainerName} / ${dueDate} / ${taskName}`;
   const objectKey = `sustentos/${trainerName}/${dueDate}/${taskName}/${storedName}`;
+  return { objectKey, parentPath };
+}
+
+async function uploadEvidenceToR2(env, db, task, file, fileBase64) {
+  if (!r2StorageEnabled(env)) throw new Error("R2 storage is not configured");
+  const { objectKey, parentPath } = await r2EvidenceDescriptor(db, task, file);
   const bytes = decodeEvidenceBase64(fileBase64);
 
   await env.EVIDENCE_BUCKET.put(objectKey, bytes, {
@@ -857,6 +956,89 @@ async function uploadEvidenceToR2(env, db, task, file, fileBase64) {
     throw error;
   }
   return objectKey;
+}
+
+async function uploadEvidenceDirectToR2(request, db, user, env) {
+  if (!r2StorageEnabled(env)) {
+    return json({ ok: false, message: "El almacenamiento R2 no esta configurado." }, 503);
+  }
+
+  const url = new URL(request.url);
+  const taskId = clean(url.searchParams.get("taskId"));
+  const data = await loadData(db);
+  const task = data.tasks.find((item) => clean(item.id) === taskId);
+  if (!task) return json({ ok: false, message: "La tarea ya no existe." }, 404);
+  if (user.role !== "Coordinador" && clean(task.ownerId) !== clean(user.id)) {
+    return json({ ok: false, message: "No puedes subir sustentos para esa tarea." }, 403);
+  }
+  const today = dateIsoInLima(Date.now());
+  if (!taskAllowsEvidenceUpload(task, today, data.lateEvidenceUploadsEnabled)) {
+    return json({ ok: false, message: evidenceUploadWindowError(task, today, data.lateEvidenceUploadsEnabled) }, 409);
+  }
+
+  const fileName = clean(url.searchParams.get("fileName")).replace(/[\\/:*?"<>|]/g, "-").slice(0, 120) || "archivo-sustento";
+  const extension = fileName.includes(".") ? fileName.split(".").pop().toLowerCase() : "";
+  const mimeType = clean(request.headers.get("Content-Type")).split(";", 1)[0].toLowerCase() || mimeTypeForExtension(extension);
+  const declaredSize = Number(url.searchParams.get("size") || request.headers.get("Content-Length") || 0);
+  const contentLength = Number(request.headers.get("Content-Length") || 0);
+  if (
+    !request.body ||
+    !ALLOWED_FILE_EXTENSIONS.has(extension) ||
+    !ALLOWED_FILE_MIME_TYPES.has(mimeType) ||
+    !Number.isInteger(declaredSize) ||
+    declaredSize < 1 ||
+    declaredSize > MAX_FILE_BYTES ||
+    (contentLength && contentLength !== declaredSize)
+  ) {
+    return json({ ok: false, message: "El archivo no tiene un formato o tamano permitido." }, 400);
+  }
+
+  const fileId = crypto.randomUUID();
+  const createdAt = Date.now();
+  const file = { id: fileId, fileName, mimeType };
+  const { objectKey, parentPath } = await r2EvidenceDescriptor(db, task, file);
+  let storedObject;
+  try {
+    storedObject = await env.EVIDENCE_BUCKET.put(objectKey, request.body, {
+      httpMetadata: { contentType: mimeType },
+      customMetadata: { fileId, taskId: clean(task.id), ownerId: clean(task.ownerId) }
+    });
+  } catch (error) {
+    console.error("Direct R2 evidence upload", error);
+    return json({ ok: false, message: "R2 no pudo recibir el archivo. Intenta nuevamente." }, 503);
+  }
+
+  const storedSize = Number(storedObject?.size || 0);
+  if (storedSize < 1 || storedSize > MAX_FILE_BYTES || storedSize !== declaredSize) {
+    await env.EVIDENCE_BUCKET.delete(objectKey).catch(() => {});
+    return json({ ok: false, message: "La carga quedo incompleta y fue descartada. Intenta nuevamente." }, 409);
+  }
+
+  try {
+    await db.batch([
+      db
+        .prepare(
+          "INSERT INTO evidence_files (id, task_id, owner_id, submitted_by_id, file_name, mime_type, photo_base64, created_at) VALUES (?, ?, ?, ?, ?, ?, '', ?)"
+        )
+        .bind(fileId, task.id, task.ownerId, user.id, fileName, mimeType, createdAt),
+      db
+        .prepare(
+          `INSERT INTO evidence_storage
+           (file_id, provider, drive_id, drive_item_id, parent_path, size_bytes, sha256, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, '', ?)`
+        )
+        .bind(fileId, R2_STORAGE_PROVIDER, "EVIDENCE_BUCKET", objectKey, parentPath, storedSize, createdAt)
+    ]);
+  } catch (error) {
+    await env.EVIDENCE_BUCKET.delete(objectKey).catch(() => {});
+    console.error("Direct R2 evidence metadata", error);
+    return json({ ok: false, message: "El archivo llego a R2, pero no se pudo registrar. Intenta nuevamente." }, 503);
+  }
+
+  return json({
+    ok: true,
+    file: { id: fileId, name: fileName, mimeType, createdAt, url: `/cloud/evidence/${fileId}/file` }
+  }, 201);
 }
 
 async function r2FileResponse(env, storage, row) {
