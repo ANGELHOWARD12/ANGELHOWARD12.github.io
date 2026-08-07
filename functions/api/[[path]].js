@@ -7,7 +7,7 @@ const MAINTENANCE_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const ABANDONED_UPLOAD_TTL_MS = 10 * 60 * 1000;
 const DELIVERED_NOTIFICATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const UNDELIVERED_NOTIFICATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const MAINTENANCE_SETTING_KEY = "storage_maintenance_r2_direct_v5";
+const MAINTENANCE_SETTING_KEY = "storage_maintenance_r2_direct_v6";
 const OBSERVER_ACCESS_LEVEL = "observer";
 const OBSERVER_EMAIL = "giuliana.parra@lgtask.local";
 
@@ -353,7 +353,7 @@ async function runMaintenance(db, env) {
 
 async function migrateOneLegacyEvidence(db, env) {
   if (!r2StorageEnabled(env)) return { migrated: false, failed: false };
-  const candidate = await db
+  const candidates = await db
     .prepare(
       `SELECT files.*
        FROM evidence_files files
@@ -371,36 +371,44 @@ async function migrateOneLegacyEvidence(db, env) {
          )
          AND NOT EXISTS (
            SELECT 1 FROM app_settings setting WHERE setting.key = 'storage_migration_failed:' || files.id
-         )
+       )
        ORDER BY files.created_at ASC
-       LIMIT 1`
+       LIMIT 2`
     )
-    .first();
-  if (!candidate) return { migrated: false, failed: false };
+    .all();
+  if (!candidates.results?.length) return { migrated: false, failed: false };
 
-  try {
-    const data = await loadData(db);
-    const task = data.tasks.find((item) => clean(item.id) === clean(candidate.task_id));
-    if (!task) throw new Error("Referenced task not found");
-    const file = { id: candidate.id, fileName: candidate.file_name, mimeType: candidate.mime_type };
-    if (candidate.photo_base64) {
-      await uploadEvidenceToR2(env, db, task, file, candidate.photo_base64);
-    } else {
-      await uploadChunkedEvidenceToR2(env, db, task, file);
-    }
-    await db.batch([
-      db.prepare("UPDATE evidence_files SET photo_base64 = '' WHERE id = ?").bind(candidate.id),
-      db.prepare("DELETE FROM evidence_file_chunks WHERE file_id = ?").bind(candidate.id)
-    ]);
-    return { migrated: true, failed: false };
-  } catch (error) {
-    console.error("Legacy evidence migration", candidate.id, error);
-    await db
-      .prepare("INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)")
-      .bind(`storage_migration_failed:${candidate.id}`, clean(error?.message || error).slice(0, 300), Date.now())
-      .run();
-    return { migrated: false, failed: true };
-  }
+  const data = await loadData(db);
+  const results = await Promise.all(
+    candidates.results.map(async (candidate) => {
+      try {
+        const task = data.tasks.find((item) => clean(item.id) === clean(candidate.task_id));
+        if (!task) throw new Error("Referenced task not found");
+        const file = { id: candidate.id, fileName: candidate.file_name, mimeType: candidate.mime_type };
+        if (candidate.photo_base64) {
+          await uploadEvidenceToR2(env, db, task, file, candidate.photo_base64);
+        } else {
+          await uploadChunkedEvidenceToR2(env, db, task, file);
+        }
+        await db.batch([
+          db.prepare("UPDATE evidence_files SET photo_base64 = '' WHERE id = ?").bind(candidate.id),
+          db.prepare("DELETE FROM evidence_file_chunks WHERE file_id = ?").bind(candidate.id)
+        ]);
+        return { migrated: true, failed: false };
+      } catch (error) {
+        console.error("Legacy evidence migration", candidate.id, error);
+        await db
+          .prepare("INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)")
+          .bind(`storage_migration_failed:${candidate.id}`, clean(error?.message || error).slice(0, 300), Date.now())
+          .run();
+        return { migrated: false, failed: true };
+      }
+    })
+  );
+  return {
+    migrated: results.some((result) => result.migrated),
+    failed: results.some((result) => result.failed)
+  };
 }
 
 async function storageStatus(db, user, env) {
