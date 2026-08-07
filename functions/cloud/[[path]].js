@@ -7,7 +7,7 @@ const MAINTENANCE_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const ABANDONED_UPLOAD_TTL_MS = 10 * 60 * 1000;
 const DELIVERED_NOTIFICATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const UNDELIVERED_NOTIFICATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const MAINTENANCE_SETTING_KEY = "storage_maintenance_r2_direct_v2";
+const MAINTENANCE_SETTING_KEY = "storage_maintenance_r2_direct_v3";
 const OBSERVER_ACCESS_LEVEL = "observer";
 const OBSERVER_EMAIL = "giuliana.parra@lgtask.local";
 
@@ -336,10 +336,71 @@ async function runMaintenance(db, env) {
     db.prepare("DELETE FROM user_notifications WHERE delivered_at = 0 AND created_at < ?").bind(undeliveredNotificationCutoff)
   ]);
 
+  const migration = await migrateOneLegacyEvidence(db, env);
+  if (migration.migrated || migration.failed) {
+    await db
+      .prepare("UPDATE app_settings SET value = ?, updated_at = 0 WHERE key = ?")
+      .bind(migration.migrated ? "migrating" : "migration-retry", MAINTENANCE_SETTING_KEY)
+      .run();
+    return;
+  }
+
   await db
     .prepare("UPDATE app_settings SET value = 'complete', updated_at = ? WHERE key = ?")
     .bind(Date.now(), MAINTENANCE_SETTING_KEY)
     .run();
+}
+
+async function migrateOneLegacyEvidence(db, env) {
+  if (!r2StorageEnabled(env)) return { migrated: false, failed: false };
+  const candidate = await db
+    .prepare(
+      `SELECT files.*
+       FROM evidence_files files
+       WHERE NOT EXISTS (SELECT 1 FROM evidence_storage storage WHERE storage.file_id = files.id)
+         AND (LENGTH(files.photo_base64) > 0 OR EXISTS (
+           SELECT 1 FROM evidence_file_chunks chunks WHERE chunks.file_id = files.id
+         ))
+         AND EXISTS (
+           SELECT 1
+           FROM app_data data,
+                json_each(data.data, '$.tasks') task,
+                json_each(task.value, '$.evidence') evidence,
+                json_each(evidence.value, '$.files') file
+           WHERE data.id = 1 AND json_extract(file.value, '$.id') = files.id
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM app_settings setting WHERE setting.key = 'storage_migration_failed:' || files.id
+         )
+       ORDER BY files.created_at ASC
+       LIMIT 1`
+    )
+    .first();
+  if (!candidate) return { migrated: false, failed: false };
+
+  try {
+    const data = await loadData(db);
+    const task = data.tasks.find((item) => clean(item.id) === clean(candidate.task_id));
+    if (!task) throw new Error("Referenced task not found");
+    const file = { id: candidate.id, fileName: candidate.file_name, mimeType: candidate.mime_type };
+    if (candidate.photo_base64) {
+      await uploadEvidenceToR2(env, db, task, file, candidate.photo_base64);
+    } else {
+      await uploadChunkedEvidenceToR2(env, db, task, file);
+    }
+    await db.batch([
+      db.prepare("UPDATE evidence_files SET photo_base64 = '' WHERE id = ?").bind(candidate.id),
+      db.prepare("DELETE FROM evidence_file_chunks WHERE file_id = ?").bind(candidate.id)
+    ]);
+    return { migrated: true, failed: false };
+  } catch (error) {
+    console.error("Legacy evidence migration", candidate.id, error);
+    await db
+      .prepare("INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)")
+      .bind(`storage_migration_failed:${candidate.id}`, clean(error?.message || error).slice(0, 300), Date.now())
+      .run();
+    return { migrated: false, failed: true };
+  }
 }
 
 async function storageStatus(db, user, env) {
@@ -415,6 +476,9 @@ async function storageStatus(db, user, env) {
     .prepare("SELECT value, updated_at FROM app_settings WHERE key = ?")
     .bind(MAINTENANCE_SETTING_KEY)
     .first();
+  const failedMigrations = await db
+    .prepare("SELECT COUNT(*) AS count FROM app_settings WHERE key LIKE 'storage_migration_failed:%'")
+    .first();
   return json({
     ok: true,
     storage: {
@@ -446,7 +510,8 @@ async function storageStatus(db, user, env) {
       },
       maintenance: {
         state: clean(maintenance?.value) || "pending",
-        updatedAt: Number(maintenance?.updated_at || 0)
+        updatedAt: Number(maintenance?.updated_at || 0),
+        failedMigrations: Number(failedMigrations?.count || 0)
       }
     }
   });
@@ -980,6 +1045,68 @@ async function uploadEvidenceToR2(env, db, task, file, fileBase64) {
       .run();
   } catch (error) {
     await env.EVIDENCE_BUCKET.delete(objectKey);
+    throw error;
+  }
+  return objectKey;
+}
+
+function decodedBase64Length(length, tail = "") {
+  const padding = String(tail).endsWith("==") ? 2 : String(tail).endsWith("=") ? 1 : 0;
+  return Math.floor((Number(length || 0) * 3) / 4) - padding;
+}
+
+async function uploadChunkedEvidenceToR2(env, db, task, file) {
+  const chunks = await db
+    .prepare(
+      `SELECT chunk_index, LENGTH(chunk_base64) AS base64_length,
+              SUBSTR(chunk_base64, -2) AS base64_tail
+       FROM evidence_file_chunks WHERE file_id = ? ORDER BY chunk_index ASC`
+    )
+    .bind(file.id)
+    .all();
+  const chunkRows = chunks.results || [];
+  if (!chunkRows.length || chunkRows.some((chunk, index) => Number(chunk.chunk_index) !== index)) {
+    throw new Error("Incomplete legacy chunks");
+  }
+  const totalBytes = chunkRows.reduce(
+    (total, chunk) => total + decodedBase64Length(chunk.base64_length, chunk.base64_tail),
+    0
+  );
+  if (totalBytes < 1 || totalBytes > MAX_FILE_BYTES) throw new Error("Invalid legacy file size");
+
+  const { objectKey, parentPath } = await r2EvidenceDescriptor(db, task, file);
+  const { readable, writable } = new FixedLengthStream(totalBytes);
+  const writer = writable.getWriter();
+  const uploadPromise = env.EVIDENCE_BUCKET.put(objectKey, readable, {
+    httpMetadata: { contentType: file.mimeType },
+    customMetadata: { fileId: clean(file.id), taskId: clean(task.id), ownerId: clean(task.ownerId) }
+  });
+
+  try {
+    for (const chunk of chunkRows) {
+      const row = await db
+        .prepare("SELECT chunk_base64 FROM evidence_file_chunks WHERE file_id = ? AND chunk_index = ?")
+        .bind(file.id, chunk.chunk_index)
+        .first();
+      const base64 = String(row?.chunk_base64 || "");
+      if (!base64 || base64.length !== Number(chunk.base64_length)) throw new Error("Legacy chunk changed during migration");
+      await writer.write(decodeEvidenceBase64(base64));
+    }
+    await writer.close();
+    const storedObject = await uploadPromise;
+    if (Number(storedObject?.size || 0) !== totalBytes) throw new Error("Incomplete R2 migration");
+    await db
+      .prepare(
+        `INSERT INTO evidence_storage
+         (file_id, provider, drive_id, drive_item_id, parent_path, size_bytes, sha256, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, '', ?)`
+      )
+      .bind(file.id, R2_STORAGE_PROVIDER, "EVIDENCE_BUCKET", objectKey, parentPath, totalBytes, Date.now())
+      .run();
+  } catch (error) {
+    await writer.abort(error).catch(() => {});
+    await uploadPromise.catch(() => {});
+    await env.EVIDENCE_BUCKET.delete(objectKey).catch(() => {});
     throw error;
   }
   return objectKey;
