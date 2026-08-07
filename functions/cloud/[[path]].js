@@ -7,7 +7,7 @@ const MAINTENANCE_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const ABANDONED_UPLOAD_TTL_MS = 10 * 60 * 1000;
 const DELIVERED_NOTIFICATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const UNDELIVERED_NOTIFICATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const MAINTENANCE_SETTING_KEY = "storage_maintenance_r2_direct_v3";
+const MAINTENANCE_SETTING_KEY = "storage_maintenance_r2_direct_v4";
 const OBSERVER_ACCESS_LEVEL = "observer";
 const OBSERVER_EMAIL = "giuliana.parra@lgtask.local";
 
@@ -1050,17 +1050,10 @@ async function uploadEvidenceToR2(env, db, task, file, fileBase64) {
   return objectKey;
 }
 
-function decodedBase64Length(length, tail = "") {
-  const padding = String(tail).endsWith("==") ? 2 : String(tail).endsWith("=") ? 1 : 0;
-  return Math.floor((Number(length || 0) * 3) / 4) - padding;
-}
-
 async function uploadChunkedEvidenceToR2(env, db, task, file) {
   const chunks = await db
     .prepare(
-      `SELECT chunk_index, LENGTH(chunk_base64) AS base64_length,
-              SUBSTR(chunk_base64, -2) AS base64_tail
-       FROM evidence_file_chunks WHERE file_id = ? ORDER BY chunk_index ASC`
+      "SELECT chunk_index, chunk_base64 FROM evidence_file_chunks WHERE file_id = ? ORDER BY chunk_index ASC"
     )
     .bind(file.id)
     .all();
@@ -1068,48 +1061,9 @@ async function uploadChunkedEvidenceToR2(env, db, task, file) {
   if (!chunkRows.length || chunkRows.some((chunk, index) => Number(chunk.chunk_index) !== index)) {
     throw new Error("Incomplete legacy chunks");
   }
-  const totalBytes = chunkRows.reduce(
-    (total, chunk) => total + decodedBase64Length(chunk.base64_length, chunk.base64_tail),
-    0
-  );
-  if (totalBytes < 1 || totalBytes > MAX_FILE_BYTES) throw new Error("Invalid legacy file size");
-
-  const { objectKey, parentPath } = await r2EvidenceDescriptor(db, task, file);
-  const { readable, writable } = new FixedLengthStream(totalBytes);
-  const writer = writable.getWriter();
-  const uploadPromise = env.EVIDENCE_BUCKET.put(objectKey, readable, {
-    httpMetadata: { contentType: file.mimeType },
-    customMetadata: { fileId: clean(file.id), taskId: clean(task.id), ownerId: clean(task.ownerId) }
-  });
-
-  try {
-    for (const chunk of chunkRows) {
-      const row = await db
-        .prepare("SELECT chunk_base64 FROM evidence_file_chunks WHERE file_id = ? AND chunk_index = ?")
-        .bind(file.id, chunk.chunk_index)
-        .first();
-      const base64 = String(row?.chunk_base64 || "");
-      if (!base64 || base64.length !== Number(chunk.base64_length)) throw new Error("Legacy chunk changed during migration");
-      await writer.write(decodeEvidenceBase64(base64));
-    }
-    await writer.close();
-    const storedObject = await uploadPromise;
-    if (Number(storedObject?.size || 0) !== totalBytes) throw new Error("Incomplete R2 migration");
-    await db
-      .prepare(
-        `INSERT INTO evidence_storage
-         (file_id, provider, drive_id, drive_item_id, parent_path, size_bytes, sha256, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, '', ?)`
-      )
-      .bind(file.id, R2_STORAGE_PROVIDER, "EVIDENCE_BUCKET", objectKey, parentPath, totalBytes, Date.now())
-      .run();
-  } catch (error) {
-    await writer.abort(error).catch(() => {});
-    await uploadPromise.catch(() => {});
-    await env.EVIDENCE_BUCKET.delete(objectKey).catch(() => {});
-    throw error;
-  }
-  return objectKey;
+  const fileBase64 = chunkRows.map((chunk) => String(chunk.chunk_base64 || "")).join("");
+  if (!fileBase64 || fileBase64.length > MAX_FILE_TOTAL_BASE64) throw new Error("Invalid legacy file size");
+  return uploadEvidenceToR2(env, db, task, file, fileBase64);
 }
 
 async function uploadEvidenceDirectToR2(request, db, user, env) {
