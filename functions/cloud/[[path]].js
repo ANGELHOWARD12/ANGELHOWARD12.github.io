@@ -264,7 +264,7 @@ async function ensureSchema(db) {
     }
   }
   await db
-    .prepare("UPDATE users SET access_level = ? WHERE email = ?")
+    .prepare("UPDATE users SET access_level = ?, zone = 'Administracion general' WHERE email = ?")
     .bind(OBSERVER_ACCESS_LEVEL, OBSERVER_EMAIL)
     .run();
   schemaReady = true;
@@ -2719,7 +2719,7 @@ function publicUser(row) {
     name: row.name,
     email: row.email,
     zone: row.zone || "",
-    role: observer ? "Observadora" : row.role,
+    role: observer ? "Admin" : row.role,
     accessLevel: observer ? OBSERVER_ACCESS_LEVEL : "",
     status: row.status || "Activo",
     createdAt: Number(row.createdAt || row.created_at || Date.now())

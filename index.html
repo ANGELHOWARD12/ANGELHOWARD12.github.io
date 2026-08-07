@@ -4024,7 +4024,7 @@
       }
 
       function isObserver() {
-        return activeUser()?.role === "Observadora";
+        return activeUser()?.accessLevel === "observer";
       }
 
       function canViewAll() {
@@ -7147,8 +7147,8 @@
               ${
                 user.role === "Trainer"
                   ? teamProfileMarkup(profile)
-                  : user.role === "Observadora"
-                    ? `<div class="note"><strong>Observacion</strong><p>Consulta de tareas realizadas y sus sustentos, sin permisos de modificacion.</p></div>`
+                  : user.role === "Admin"
+                    ? `<div class="note"><strong>Administracion</strong><p>Consulta de tareas realizadas y sus sustentos, sin permisos de modificacion.</p></div>`
                     : `<div class="note"><strong>Coordinacion</strong><p>Gestion y seguimiento del equipo de trainers.</p></div>`
               }
               ${
