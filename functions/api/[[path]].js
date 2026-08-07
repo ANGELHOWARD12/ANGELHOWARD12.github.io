@@ -4,10 +4,10 @@ const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb
 const MICROSOFT_STORAGE_PROVIDER = "onedrive";
 const R2_STORAGE_PROVIDER = "r2";
 const MAINTENANCE_INTERVAL_MS = 12 * 60 * 60 * 1000;
-const ABANDONED_UPLOAD_TTL_MS = 6 * 60 * 60 * 1000;
+const ABANDONED_UPLOAD_TTL_MS = 10 * 60 * 1000;
 const DELIVERED_NOTIFICATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const UNDELIVERED_NOTIFICATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const MAINTENANCE_SETTING_KEY = "storage_maintenance_r2_direct_v1";
+const MAINTENANCE_SETTING_KEY = "storage_maintenance_r2_direct_v2";
 const OBSERVER_ACCESS_LEVEL = "observer";
 const OBSERVER_EMAIL = "giuliana.parra@lgtask.local";
 
@@ -361,6 +361,25 @@ async function storageStatus(db, user, env) {
     )
     .bind(Date.now(), Date.now() - DELIVERED_NOTIFICATION_TTL_MS)
     .first();
+  const chunkFiles = await db
+    .prepare(
+      `SELECT files.id, files.created_at, COUNT(chunks.chunk_index) AS chunks,
+              COALESCE(SUM(LENGTH(chunks.chunk_base64)), 0) AS bytes
+       FROM evidence_files files
+       INNER JOIN evidence_file_chunks chunks ON chunks.file_id = files.id
+       GROUP BY files.id, files.created_at`
+    )
+    .all();
+  const appData = await loadData(db);
+  const referencedFileIds = new Set(
+    (appData.tasks || []).flatMap((task) =>
+      (Array.isArray(task.evidence) ? task.evidence : []).flatMap((entry) =>
+        (Array.isArray(entry.files) ? entry.files : []).map((file) => clean(file.id)).filter(Boolean)
+      )
+    )
+  );
+  const temporaryFiles = chunkFiles.results || [];
+  const unreferencedTemporaryFiles = temporaryFiles.filter((file) => !referencedFileIds.has(clean(file.id)));
 
   let pageCount = 0;
   let pageSize = 0;
@@ -403,9 +422,17 @@ async function storageStatus(db, user, env) {
         evidenceFiles: Number(counts?.evidence_files || 0),
         storedFiles: Number(counts?.stored_files || 0),
         temporaryChunks: Number(counts?.temporary_chunks || 0),
+        temporaryFiles: temporaryFiles.length,
+        referencedTemporaryFiles: temporaryFiles.length - unreferencedTemporaryFiles.length,
+        unreferencedTemporaryFiles: unreferencedTemporaryFiles.length,
+        unreferencedTemporaryBytes: unreferencedTemporaryFiles.reduce((total, file) => total + Number(file.bytes || 0), 0),
         legacyBase64Bytes: Number(counts?.legacy_base64_bytes || 0),
         temporaryBase64Bytes: Number(counts?.temporary_base64_bytes || 0),
         appDataBytes: Number(counts?.app_data_bytes || 0),
+        approximatePayloadBytes:
+          Number(counts?.legacy_base64_bytes || 0) +
+          Number(counts?.temporary_base64_bytes || 0) +
+          Number(counts?.app_data_bytes || 0),
         databaseBytes: pageCount && pageSize ? pageCount * pageSize : 0,
         reusableBytes: freePages && pageSize ? freePages * pageSize : 0,
         expiredSessions: Number(counts?.expired_sessions || 0),
