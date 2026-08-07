@@ -7,7 +7,7 @@ const MAINTENANCE_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const ABANDONED_UPLOAD_TTL_MS = 10 * 60 * 1000;
 const DELIVERED_NOTIFICATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const UNDELIVERED_NOTIFICATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const MAINTENANCE_SETTING_KEY = "storage_maintenance_r2_direct_v4";
+const MAINTENANCE_SETTING_KEY = "storage_maintenance_r2_direct_v5";
 const OBSERVER_ACCESS_LEVEL = "observer";
 const OBSERVER_EMAIL = "giuliana.parra@lgtask.local";
 
@@ -1053,7 +1053,9 @@ async function uploadEvidenceToR2(env, db, task, file, fileBase64) {
 async function uploadChunkedEvidenceToR2(env, db, task, file) {
   const chunks = await db
     .prepare(
-      "SELECT chunk_index, chunk_base64 FROM evidence_file_chunks WHERE file_id = ? ORDER BY chunk_index ASC"
+      `SELECT chunk_index, LENGTH(chunk_base64) AS base64_length,
+              SUBSTR(chunk_base64, -2) AS base64_tail
+       FROM evidence_file_chunks WHERE file_id = ? ORDER BY chunk_index ASC`
     )
     .bind(file.id)
     .all();
@@ -1061,9 +1063,74 @@ async function uploadChunkedEvidenceToR2(env, db, task, file) {
   if (!chunkRows.length || chunkRows.some((chunk, index) => Number(chunk.chunk_index) !== index)) {
     throw new Error("Incomplete legacy chunks");
   }
-  const fileBase64 = chunkRows.map((chunk) => String(chunk.chunk_base64 || "")).join("");
-  if (!fileBase64 || fileBase64.length > MAX_FILE_TOTAL_BASE64) throw new Error("Invalid legacy file size");
-  return uploadEvidenceToR2(env, db, task, file, fileBase64);
+  const decodedLength = (chunk) => {
+    const tail = String(chunk.base64_tail || "");
+    const padding = tail.endsWith("==") ? 2 : tail.endsWith("=") ? 1 : 0;
+    return Math.floor((Number(chunk.base64_length || 0) * 3) / 4) - padding;
+  };
+  const totalBytes = chunkRows.reduce((total, chunk) => total + decodedLength(chunk), 0);
+  if (totalBytes < 1 || totalBytes > MAX_FILE_BYTES) throw new Error("Invalid legacy file size");
+
+  const minimumPartBytes = 5 * 1024 * 1024;
+  const groups = [];
+  let currentGroup = [];
+  let currentBytes = 0;
+  for (const chunk of chunkRows) {
+    currentGroup.push(chunk);
+    currentBytes += decodedLength(chunk);
+    if (currentBytes >= minimumPartBytes) {
+      groups.push(currentGroup);
+      currentGroup = [];
+      currentBytes = 0;
+    }
+  }
+  if (currentGroup.length) groups.push(currentGroup);
+
+  const { objectKey, parentPath } = await r2EvidenceDescriptor(db, task, file);
+  let multipartUpload;
+  let completed = false;
+  try {
+    multipartUpload = await env.EVIDENCE_BUCKET.createMultipartUpload(objectKey, {
+      httpMetadata: { contentType: file.mimeType },
+      customMetadata: { fileId: clean(file.id), taskId: clean(task.id), ownerId: clean(task.ownerId) }
+    });
+    const uploadedParts = [];
+    for (let groupIndex = 0; groupIndex < groups.length; groupIndex += 1) {
+      const group = groups[groupIndex];
+      const firstIndex = Number(group[0].chunk_index);
+      const lastIndex = Number(group[group.length - 1].chunk_index);
+      const rows = await db
+        .prepare(
+          `SELECT chunk_base64 FROM evidence_file_chunks
+           WHERE file_id = ? AND chunk_index BETWEEN ? AND ? ORDER BY chunk_index ASC`
+        )
+        .bind(file.id, firstIndex, lastIndex)
+        .all();
+      if ((rows.results || []).length !== group.length) throw new Error("Legacy chunks changed during migration");
+      const partBase64 = (rows.results || []).map((row) => String(row.chunk_base64 || "")).join("");
+      const bytes = decodeEvidenceBase64(partBase64);
+      if (groupIndex < groups.length - 1 && bytes.byteLength < minimumPartBytes) {
+        throw new Error("Legacy multipart part is too small");
+      }
+      uploadedParts.push(await multipartUpload.uploadPart(groupIndex + 1, bytes));
+    }
+    const storedObject = await multipartUpload.complete(uploadedParts);
+    completed = true;
+    if (Number(storedObject?.size || 0) !== totalBytes) throw new Error("Incomplete R2 multipart migration");
+    await db
+      .prepare(
+        `INSERT INTO evidence_storage
+         (file_id, provider, drive_id, drive_item_id, parent_path, size_bytes, sha256, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, '', ?)`
+      )
+      .bind(file.id, R2_STORAGE_PROVIDER, "EVIDENCE_BUCKET", objectKey, parentPath, totalBytes, Date.now())
+      .run();
+  } catch (error) {
+    if (multipartUpload && !completed) await multipartUpload.abort().catch(() => {});
+    if (completed) await env.EVIDENCE_BUCKET.delete(objectKey).catch(() => {});
+    throw error;
+  }
+  return objectKey;
 }
 
 async function uploadEvidenceDirectToR2(request, db, user, env) {
