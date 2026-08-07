@@ -6,6 +6,8 @@ const R2_STORAGE_PROVIDER = "r2";
 const MAINTENANCE_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const ABANDONED_UPLOAD_TTL_MS = 24 * 60 * 60 * 1000;
 const DELIVERED_NOTIFICATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+const OBSERVER_ACCESS_LEVEL = "observer";
+const OBSERVER_EMAIL = "giuliana.parra@lgtask.local";
 
 let microsoftTokenCache = { token: "", expiresAt: 0 };
 let schemaReady = false;
@@ -115,6 +117,13 @@ export async function onRequest(context) {
 
     const session = await authenticate(request, env.DB);
     if (!session) return json({ ok: false, message: "Sesion no valida." }, 401);
+    if (
+      isObserverUser(session.user) &&
+      !["GET", "HEAD"].includes(request.method) &&
+      !["notifications/subscribe", "notifications/unsubscribe"].includes(route)
+    ) {
+      return json({ ok: false, message: "La cuenta observadora es de solo lectura." }, 403);
+    }
 
     if (route === "notifications/config" && request.method === "GET") return notificationConfig(env.DB);
     if (route === "notifications/subscribe" && request.method === "POST") {
@@ -246,6 +255,18 @@ async function ensureSchema(db) {
     db.prepare("CREATE INDEX IF NOT EXISTS idx_notification_subscriptions_user ON notification_subscriptions(user_id)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_user_notifications_pending ON user_notifications(user_id, delivered_at)")
   ]);
+  const userColumns = await db.prepare("PRAGMA table_info(users)").all();
+  if (!(userColumns.results || []).some((column) => column.name === "access_level")) {
+    try {
+      await db.prepare("ALTER TABLE users ADD COLUMN access_level TEXT NOT NULL DEFAULT ''").run();
+    } catch (error) {
+      if (!String(error?.message || error).toLowerCase().includes("duplicate column")) throw error;
+    }
+  }
+  await db
+    .prepare("UPDATE users SET access_level = ? WHERE email = ?")
+    .bind(OBSERVER_ACCESS_LEVEL, OBSERVER_EMAIL)
+    .run();
   schemaReady = true;
 }
 
@@ -440,7 +461,10 @@ async function setLateEvidencePolicy(request, db, user, context) {
   data.lateEvidencePolicyHistory = data.lateEvidencePolicyHistory.slice(0, 100);
   await saveData(db, data);
 
-  const trainers = await db.prepare("SELECT id FROM users WHERE role = 'Trainer' AND status = 'Activo'").all();
+  const trainers = await db
+    .prepare("SELECT id FROM users WHERE role = 'Trainer' AND status = 'Activo' AND access_level <> ?")
+    .bind(OBSERVER_ACCESS_LEVEL)
+    .all();
   const notifiedUsers = await queueNotifications(
     db,
     (trainers.results || []).map((trainer) => ({
@@ -1125,7 +1149,14 @@ async function completeEvidenceUpload(request, db, user, env) {
 async function evidenceFile(db, user, fileId, env) {
   const row = await db.prepare("SELECT * FROM evidence_files WHERE id = ?").bind(clean(fileId)).first();
   if (!row) return json({ ok: false, message: "Archivo no encontrado." }, 404);
-  const allowed = user.role === "Coordinador" || row.submitted_by_id === user.id || row.owner_id === user.id;
+  let observerAllowed = false;
+  if (isObserverUser(user)) {
+    const data = await loadData(db);
+    const task = data.tasks.find((item) => clean(item.id) === clean(row.task_id));
+    observerAllowed = task?.status === "Cumplida";
+  }
+  const allowed =
+    user.role === "Coordinador" || observerAllowed || row.submitted_by_id === user.id || row.owner_id === user.id;
   if (!allowed) return json({ ok: false, message: "No tienes acceso a este archivo." }, 403);
 
   const storage = await db.prepare("SELECT * FROM evidence_storage WHERE file_id = ?").bind(row.id).first();
@@ -1173,10 +1204,10 @@ async function createTask(request, db, user, context) {
   if (!title || title.length < 2) return json({ ok: false, message: "Escribe el nombre de la tarea." }, 400);
 
   const owner = await db
-    .prepare("SELECT id, name, role, status FROM users WHERE id = ? AND status = 'Activo'")
+    .prepare("SELECT id, name, role, status, access_level FROM users WHERE id = ? AND status = 'Activo'")
     .bind(ownerId)
     .first();
-  if (!owner) return json({ ok: false, message: "El responsable ya no esta activo." }, 400);
+  if (!owner || isObserverUser(owner)) return json({ ok: false, message: "El responsable no esta disponible para tareas." }, 400);
   if (user.role !== "Coordinador" && clean(owner.id) !== user.id) {
     return json({ ok: false, message: "Solo puedes crear tareas para tu propio usuario." }, 403);
   }
@@ -1621,10 +1652,10 @@ async function saveOvertimeSchedule(request, db, user, context) {
   const endTime = clean(body.endTime);
   const reason = clean(body.reason).slice(0, 300);
   const target = await db
-    .prepare("SELECT id, name, email, zone, role, status, created_at FROM users WHERE id = ? AND status = 'Activo'")
+    .prepare("SELECT id, name, email, zone, role, status, created_at, access_level FROM users WHERE id = ? AND status = 'Activo'")
     .bind(targetUserId)
     .first();
-  if (!target || target.role !== "Trainer") return json({ ok: false, message: "Selecciona un trainer activo." }, 400);
+  if (!target || target.role !== "Trainer" || isObserverUser(target)) return json({ ok: false, message: "Selecciona un trainer activo." }, 400);
   if (user.role !== "Coordinador" && target.id !== user.id) {
     return json({ ok: false, message: "Solo puedes ampliar tu propia jornada." }, 403);
   }
@@ -1758,10 +1789,10 @@ async function reviewOvertimeSchedule(request, db, user, context) {
   if (requestIndex < 0) return json({ ok: false, message: "La solicitud ya fue revisada o no existe." }, 404);
   const overtimeRequest = data.overtimeRequests[requestIndex];
   const target = await db
-    .prepare("SELECT id, name, email, zone, role, status, created_at FROM users WHERE id = ? AND status = 'Activo'")
+    .prepare("SELECT id, name, email, zone, role, status, created_at, access_level FROM users WHERE id = ? AND status = 'Activo'")
     .bind(overtimeRequest.userId)
     .first();
-  if (!target || target.role !== "Trainer") return json({ ok: false, message: "El trainer ya no esta activo." }, 400);
+  if (!target || target.role !== "Trainer" || isObserverUser(target)) return json({ ok: false, message: "El trainer ya no esta activo." }, 400);
   const baseEnd = baseWorkdayEnd(overtimeRequest.date, target.name);
   if (
     !/^\d{4}-\d{2}-\d{2}$/.test(overtimeRequest.date) ||
@@ -1817,10 +1848,12 @@ async function reviewOvertimeSchedule(request, db, user, context) {
 async function stateResponse(db, user, loadedData = null) {
   const data = loadedData || (await loadData(db));
   const coordinator = user.role === "Coordinador";
+  const observer = isObserverUser(user);
+  const canViewAll = coordinator || observer;
   const userRows = coordinator
-    ? await db.prepare("SELECT id, name, email, zone, role, status, created_at FROM users ORDER BY created_at ASC").all()
+    ? await db.prepare("SELECT id, name, email, zone, role, status, created_at, access_level FROM users ORDER BY created_at ASC").all()
     : await db
-        .prepare("SELECT id, name, email, zone, role, status, created_at FROM users WHERE status = 'Activo' ORDER BY role ASC, name ASC")
+        .prepare("SELECT id, name, email, zone, role, status, created_at, access_level FROM users WHERE status = 'Activo' ORDER BY role ASC, name ASC")
         .all();
   const users = (userRows.results || []).map(publicUser);
   const state = {
@@ -1828,22 +1861,32 @@ async function stateResponse(db, user, loadedData = null) {
     ...data,
     activeUserId: user.id,
     users,
-    tasks: coordinator ? data.tasks : data.tasks.filter((task) => task.ownerId === user.id),
+    tasks: observer
+      ? data.tasks.filter((task) => task.status === "Cumplida")
+      : coordinator
+        ? data.tasks
+        : data.tasks.filter((task) => task.ownerId === user.id),
     deletedTasks: coordinator
       ? data.deletedTasks
-      : (data.deletedTasks || []).filter((task) => task.ownerId === user.id),
-    workScheduleByUserDate: coordinator
+      : observer
+        ? []
+        : (data.deletedTasks || []).filter((task) => task.ownerId === user.id),
+    workScheduleByUserDate: canViewAll
       ? data.workScheduleByUserDate
       : { [user.id]: data.workScheduleByUserDate?.[user.id] || {} },
     overtimeRequests: coordinator
       ? data.overtimeRequests
-      : (data.overtimeRequests || []).filter((request) => request.userId === user.id),
-    announcements: coordinator
+      : observer
+        ? []
+        : (data.overtimeRequests || []).filter((request) => request.userId === user.id),
+    announcements: canViewAll
       ? data.announcements
       : data.announcements.filter((item) => item.audience === "all" || item.targetId === user.id),
     supportRequests: coordinator
       ? data.supportRequests
-      : data.supportRequests.filter((item) => item.fromId === user.id || item.toId === user.id),
+      : observer
+        ? []
+        : data.supportRequests.filter((item) => item.fromId === user.id || item.toId === user.id),
     passwordRecoveryRequests: coordinator ? data.passwordRecoveryRequests : [],
     registrationRequests: coordinator ? data.registrationRequests : []
   };
@@ -1855,7 +1898,7 @@ async function putState(request, db, user, context) {
   const submitted = body.state || {};
   const current = await loadData(db);
   const notifications = [];
-  const activeUserRows = await db.prepare("SELECT id, name, role FROM users WHERE status = 'Activo'").all();
+  const activeUserRows = await db.prepare("SELECT id, name, role, access_level FROM users WHERE status = 'Activo'").all();
   const activeUsers = activeUserRows.results || [];
   const activeUserIds = new Set(activeUsers.map((row) => clean(row.id)));
   const userNamesById = new Map(activeUsers.map((row) => [row.id, row.name]));
@@ -2018,7 +2061,9 @@ async function putState(request, db, user, context) {
     }
   } else {
     const submittedTasks = new Map((submitted.tasks || []).map((task) => [task.id, task]));
-    const activeTrainerIds = new Set(activeUsers.filter((row) => row.role === "Trainer").map((row) => row.id));
+    const activeTrainerIds = new Set(
+      activeUsers.filter((row) => row.role === "Trainer" && !isObserverUser(row)).map((row) => row.id)
+    );
     current.tasks = current.tasks.map((task) => {
       if (task.ownerId !== user.id) return task;
       const next = submittedTasks.get(task.id);
@@ -2663,13 +2708,19 @@ async function saveData(db, data) {
   await db.prepare("UPDATE app_data SET data = ?, updated_at = ? WHERE id = 1").bind(JSON.stringify(payload), Date.now()).run();
 }
 
+function isObserverUser(user) {
+  return clean(user?.access_level).toLowerCase() === OBSERVER_ACCESS_LEVEL;
+}
+
 function publicUser(row) {
+  const observer = isObserverUser(row);
   return {
     id: row.id,
     name: row.name,
     email: row.email,
     zone: row.zone || "",
-    role: row.role,
+    role: observer ? "Observadora" : row.role,
+    accessLevel: observer ? OBSERVER_ACCESS_LEVEL : "",
     status: row.status || "Activo",
     createdAt: Number(row.createdAt || row.created_at || Date.now())
   };

@@ -3220,11 +3220,12 @@
       ];
 
       const TEAM_PROFILE_DEFAULTS = [
-        { name: "DANNY DIOS", aliases: ["DANNY DIOS"], chains: ["Plaza Vea", "Hiraoka"], specialty: "Trainer retail" },
-        { name: "CAROLINA PALACIOS", aliases: ["CAROLINA PALACIOS"], chains: ["Metro", "Oechsle", "Conecta"], specialty: "Trainer retail" },
+        { name: "DANNY DIOS", aliases: ["DANNY DIOS"], chains: ["Plaza Vea", "Hiraoka"], specialty: "Trainer General" },
+        { name: "CAROLINA PALACIOS", aliases: ["CAROLINA PALACIOS"], chains: ["Metro", "Oechsle", "Conecta"], specialty: "Trainer General" },
         { name: "ANGEL CARRENO", aliases: ["ANGEL CARRENO"], chains: ["Coolbox"], specialty: "Especialista AV" },
-        { name: "HAROLD MONTORO", aliases: ["HAROLD MONTORO"], chains: ["Estilos", "Ripley", "Credivargas"], specialty: "Trainer retail" },
-        { name: "ANTONIO GONZALES", aliases: ["ANTONIO GONZALES", "ANTONIO VIDAL"], chains: ["Integra", "Sodimac", "Rubi"], specialty: "Trainer retail" },
+        { name: "ANGEL GUEVARA", aliases: ["ANGEL GUEVARA"], chains: ["Tottus", "Saga Falabella"], specialty: "Trainer General" },
+        { name: "HAROLD MONTORO", aliases: ["HAROLD MONTORO"], chains: ["Estilos", "Ripley", "Credivargas"], specialty: "Trainer General" },
+        { name: "ANTONIO GONZALES", aliases: ["ANTONIO GONZALES", "ANTONIO VIDAL"], chains: ["Integra", "Sodimac", "Rubi"], specialty: "Trainer General" },
         { name: "ELOY NIETO", aliases: ["ELOY NIETO"], chains: [], specialty: "ULG" },
         { name: "BRYAN TAPIA", aliases: ["BRYAN TAPIA"], chains: [], specialty: "New Hired" },
         { name: "GIANPIERO VASQUEZ", aliases: ["GIANPIERO VASQUEZ"], chains: [], specialty: "Asesor ULG" }
@@ -3326,6 +3327,7 @@
         coordinatorDate: document.querySelector("#coordinatorDate"),
         coordinatorDayLabel: document.querySelector("#coordinatorDayLabel"),
         coordinatorDayRoster: document.querySelector("#coordinatorDayRoster"),
+        personalBreakPanel: document.querySelector("#personalBreakPanel"),
         breakSettingsForm: document.querySelector("#breakSettingsForm"),
         breakDate: document.querySelector("#breakDate"),
         breakDuration: document.querySelector("#breakDuration"),
@@ -4019,6 +4021,14 @@
 
       function isCoordinator() {
         return activeUser()?.role === "Coordinador";
+      }
+
+      function isObserver() {
+        return activeUser()?.role === "Observadora";
+      }
+
+      function canViewAll() {
+        return isCoordinator() || isObserver();
       }
 
       function trainers() {
@@ -5651,17 +5661,20 @@
           month: "long"
         }).format(new Date());
 
-        els.coordinatorTaskPanel.classList.remove("hidden");
-        els.coordinatorDayPanel.classList.toggle("hidden", !isCoordinator());
-        els.trainerWeekPanel.classList.toggle("hidden", isCoordinator());
-        els.trainerFilterWrap.classList.toggle("hidden", !isCoordinator());
+        els.coordinatorTaskPanel.classList.toggle("hidden", isObserver());
+        els.personalBreakPanel.classList.toggle("hidden", isObserver());
+        els.overtimePanel.classList.toggle("hidden", isObserver());
+        els.coordinatorDayPanel.classList.toggle("hidden", !canViewAll());
+        els.trainerWeekPanel.classList.toggle("hidden", canViewAll());
+        els.trainerFilterWrap.classList.toggle("hidden", !canViewAll());
         els.coordinatorTeamPanel.classList.toggle("hidden", !isCoordinator());
         els.backupTools.classList.toggle("hidden", !isCoordinator());
         els.coordinatorAnnouncementPanel.classList.toggle("hidden", !isCoordinator());
-        els.cloudPlanPanel.classList.toggle("hidden", !isCoordinator());
-        els.evidenceFilters.classList.toggle("hidden", !isCoordinator());
+        els.cloudPlanPanel.classList.toggle("hidden", !canViewAll());
+        els.evidenceFilters.classList.toggle("hidden", !canViewAll());
         els.lateEvidencePolicyPanel.classList.toggle("hidden", !isCoordinator());
         els.editMotivation.classList.toggle("hidden", !isCoordinator());
+        els.lgUpdateForm.classList.toggle("hidden", isObserver());
         if (!isCoordinator()) els.motivationForm.classList.add("hidden");
         els.taskFormTitle.textContent = isCoordinator() ? "Asignar tarea" : "Agregar mi tarea";
         els.taskFormHelp.textContent = isCoordinator()
@@ -5675,7 +5688,8 @@
         renderMotivation();
         renderDashboard();
         if (activeViewId === "tasksView") {
-          renderWeeklyPlanningReminder();
+          if (isObserver()) els.weeklyPlanningReminder.classList.add("hidden");
+          else renderWeeklyPlanningReminder();
           renderPersonalBreakSettings();
           renderOvertimeSettings();
           renderCoordinatorDay();
@@ -5939,7 +5953,11 @@
 
       function refreshSelects() {
         const trainerOptions = trainers().map((trainer) => ({ value: trainer.id, label: `${trainer.name} - ${trainer.zone}` }));
-        const taskPeople = isCoordinator() ? assignableUsers() : [activeUser()].filter(Boolean);
+        const taskPeople = isObserver()
+          ? state.users.filter((user) => ["Coordinador", "Trainer"].includes(user.role) && user.status === "Activo")
+          : isCoordinator()
+            ? assignableUsers()
+            : [activeUser()].filter(Boolean);
         const assignableOptions = taskPeople.map((user) => ({ value: user.id, label: `${user.name} - ${user.role === "Coordinador" ? "Coordinador" : user.zone}` }));
         fillSelect(els.taskTrainerFilter, [{ value: "all", label: "Todo el equipo y coordinador" }, ...assignableOptions], els.taskTrainerFilter.value || "all");
         fillSelect(els.announcementTarget, trainerOptions, els.announcementTarget.value);
@@ -5957,7 +5975,7 @@
       }
 
       function relevantTasks() {
-        return isCoordinator() ? state.tasks : state.tasks.filter((task) => task.ownerId === state.activeUserId);
+        return canViewAll() ? state.tasks : state.tasks.filter((task) => task.ownerId === state.activeUserId);
       }
 
       function filteredTasks() {
@@ -5969,7 +5987,7 @@
         const to = els.taskDateTo.value;
         return relevantTasks()
           .filter((task) => status === "all" || (status === "missing_evidence" ? taskMissingEvidence(task) : task.status === status))
-          .filter((task) => !isCoordinator() || trainer === "all" || task.ownerId === trainer)
+          .filter((task) => !canViewAll() || trainer === "all" || task.ownerId === trainer)
           .filter((task) => category === "all" || task.category === category)
           .filter((task) => !query || task.title.toLocaleLowerCase("es").includes(query))
           .filter((task) => (!from || task.dueDate >= from) && (!to || task.dueDate <= to))
@@ -6308,7 +6326,7 @@
       }
 
       function renderCoordinatorDay() {
-        if (!isCoordinator()) return;
+        if (!canViewAll()) return;
         const dateValue = nearestWorkingDay(state.selectedCoordinatorDate || todayIso);
         const schedule = workScheduleForDate(dateValue, state.activeUserId);
         const bounds = coordinatorScheduleBounds(dateValue);
@@ -6328,7 +6346,10 @@
           </div>
         `;
 
-        assignableUsers().forEach((person) => {
+        const rosterPeople = isObserver()
+          ? state.users.filter((user) => ["Coordinador", "Trainer"].includes(user.role) && user.status === "Activo")
+          : assignableUsers();
+        rosterPeople.forEach((person) => {
           const personSchedule = workScheduleForDate(dateValue, person.id);
           const tasks = state.tasks
             .filter((task) => task.ownerId === person.id && task.dueDate === dateValue)
@@ -6341,12 +6362,12 @@
             <div class="roster-person">
               <strong>${escapeHtml(person.name)}</strong>
               <span>${escapeHtml(person.role === "Coordinador" ? "Coordinador" : person.zone || "Sin zona")} | ${personSchedule.start}-${personSchedule.end}${personSchedule.overtime ? " | Horas extra" : ""}</span>
-              <button class="small" type="button">+ Tarea</button>
+              ${isCoordinator() ? `<button class="small" type="button">+ Tarea</button>` : ""}
             </div>
             <div class="schedule-track" style="--schedule-slots: ${scheduleSlots}">${scheduleBreakMarkup(dateValue, person.id)}</div>
             <div class="roster-progress"><strong>${percent}%</strong><span>${done}/${tasks.length} aprobadas</span></div>
           `;
-          row.querySelector(".roster-person button").addEventListener("click", () => {
+          row.querySelector(".roster-person button")?.addEventListener("click", () => {
             focusTaskFormForDate(dateValue, person.id);
           });
           const track = row.querySelector(".schedule-track");
@@ -6545,7 +6566,7 @@
         const platformToday = dateIsoInLima(Date.now());
         const currentWeekStart = weekStartIso(platformToday);
         const currentWeekEnd = addDaysIso(currentWeekStart, 5);
-        const tasks = isCoordinator()
+        const tasks = canViewAll()
           ? allTasks
           : allTasks.filter((task) => task.dueDate >= currentWeekStart && task.dueDate <= currentWeekEnd);
         const done = tasks.filter((task) => task.status === "Cumplida").length;
@@ -6555,16 +6576,20 @@
         const todayTasks = allTasks.filter((task) => task.dueDate === platformToday);
         const todayDone = todayTasks.filter((task) => task.status === "Cumplida").length;
         const todayPercent = todayTasks.length ? Math.round((todayDone / todayTasks.length) * 100) : 0;
-        els.dashboardTitle.textContent = isCoordinator() ? "Tablero general" : `Tablero Week ${isoWeekNumber(currentWeekStart)}`;
-        els.progressLabel.textContent = isCoordinator() ? "Avance general" : "Avance semanal";
+        els.dashboardTitle.textContent = isObserver()
+          ? "Tareas realizadas"
+          : isCoordinator()
+            ? "Tablero general"
+            : `Tablero Week ${isoWeekNumber(currentWeekStart)}`;
+        els.progressLabel.textContent = canViewAll() ? "Avance general" : "Avance semanal";
         els.progressPercent.textContent = `${percent}%`;
         els.progressBar.style.width = `${percent}%`;
         els.pendingCount.textContent = pending;
         els.reviewCount.textContent = review;
         els.doneCount.textContent = done;
-        els.trainerMetricLabel.textContent = isCoordinator() ? "Trainers" : "Avance hoy";
-        els.trainerCount.textContent = isCoordinator() ? trainers().length : `${todayPercent}%`;
-        els.trainerCount.title = isCoordinator() ? "Equipo activo" : `${todayDone} de ${todayTasks.length} tareas aprobadas hoy`;
+        els.trainerMetricLabel.textContent = canViewAll() ? "Trainers" : "Avance hoy";
+        els.trainerCount.textContent = canViewAll() ? trainers().length : `${todayPercent}%`;
+        els.trainerCount.title = canViewAll() ? "Equipo activo" : `${todayDone} de ${todayTasks.length} tareas aprobadas hoy`;
       }
 
       function openEvidenceForReview(task) {
@@ -6863,8 +6888,8 @@
       }
 
       function renderEvidence() {
-        els.evidenceUploadPanel.classList.toggle("hidden", isCoordinator());
-        if (!isCoordinator()) renderEvidenceTaskPicker(els.evidenceTask.value);
+        els.evidenceUploadPanel.classList.toggle("hidden", isCoordinator() || isObserver());
+        if (!canViewAll()) renderEvidenceTaskPicker(els.evidenceTask.value);
         let allEvidence = relevantTasks()
           .flatMap((task) => (task.evidence || []).map((evidence) => ({ ...evidence, task })))
           .sort((a, b) => b.submittedAt - a.submittedAt);
@@ -6878,7 +6903,7 @@
           ? evidenceFilesForEntry(linkedEntry).find((file) => file.id === linkedFileId)
           : null;
 
-        if (isCoordinator() && !linkedFileId && !linkedEvidenceId) {
+        if (canViewAll() && !linkedFileId && !linkedEvidenceId) {
           const trainerId = els.evidenceTrainerFilter.value || "all";
           allEvidence = allEvidence
             .filter((entry) => trainerId === "all" || entry.submittedById === trainerId)
@@ -6898,7 +6923,7 @@
         if (!allEvidence.length) {
           els.evidenceList.innerHTML = emptyState(
             "No hay sustentos para este filtro",
-            isCoordinator() ? "Cambia el trainer o la fecha para consultar otro periodo." : "Los sustentos apareceran cuando cargues evidencia."
+            canViewAll() ? "Cambia el trainer o la fecha para consultar otro periodo." : "Los sustentos apareceran cuando cargues evidencia."
           );
           return;
         }
@@ -7091,7 +7116,7 @@
 
         els.teamList.innerHTML = "";
         const activeUsers = state.users.filter((user) => user.status === "Activo");
-        const visibleUsers = isCoordinator() ? activeUsers : activeUsers.filter((user) => user.role === "Trainer");
+        const visibleUsers = canViewAll() ? activeUsers : activeUsers.filter((user) => user.role === "Trainer");
         const matchedProfiles = new Set();
         visibleUsers
           .sort((left, right) => {
@@ -7119,7 +7144,13 @@
                 <span>${completed}/${assigned.length} tareas cumplidas</span>
                 ${isCoordinator() || user.id === state.activeUserId ? `<span>Clave actual: protegida</span>` : ""}
               </div>
-              ${user.role === "Trainer" ? teamProfileMarkup(profile) : `<div class="note"><strong>Coordinacion</strong><p>Gestion y seguimiento del equipo de trainers.</p></div>`}
+              ${
+                user.role === "Trainer"
+                  ? teamProfileMarkup(profile)
+                  : user.role === "Observadora"
+                    ? `<div class="note"><strong>Observacion</strong><p>Consulta de tareas realizadas y sus sustentos, sin permisos de modificacion.</p></div>`
+                    : `<div class="note"><strong>Coordinacion</strong><p>Gestion y seguimiento del equipo de trainers.</p></div>`
+              }
               ${
                 isCoordinator()
                   ? `<div class="note">
@@ -7236,7 +7267,7 @@
 
       function renderAnnouncements() {
         const visible = state.announcements
-          .filter((announcement) => isCoordinator() || announcement.audience === "all" || announcement.targetId === state.activeUserId)
+          .filter((announcement) => canViewAll() || announcement.audience === "all" || announcement.targetId === state.activeUserId)
           .sort((a, b) => b.createdAt - a.createdAt);
         els.announcementList.innerHTML = "";
 
@@ -7332,17 +7363,19 @@
             <div class="actions"></div>
           `;
           const actions = card.querySelector(".actions");
-          const editButton = document.createElement("button");
-          editButton.className = "small";
-          editButton.type = "button";
-          editButton.textContent = "Editar";
-          editButton.addEventListener("click", () => editLgUpdate(item));
-          const deleteButton = document.createElement("button");
-          deleteButton.className = "danger small";
-          deleteButton.type = "button";
-          deleteButton.textContent = "Eliminar";
-          deleteButton.addEventListener("click", () => removeLgUpdate(item));
-          actions.append(editButton, deleteButton);
+          if (!isObserver()) {
+            const editButton = document.createElement("button");
+            editButton.className = "small";
+            editButton.type = "button";
+            editButton.textContent = "Editar";
+            editButton.addEventListener("click", () => editLgUpdate(item));
+            const deleteButton = document.createElement("button");
+            deleteButton.className = "danger small";
+            deleteButton.type = "button";
+            deleteButton.textContent = "Eliminar";
+            deleteButton.addEventListener("click", () => removeLgUpdate(item));
+            actions.append(editButton, deleteButton);
+          }
           els.lgUpdatesList.appendChild(card);
         });
       }
