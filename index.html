@@ -4031,6 +4031,32 @@
         return isCoordinator() || isObserver();
       }
 
+      function clearAdminReadOnlyMode() {
+        document.querySelectorAll('[data-admin-readonly="true"]').forEach((control) => {
+          control.disabled = false;
+          delete control.dataset.adminReadonly;
+        });
+      }
+
+      function applyAdminReadOnlyMode() {
+        if (!isObserver()) return;
+        const controls = [
+          ...els.taskForm.querySelectorAll("input, select, textarea, button"),
+          ...els.breakSettingsForm.querySelectorAll("input, select, textarea, button"),
+          ...els.overtimeForm.querySelectorAll("input, select, textarea, button"),
+          ...els.createTrainerForm.querySelectorAll("input, select, textarea, button"),
+          ...els.announcementForm.querySelectorAll("input, select, textarea, button"),
+          ...els.lgUpdateForm.querySelectorAll("input, select, textarea, button"),
+          els.lateEvidencePolicyToggle,
+          els.editMotivation,
+          els.importData
+        ].filter(Boolean);
+        controls.forEach((control) => {
+          if (!control.disabled) control.dataset.adminReadonly = "true";
+          control.disabled = true;
+        });
+      }
+
       function trainers() {
         return state.users.filter((user) => user.role === "Trainer" && user.status === "Activo");
       }
@@ -4272,7 +4298,9 @@
       }
 
       function taskSchedulingPeople() {
-        return isCoordinator() ? assignableUsers() : [activeUser()].filter(Boolean);
+        return canViewAll()
+          ? state.users.filter((user) => ["Coordinador", "Trainer"].includes(user.role) && user.status === "Activo")
+          : [activeUser()].filter(Boolean);
       }
 
       function scheduleBoundsForPeople(people, dateValue) {
@@ -4369,11 +4397,11 @@
           label: `${person.name} - ${person.role === "Coordinador" ? "Coordinador" : person.zone || "Sin zona"}`
         }));
         fillSelect(els.taskOwner, ownerOptions.length ? ownerOptions : [{ value: "", label: "Sin colaboradores disponibles" }], previousOwner);
-        if (!isCoordinator() && ownerOptions.length) els.taskOwner.value = state.activeUserId;
+        if (!canViewAll() && ownerOptions.length) els.taskOwner.value = state.activeUserId;
         const ready = Boolean(dateValue && startTime && endTime && availablePeople.length);
         els.taskStartTime.disabled = !startOptions.length;
         els.taskEndTime.disabled = !endOptions.length;
-        els.taskOwner.disabled = !isCoordinator() || !ownerOptions.length;
+        els.taskOwner.disabled = !canViewAll() || !ownerOptions.length;
         els.taskSubmitButton.disabled = !ready;
         els.taskDurationSummary.classList.toggle("is-blocked", !ready);
         els.taskDurationSummary.textContent = ready
@@ -4705,9 +4733,52 @@
         anchor.addEventListener("click", () => openTaskPreviewDialog(task.id));
       }
 
+      function appendReadOnlyAction(container, label, className = "small") {
+        const button = document.createElement("button");
+        button.className = className;
+        button.type = "button";
+        button.textContent = label;
+        button.disabled = true;
+        button.title = "Cuenta Admin de solo lectura";
+        container.appendChild(button);
+      }
+
+      function renderAdminReadOnlyTaskActions(task) {
+        if (task.status === "En revision") {
+          appendReadOnlyAction(els.taskPreviewActions, "Aprobar y completar", "primary");
+          appendReadOnlyAction(els.taskPreviewActions, "Rechazar", "danger");
+        }
+        if (task.status === "Cumplida") {
+          const check = document.createElement("span");
+          check.className = "approval-check";
+          check.setAttribute("aria-label", "Tarea aprobada");
+          check.innerHTML = "&#10003;";
+          els.taskPreviewActions.appendChild(check);
+        }
+        if (task.dueDate < dateIsoInLima(Date.now()) && task.status !== "Cumplida") {
+          if (lateEvidenceAuthorizationActive(task)) {
+            const authorized = document.createElement("span");
+            authorized.className = "workflow-status";
+            authorized.textContent = "Carga tardia habilitada hoy";
+            els.taskPreviewActions.appendChild(authorized);
+          } else {
+            appendReadOnlyAction(els.taskPreviewActions, "Habilitar sustento tardio");
+          }
+        }
+        if (task.status !== "Cumplida") {
+          appendReadOnlyAction(els.taskPreviewActions, "Mover horario");
+          if (availableTrainersForTask(task).length) appendReadOnlyAction(els.taskPreviewActions, "Reasignar");
+          appendReadOnlyAction(els.taskPreviewActions, "Recordatorio");
+        }
+        appendReadOnlyAction(els.taskPreviewActions, "Corregir nombre");
+        appendReadOnlyAction(els.taskPreviewActions, "Eliminar", "danger");
+      }
+
       function renderTaskPreviewActions(task) {
         els.taskPreviewActions.innerHTML = "";
-        if (isCoordinator()) {
+        if (isObserver()) {
+          renderAdminReadOnlyTaskActions(task);
+        } else if (isCoordinator()) {
           if (task.status === "En revision") {
             const approveButton = document.createElement("button");
             approveButton.type = "button";
@@ -5520,8 +5591,8 @@
       }
 
       async function createEvidenceDownload(includePackage = false) {
-        if (!isCoordinator()) {
-          setMessage(els.evidenceExportMessage, "Solo el coordinador puede generar este reporte.", "err");
+        if (!canViewAll()) {
+          setMessage(els.evidenceExportMessage, "Solo Coordinacion o Admin pueden generar este reporte.", "err");
           return;
         }
         const rangeError = evidenceRangeError();
@@ -5539,7 +5610,7 @@
         try {
           if (syncInFlight) await syncInFlight;
           const refreshed = await refreshStateFromServer({ quiet: true });
-          if (!refreshed || !isCoordinator()) throw new Error("No se pudo actualizar la informacion de la nube.");
+          if (!refreshed || !canViewAll()) throw new Error("No se pudo actualizar la informacion de la nube.");
           const rows = evidenceReportRows();
           const attachments = await loadEvidenceReportAttachments(rows, (current, total) => {
             setMessage(els.evidenceExportMessage, `Incluyendo archivo ${current} de ${total} en el reporte...`, "");
@@ -5652,6 +5723,8 @@
 
         if (!logged) return;
 
+        clearAdminReadOnlyMode();
+
         els.sessionName.textContent = user.name;
         els.sessionRole.textContent = user.role;
         updateNotificationButton();
@@ -5661,26 +5734,26 @@
           month: "long"
         }).format(new Date());
 
-        els.coordinatorTaskPanel.classList.toggle("hidden", isObserver());
-        els.personalBreakPanel.classList.toggle("hidden", isObserver());
-        els.overtimePanel.classList.toggle("hidden", isObserver());
+        els.coordinatorTaskPanel.classList.remove("hidden");
+        els.personalBreakPanel.classList.remove("hidden");
+        els.overtimePanel.classList.remove("hidden");
         els.coordinatorDayPanel.classList.toggle("hidden", !canViewAll());
         els.trainerWeekPanel.classList.toggle("hidden", canViewAll());
         els.trainerFilterWrap.classList.toggle("hidden", !canViewAll());
-        els.coordinatorTeamPanel.classList.toggle("hidden", !isCoordinator());
-        els.backupTools.classList.toggle("hidden", !isCoordinator());
-        els.coordinatorAnnouncementPanel.classList.toggle("hidden", !isCoordinator());
+        els.coordinatorTeamPanel.classList.toggle("hidden", !canViewAll());
+        els.backupTools.classList.toggle("hidden", !canViewAll());
+        els.coordinatorAnnouncementPanel.classList.toggle("hidden", !canViewAll());
         els.cloudPlanPanel.classList.toggle("hidden", !canViewAll());
         els.evidenceFilters.classList.toggle("hidden", !canViewAll());
-        els.lateEvidencePolicyPanel.classList.toggle("hidden", !isCoordinator());
-        els.editMotivation.classList.toggle("hidden", !isCoordinator());
-        els.lgUpdateForm.classList.toggle("hidden", isObserver());
+        els.lateEvidencePolicyPanel.classList.toggle("hidden", !canViewAll());
+        els.editMotivation.classList.toggle("hidden", !canViewAll());
+        els.lgUpdateForm.classList.remove("hidden");
         if (!isCoordinator()) els.motivationForm.classList.add("hidden");
-        els.taskFormTitle.textContent = isCoordinator() ? "Asignar tarea" : "Agregar mi tarea";
-        els.taskFormHelp.textContent = isCoordinator()
+        els.taskFormTitle.textContent = canViewAll() ? "Asignar tarea" : "Agregar mi tarea";
+        els.taskFormHelp.textContent = canViewAll()
           ? "Pablo puede asignar tareas a cualquier trainer o a si mismo."
           : "Organiza tus propias tareas de la semana. Solo puedes asignarlas a tu usuario.";
-        els.taskSubmitButton.textContent = isCoordinator() ? "Asignar tarea" : "Agregar a mi semana";
+        els.taskSubmitButton.textContent = canViewAll() ? "Asignar tarea" : "Agregar a mi semana";
         els.taskOwner.disabled = !isCoordinator();
         activateView(activeViewId);
 
@@ -5688,8 +5761,7 @@
         renderMotivation();
         renderDashboard();
         if (activeViewId === "tasksView") {
-          if (isObserver()) els.weeklyPlanningReminder.classList.add("hidden");
-          else renderWeeklyPlanningReminder();
+          renderWeeklyPlanningReminder();
           renderPersonalBreakSettings();
           renderOvertimeSettings();
           renderCoordinatorDay();
@@ -5707,6 +5779,7 @@
           renderProducts();
         }
         if (els.taskPreviewDialog.open) refreshTaskPreviewDialog();
+        applyAdminReadOnlyMode();
       }
 
       function renderMotivation() {
@@ -5779,8 +5852,8 @@
       }
 
       function renderOvertimeRequests() {
-        els.overtimeRequestsWrap.classList.toggle("hidden", !isCoordinator());
-        if (!isCoordinator()) {
+        els.overtimeRequestsWrap.classList.toggle("hidden", !canViewAll());
+        if (!canViewAll()) {
           els.overtimeRequests.innerHTML = "";
           return;
         }
@@ -5805,11 +5878,15 @@
                       </div>
                       <p>${escapeHtml(request.reason || "Sin motivo")}</p>
                     </div>
-                    <div class="actions">
-                      <input type="text" maxlength="300" placeholder="Nota para el trainer" aria-label="Nota para ${escapeHtml(request.userName || userName(request.userId))}" data-overtime-note="${escapeHtml(request.id)}" />
-                      <button class="primary small" type="button" data-overtime-request="${escapeHtml(request.id)}" data-overtime-decision="Aprobar">Aprobar</button>
-                      <button class="danger small" type="button" data-overtime-request="${escapeHtml(request.id)}" data-overtime-decision="Rechazar">Rechazar</button>
-                    </div>
+                    ${
+                      isCoordinator()
+                        ? `<div class="actions">
+                            <input type="text" maxlength="300" placeholder="Nota para el trainer" aria-label="Nota para ${escapeHtml(request.userName || userName(request.userId))}" data-overtime-note="${escapeHtml(request.id)}" />
+                            <button class="primary small" type="button" data-overtime-request="${escapeHtml(request.id)}" data-overtime-decision="Aprobar">Aprobar</button>
+                            <button class="danger small" type="button" data-overtime-request="${escapeHtml(request.id)}" data-overtime-decision="Rechazar">Rechazar</button>
+                          </div>`
+                        : `<span class="pill">Solo lectura</span>`
+                    }
                   </article>`
               )
               .join("")
@@ -5817,7 +5894,7 @@
       }
 
       function renderOvertimeSettings(forceSaved = false) {
-        const availablePeople = isCoordinator() ? trainers() : [activeUser()].filter(Boolean);
+        const availablePeople = canViewAll() ? trainers() : [activeUser()].filter(Boolean);
         const selectedUserId = availablePeople.some((person) => person.id === els.overtimeUser.value)
           ? els.overtimeUser.value
           : availablePeople[0]?.id || "";
@@ -5826,8 +5903,8 @@
           availablePeople.map((person) => ({ value: person.id, label: `${person.name}${person.zone ? ` - ${person.zone}` : ""}` })),
           selectedUserId
         );
-        els.overtimeUserWrap.classList.toggle("hidden", !isCoordinator());
-        els.overtimeHelp.textContent = isCoordinator()
+        els.overtimeUserWrap.classList.toggle("hidden", !canViewAll());
+        els.overtimeHelp.textContent = canViewAll()
           ? "Pablo puede ampliar directamente la jornada y aprobar o rechazar las solicitudes de los trainers."
           : "Solicita horas extra para una fecha. El horario se habilitara solamente cuando Pablo lo apruebe.";
         if (!els.overtimeDate.value) els.overtimeDate.value = nearestWorkingDay(todayIso);
@@ -5841,41 +5918,41 @@
         const pendingRequest = matchingRequests.find((request) => request.status === "Pendiente") || null;
         const latestRequest = matchingRequests[0] || null;
         const base = dateValue && userId ? baseWorkScheduleForDate(dateValue, userId) : null;
-        const selectedEnd = clean(!isCoordinator() && pendingRequest ? pendingRequest.endTime : saved?.endTime) || base?.end || "";
+        const selectedEnd = clean(!canViewAll() && pendingRequest ? pendingRequest.endTime : saved?.endTime) || base?.end || "";
         const options = overtimeEndOptions(dateValue, userId, selectedEnd);
         fillSelect(els.overtimeEnd, options.length ? options : [{ value: "", label: "Dia no laborable" }], selectedEnd);
         const blocked = !userId || !dateValue || isSunday(dateValue) || !options.length;
         els.overtimeEnd.disabled = blocked;
         els.overtimeReason.disabled = blocked;
         els.saveOvertimeButton.disabled = blocked;
-        els.saveOvertimeButton.textContent = isCoordinator()
+        els.saveOvertimeButton.textContent = canViewAll()
           ? "Guardar jornada"
           : pendingRequest
             ? "Actualizar solicitud"
             : "Solicitar autorizacion";
         if (forceSaved || editorKey !== overtimeEditorKey) {
-          els.overtimeReason.value = (!isCoordinator() && pendingRequest ? pendingRequest.reason : saved?.reason) || "";
+          els.overtimeReason.value = (!canViewAll() && pendingRequest ? pendingRequest.reason : saved?.reason) || "";
         }
         els.overtimeCurrent.classList.toggle("is-blocked", blocked);
         if (blocked) {
           els.overtimeCurrent.textContent = isSunday(dateValue)
             ? "Los domingos no forman parte de la jornada laboral."
             : "Selecciona un trainer y una fecha valida.";
-        } else if (!isCoordinator() && pendingRequest) {
+        } else if (!canViewAll() && pendingRequest) {
           const currentSchedule = workScheduleForDate(dateValue, userId);
           els.overtimeCurrent.textContent = `Solicitud pendiente para salir a las ${pendingRequest.endTime}. Tu jornada continua hasta las ${currentSchedule.end} mientras Pablo revisa la autorizacion.`;
         } else if (saved && timeToMinutes(saved.endTime) > timeToMinutes(base.end)) {
           const author = saved.updatedByName || userName(saved.updatedById);
           els.overtimeCurrent.textContent = `Jornada base ${base.start}-${base.end}. Ampliada hasta ${saved.endTime} por ${author}${saved.updatedAt ? ` el ${formatDateTime(saved.updatedAt)}` : ""}. Motivo: ${saved.reason || "Sin detalle"}.`;
         } else {
-          els.overtimeCurrent.textContent = `Jornada normal para ${formatDate(dateValue)}: ${base.start}-${base.end}.${!isCoordinator() && latestRequest?.status === "Rechazada" ? ` Ultima solicitud rechazada${latestRequest.reviewNote ? `: ${latestRequest.reviewNote}` : "."}` : ""}`;
+          els.overtimeCurrent.textContent = `Jornada normal para ${formatDate(dateValue)}: ${base.start}-${base.end}.${!canViewAll() && latestRequest?.status === "Rechazada" ? ` Ultima solicitud rechazada${latestRequest.reviewNote ? `: ${latestRequest.reviewNote}` : "."}` : ""}`;
         }
         overtimeEditorKey = editorKey;
         renderOvertimeRequests();
       }
 
       function evidenceCandidateTasks(dateValue = els.evidenceTaskDate.value) {
-        if (isCoordinator()) return [];
+        if (canViewAll()) return [];
         return state.tasks
           .filter(
             (task) =>
@@ -6362,7 +6439,7 @@
             <div class="roster-person">
               <strong>${escapeHtml(person.name)}</strong>
               <span>${escapeHtml(person.role === "Coordinador" ? "Coordinador" : person.zone || "Sin zona")} | ${personSchedule.start}-${personSchedule.end}${personSchedule.overtime ? " | Horas extra" : ""}</span>
-              ${isCoordinator() ? `<button class="small" type="button">+ Tarea</button>` : ""}
+              ${canViewAll() ? `<button class="small" type="button"${isObserver() ? " disabled" : ""}>+ Tarea</button>` : ""}
             </div>
             <div class="schedule-track" style="--schedule-slots: ${scheduleSlots}">${scheduleBreakMarkup(dateValue, person.id)}</div>
             <div class="roster-progress"><strong>${percent}%</strong><span>${done}/${tasks.length} aprobadas</span></div>
@@ -6514,7 +6591,7 @@
       }
 
       function renderTrainerWeek() {
-        if (isCoordinator()) return;
+        if (canViewAll()) return;
         const days = selectedWeekDates();
         els.weekLabel.textContent = `Week ${isoWeekNumber(days[0])} | ${formatShortDate(days[0])} - ${formatShortDate(days[5])}`;
         els.weeklySummary.innerHTML = "";
@@ -6576,11 +6653,7 @@
         const todayTasks = allTasks.filter((task) => task.dueDate === platformToday);
         const todayDone = todayTasks.filter((task) => task.status === "Cumplida").length;
         const todayPercent = todayTasks.length ? Math.round((todayDone / todayTasks.length) * 100) : 0;
-        els.dashboardTitle.textContent = isObserver()
-          ? "Tareas realizadas"
-          : isCoordinator()
-            ? "Tablero general"
-            : `Tablero Week ${isoWeekNumber(currentWeekStart)}`;
+        els.dashboardTitle.textContent = canViewAll() ? "Tablero general" : `Tablero Week ${isoWeekNumber(currentWeekStart)}`;
         els.progressLabel.textContent = canViewAll() ? "Avance general" : "Avance semanal";
         els.progressPercent.textContent = `${percent}%`;
         els.progressBar.style.width = `${percent}%`;
@@ -6615,13 +6688,13 @@
 
       function renderDeletedTasks() {
         const deleted = (state.deletedTasks || [])
-          .filter((task) => isCoordinator() || task.ownerId === state.activeUserId)
+          .filter((task) => canViewAll() || task.ownerId === state.activeUserId)
           .sort((a, b) => b.dueDate.localeCompare(a.dueDate) || Number(b.deletedAt || 0) - Number(a.deletedAt || 0));
         els.deletedTasksList.innerHTML = "";
         if (!deleted.length) {
           els.deletedTasksList.innerHTML = emptyState(
             "No hay tareas eliminadas",
-            isCoordinator()
+            canViewAll()
               ? "Las tareas que elimines quedaran registradas aqui."
               : "Cuando Pablo elimine una tarea de tu agenda, podras verla aqui."
           );
@@ -7009,7 +7082,7 @@
 
             const latestEvidence = entry.task.evidence?.at(-1);
             const canReview =
-              isCoordinator() &&
+              canViewAll() &&
               latestEvidence?.id === entry.id &&
               entry.review === "Pendiente" &&
               entry.task.status === "En revision";
@@ -7020,12 +7093,16 @@
               approveButton.className = "primary";
               approveButton.type = "button";
               approveButton.textContent = "Aprobar y completar";
-              approveButton.addEventListener("click", () => reviewTask(entry.task.id, "Cumplida"));
+              approveButton.disabled = isObserver();
+              approveButton.title = isObserver() ? "Cuenta Admin de solo lectura" : "";
+              if (isCoordinator()) approveButton.addEventListener("click", () => reviewTask(entry.task.id, "Cumplida"));
               const rejectButton = document.createElement("button");
               rejectButton.className = "danger";
               rejectButton.type = "button";
               rejectButton.textContent = "Rechazar";
-              rejectButton.addEventListener("click", () => reviewTask(entry.task.id, "Observada"));
+              rejectButton.disabled = isObserver();
+              rejectButton.title = isObserver() ? "Cuenta Admin de solo lectura" : "";
+              if (isCoordinator()) rejectButton.addEventListener("click", () => reviewTask(entry.task.id, "Observada"));
               actions.append(approveButton, rejectButton);
               entryDetails.querySelector(".evidence-history-body").appendChild(actions);
             }
@@ -7088,26 +7165,28 @@
               <div class="actions"></div>
             `;
             const actions = card.querySelector(".actions");
-            const approveButton = document.createElement("button");
-            approveButton.className = "small";
-            approveButton.type = "button";
-            approveButton.textContent = "Aprobar";
-            approveButton.addEventListener("click", () => {
-              createTrainer(request.name, request.email, request.zone, request.password);
-              request.status = "Aprobada";
-              saveState();
-              render();
-            });
-            const rejectButton = document.createElement("button");
-            rejectButton.className = "small";
-            rejectButton.type = "button";
-            rejectButton.textContent = "Rechazar";
-            rejectButton.addEventListener("click", () => {
-              request.status = "Rechazada";
-              saveState();
-              render();
-            });
-            actions.append(approveButton, rejectButton);
+            if (isCoordinator()) {
+              const approveButton = document.createElement("button");
+              approveButton.className = "small";
+              approveButton.type = "button";
+              approveButton.textContent = "Aprobar";
+              approveButton.addEventListener("click", () => {
+                createTrainer(request.name, request.email, request.zone, request.password);
+                request.status = "Aprobada";
+                saveState();
+                render();
+              });
+              const rejectButton = document.createElement("button");
+              rejectButton.className = "small";
+              rejectButton.type = "button";
+              rejectButton.textContent = "Rechazar";
+              rejectButton.addEventListener("click", () => {
+                request.status = "Rechazada";
+                saveState();
+                render();
+              });
+              actions.append(approveButton, rejectButton);
+            }
             els.pendingRegistrations.appendChild(card);
           });
         }
@@ -7140,9 +7219,9 @@
               </div>
               <div class="meta">
                 <span>${escapeHtml(user.zone)}</span>
-                ${isCoordinator() || user.id === state.activeUserId ? `<span>${escapeHtml(user.email)}</span>` : ""}
+                ${canViewAll() || user.id === state.activeUserId ? `<span>${escapeHtml(user.email)}</span>` : ""}
                 <span>${completed}/${assigned.length} tareas cumplidas</span>
-                ${isCoordinator() || user.id === state.activeUserId ? `<span>Clave actual: protegida</span>` : ""}
+                ${canViewAll() || user.id === state.activeUserId ? `<span>Clave actual: protegida</span>` : ""}
               </div>
               ${
                 user.role === "Trainer"
@@ -7152,11 +7231,11 @@
                     : `<div class="note"><strong>Coordinacion</strong><p>Gestion y seguimiento del equipo de trainers.</p></div>`
               }
               ${
-                isCoordinator()
+                canViewAll()
                   ? `<div class="note">
                       <strong>Seguridad</strong>
-                      <p class="muted">No se muestran contrasenas actuales. Si el usuario olvido su clave, genera una temporal y enviala solo al correo registrado.</p>
-                      ${user.passwordResetTemp ? `<p><strong>Clave temporal:</strong> ${escapeHtml(user.passwordResetTemp)}</p>` : ""}
+                      <p class="muted">${isObserver() ? "Las contrasenas estan protegidas. Solo Pablo puede restablecerlas." : "No se muestran contrasenas actuales. Si el usuario olvido su clave, genera una temporal y enviala solo al correo registrado."}</p>
+                      ${isCoordinator() && user.passwordResetTemp ? `<p><strong>Clave temporal:</strong> ${escapeHtml(user.passwordResetTemp)}</p>` : ""}
                     </div>
                     <div class="actions"></div>`
                   : user.id === state.activeUserId
@@ -7165,14 +7244,16 @@
               }
             `;
             const actions = card.querySelector(".actions");
-            if (isCoordinator() && actions) {
+            if (canViewAll() && actions) {
               const resetButton = document.createElement("button");
               resetButton.className = "small";
               resetButton.type = "button";
               resetButton.textContent = "Restablecer clave";
-              resetButton.addEventListener("click", () => resetUserPassword(user.id));
+              resetButton.disabled = isObserver();
+              resetButton.title = isObserver() ? "Cuenta Admin de solo lectura" : "";
+              if (isCoordinator()) resetButton.addEventListener("click", () => resetUserPassword(user.id));
               actions.appendChild(resetButton);
-              if (user.passwordResetTemp) {
+              if (isCoordinator() && user.passwordResetTemp) {
                 const mailLink = document.createElement("a");
                 mailLink.className = "small";
                 mailLink.href = recoveryMailLink(user, user.passwordResetTemp);
@@ -7236,7 +7317,7 @@
             <div class="actions"></div>
           `;
           const actions = card.querySelector(".actions");
-          if (user) {
+          if (user && isCoordinator()) {
             const resetButton = document.createElement("button");
             resetButton.className = "small";
             resetButton.type = "button";
@@ -7363,19 +7444,21 @@
             <div class="actions"></div>
           `;
           const actions = card.querySelector(".actions");
-          if (!isObserver()) {
-            const editButton = document.createElement("button");
-            editButton.className = "small";
-            editButton.type = "button";
-            editButton.textContent = "Editar";
-            editButton.addEventListener("click", () => editLgUpdate(item));
-            const deleteButton = document.createElement("button");
-            deleteButton.className = "danger small";
-            deleteButton.type = "button";
-            deleteButton.textContent = "Eliminar";
-            deleteButton.addEventListener("click", () => removeLgUpdate(item));
-            actions.append(editButton, deleteButton);
-          }
+          const editButton = document.createElement("button");
+          editButton.className = "small";
+          editButton.type = "button";
+          editButton.textContent = "Editar";
+          editButton.disabled = isObserver();
+          editButton.title = isObserver() ? "Cuenta Admin de solo lectura" : "";
+          if (!isObserver()) editButton.addEventListener("click", () => editLgUpdate(item));
+          const deleteButton = document.createElement("button");
+          deleteButton.className = "danger small";
+          deleteButton.type = "button";
+          deleteButton.textContent = "Eliminar";
+          deleteButton.disabled = isObserver();
+          deleteButton.title = isObserver() ? "Cuenta Admin de solo lectura" : "";
+          if (!isObserver()) deleteButton.addEventListener("click", () => removeLgUpdate(item));
+          actions.append(editButton, deleteButton);
           els.lgUpdatesList.appendChild(card);
         });
       }
@@ -7964,7 +8047,7 @@
           state.selectedCoordinatorDate = nextWeekStart;
           saveUiState();
           render();
-          const target = isCoordinator() ? els.coordinatorDayPanel : els.trainerWeekPanel;
+          const target = canViewAll() ? els.coordinatorDayPanel : els.trainerWeekPanel;
           target.scrollIntoView({ behavior: "smooth", block: "start" });
         });
 

@@ -1153,7 +1153,7 @@ async function evidenceFile(db, user, fileId, env) {
   if (isObserverUser(user)) {
     const data = await loadData(db);
     const task = data.tasks.find((item) => clean(item.id) === clean(row.task_id));
-    observerAllowed = task?.status === "Cumplida";
+    observerAllowed = Boolean(task);
   }
   const allowed =
     user.role === "Coordinador" || observerAllowed || row.submitted_by_id === user.id || row.owner_id === user.id;
@@ -1850,7 +1850,7 @@ async function stateResponse(db, user, loadedData = null) {
   const coordinator = user.role === "Coordinador";
   const observer = isObserverUser(user);
   const canViewAll = coordinator || observer;
-  const userRows = coordinator
+  const userRows = canViewAll
     ? await db.prepare("SELECT id, name, email, zone, role, status, created_at, access_level FROM users ORDER BY created_at ASC").all()
     : await db
         .prepare("SELECT id, name, email, zone, role, status, created_at, access_level FROM users WHERE status = 'Activo' ORDER BY role ASC, name ASC")
@@ -1861,32 +1861,22 @@ async function stateResponse(db, user, loadedData = null) {
     ...data,
     activeUserId: user.id,
     users,
-    tasks: observer
-      ? data.tasks.filter((task) => task.status === "Cumplida")
-      : coordinator
-        ? data.tasks
-        : data.tasks.filter((task) => task.ownerId === user.id),
-    deletedTasks: coordinator
+    tasks: canViewAll ? data.tasks : data.tasks.filter((task) => task.ownerId === user.id),
+    deletedTasks: canViewAll
       ? data.deletedTasks
-      : observer
-        ? []
-        : (data.deletedTasks || []).filter((task) => task.ownerId === user.id),
+      : (data.deletedTasks || []).filter((task) => task.ownerId === user.id),
     workScheduleByUserDate: canViewAll
       ? data.workScheduleByUserDate
       : { [user.id]: data.workScheduleByUserDate?.[user.id] || {} },
-    overtimeRequests: coordinator
+    overtimeRequests: canViewAll
       ? data.overtimeRequests
-      : observer
-        ? []
-        : (data.overtimeRequests || []).filter((request) => request.userId === user.id),
+      : (data.overtimeRequests || []).filter((request) => request.userId === user.id),
     announcements: canViewAll
       ? data.announcements
       : data.announcements.filter((item) => item.audience === "all" || item.targetId === user.id),
-    supportRequests: coordinator
+    supportRequests: canViewAll
       ? data.supportRequests
-      : observer
-        ? []
-        : data.supportRequests.filter((item) => item.fromId === user.id || item.toId === user.id),
+      : data.supportRequests.filter((item) => item.fromId === user.id || item.toId === user.id),
     passwordRecoveryRequests: coordinator ? data.passwordRecoveryRequests : [],
     registrationRequests: coordinator ? data.registrationRequests : []
   };
