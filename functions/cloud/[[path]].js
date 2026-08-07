@@ -8,6 +8,7 @@ const ABANDONED_UPLOAD_TTL_MS = 10 * 60 * 1000;
 const DELIVERED_NOTIFICATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const UNDELIVERED_NOTIFICATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const MAINTENANCE_SETTING_KEY = "storage_maintenance_r2_direct_v6";
+const LEGACY_EVIDENCE_MIGRATION_ENABLED = false;
 const OBSERVER_ACCESS_LEVEL = "observer";
 const OBSERVER_EMAIL = "giuliana.parra@lgtask.local";
 
@@ -336,7 +337,9 @@ async function runMaintenance(db, env) {
     db.prepare("DELETE FROM user_notifications WHERE delivered_at = 0 AND created_at < ?").bind(undeliveredNotificationCutoff)
   ]);
 
-  const migration = await migrateOneLegacyEvidence(db, env);
+  const migration = LEGACY_EVIDENCE_MIGRATION_ENABLED
+    ? await migrateOneLegacyEvidence(db, env)
+    : { migrated: false, failed: false };
   if (migration.migrated || migration.failed) {
     await db
       .prepare("UPDATE app_settings SET value = ?, updated_at = 0 WHERE key = ?")
