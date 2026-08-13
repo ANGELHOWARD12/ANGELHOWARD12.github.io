@@ -3069,7 +3069,7 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = "23-r2-direct1";
+      const APP_VERSION = "23-cloud-resilience1";
       const MAX_EVIDENCE_FILES = 8;
       const MAX_EVIDENCE_FILE_BYTES = 15_000_000;
       const EVIDENCE_SELECTION_TASK_KEY = "lgtask-evidence-task-v1";
@@ -3734,7 +3734,11 @@
         }
       }
 
-      async function apiRequestWithRetry(path, options = {}, attempts = 3) {
+      function cloudRetryDelay(attempt) {
+        return Math.min(8_000, 750 * 2 ** (attempt - 1)) + Math.round(Math.random() * 250);
+      }
+
+      async function apiRequestWithRetry(path, options = {}, attempts = 4) {
         let lastError;
         for (let attempt = 1; attempt <= attempts; attempt += 1) {
           try {
@@ -3742,13 +3746,13 @@
           } catch (error) {
             lastError = error;
             if (attempt >= attempts || (error.status && error.status < 500)) throw error;
-            await new Promise((resolve) => window.setTimeout(resolve, attempt * 500));
+            await new Promise((resolve) => window.setTimeout(resolve, cloudRetryDelay(attempt)));
           }
         }
         throw lastError;
       }
 
-      async function apiBinaryRequestWithRetry(path, file, mimeType, attempts = 3) {
+      async function apiBinaryRequestWithRetry(path, file, mimeType, attempts = 4) {
         let lastError;
         for (let attempt = 1; attempt <= attempts; attempt += 1) {
           const controller = new AbortController();
@@ -3775,7 +3779,7 @@
               lastError.status = 0;
             }
             if (attempt >= attempts || (lastError.status && lastError.status < 500)) throw lastError;
-            await new Promise((resolve) => window.setTimeout(resolve, attempt * 750));
+            await new Promise((resolve) => window.setTimeout(resolve, cloudRetryDelay(attempt)));
           } finally {
             window.clearTimeout(timeout);
           }
@@ -3982,7 +3986,7 @@
 
       async function refreshStateFromServer({ quiet = false } = {}) {
         try {
-          const data = await apiRequest("/state");
+          const data = await apiRequestWithRetry("/state", {}, 4);
           applyCloudState(data.state);
           if (!quiet) render();
           checkPendingNotifications();
@@ -7825,10 +7829,11 @@
           event.preventDefault();
           setMessage(els.loginMessage, "Conectando con LGTASK...", "");
           try {
-            const data = await apiRequest("/auth/login", {
+            const data = await apiRequestWithRetry("/auth/login", {
               method: "POST",
-              body: JSON.stringify({ email: els.loginEmail.value, password: els.loginPassword.value })
-            });
+              body: JSON.stringify({ email: els.loginEmail.value, password: els.loginPassword.value }),
+              timeoutMs: 30_000
+            }, 5);
             applyCloudState(data.state);
             els.loginPassword.value = "";
             setMessage(els.loginMessage, "", "");
@@ -8619,8 +8624,9 @@
           try {
             const data = await apiRequestWithRetry("/tasks/evidence", {
               method: "POST",
-              body: JSON.stringify({ taskId: task.id, evidence })
-            });
+              body: JSON.stringify({ taskId: task.id, evidence }),
+              timeoutMs: 60_000
+            }, 6);
             applyCloudState(data.state);
           } catch (error) {
             const refreshed = await refreshStateFromServer({ quiet: true });

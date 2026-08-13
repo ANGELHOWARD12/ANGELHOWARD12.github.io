@@ -9,6 +9,7 @@ const DELIVERED_NOTIFICATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const UNDELIVERED_NOTIFICATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const MAINTENANCE_SETTING_KEY = "storage_maintenance_r2_direct_v6_paused";
 const LEGACY_EVIDENCE_MIGRATION_ENABLED = false;
+const SCHEMA_VERSION = "23-storage-resilience-1";
 const OBSERVER_ACCESS_LEVEL = "observer";
 const OBSERVER_EMAIL = "giuliana.parra@lgtask.local";
 
@@ -104,7 +105,6 @@ export async function onRequest(context) {
 
   try {
     await ensureSchema(env.DB);
-    scheduleMaintenance(env.DB, env, context);
     const url = new URL(request.url);
     const route = url.pathname.replace(/^\/(?:api|cloud)\/?/, "");
 
@@ -121,6 +121,9 @@ export async function onRequest(context) {
 
     const session = await authenticate(request, env.DB);
     if (!session) return json({ ok: false, message: "Sesion no valida." }, 401);
+    if ((route === "state" && request.method === "GET") || route === "storage/status") {
+      scheduleMaintenance(env.DB, env, context);
+    }
     if (
       isObserverUser(session.user) &&
       !["GET", "HEAD"].includes(request.method) &&
@@ -175,6 +178,15 @@ export async function onRequest(context) {
 
 async function ensureSchema(db) {
   if (schemaReady) return;
+  try {
+    const marker = await db.prepare("SELECT value FROM app_settings WHERE key = 'schema_version'").first();
+    if (clean(marker?.value) === SCHEMA_VERSION) {
+      schemaReady = true;
+      return;
+    }
+  } catch (error) {
+    if (!String(error?.message || error).toLowerCase().includes("no such table")) throw error;
+  }
   await db.batch([
     db.prepare(`CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -274,6 +286,10 @@ async function ensureSchema(db) {
   await db
     .prepare("UPDATE users SET access_level = ?, zone = 'Administracion general' WHERE email = ?")
     .bind(OBSERVER_ACCESS_LEVEL, OBSERVER_EMAIL)
+    .run();
+  await db
+    .prepare("INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES ('schema_version', ?, ?)")
+    .bind(SCHEMA_VERSION, Date.now())
     .run();
   schemaReady = true;
 }
@@ -576,7 +592,6 @@ async function login(request, db) {
   const token = randomToken(32);
   const tokenHash = await sha256Hex(token);
   const expiresAt = Date.now() + SESSION_DAYS * 86400000;
-  await db.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(Date.now()).run();
   await db
     .prepare("INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)")
     .bind(tokenHash, row.id, expiresAt, Date.now())
@@ -1789,8 +1804,12 @@ async function submitTaskEvidence(request, db, user, context) {
       url: `/?view=evidenceView&task=${encodeURIComponent(taskId)}`,
       sourceKey: `evidence:${taskId}:${evidenceId}:${clean(coordinator.id)}`
     }));
-  const notifiedUsers = await queueNotifications(db, notifications);
-  if (notifiedUsers.length) context.waitUntil(pushNotificationsForUsers(db, notifiedUsers));
+  try {
+    const notifiedUsers = await queueNotifications(db, notifications);
+    if (notifiedUsers.length) context.waitUntil(pushNotificationsForUsers(db, notifiedUsers));
+  } catch (error) {
+    console.error("Evidence notification queue", error);
+  }
   return stateResponse(db, user, data);
 }
 
