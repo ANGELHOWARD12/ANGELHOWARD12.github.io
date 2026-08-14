@@ -2589,12 +2589,12 @@
       <section id="evidenceView" class="view">
         <section id="lateEvidencePolicyPanel" class="panel late-evidence-policy hidden">
           <div class="late-evidence-policy-copy">
-            <h2>Sustentos de dias anteriores</h2>
-            <p id="lateEvidencePolicyText" class="muted">La carga de fechas pasadas esta bloqueada para todos los trainers.</p>
+            <h2>Permiso para fechas anteriores</h2>
+            <p id="lateEvidencePolicyText" class="muted">Los sustentos y la modificacion de breaks anteriores estan bloqueados para todos los trainers.</p>
             <p id="lateEvidencePolicyMessage" class="message" aria-live="polite"></p>
           </div>
           <label class="policy-switch" for="lateEvidencePolicyToggle">
-            <input id="lateEvidencePolicyToggle" type="checkbox" role="switch" aria-label="Permitir sustentos de dias anteriores" />
+            <input id="lateEvidencePolicyToggle" type="checkbox" role="switch" aria-label="Permitir sustentos y breaks de dias anteriores" />
             <span class="policy-switch-track" aria-hidden="true"></span>
             <span id="lateEvidencePolicyState" class="policy-switch-state">Apagado</span>
           </label>
@@ -3155,7 +3155,7 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = "23-cloud-resilience2";
+      const APP_VERSION = "23-cloud-resilience3";
       const MAX_EVIDENCE_FILES = 8;
       const MAX_EVIDENCE_FILE_BYTES = 15_000_000;
       const EVIDENCE_MULTIPART_PART_BYTES = 5 * 1024 * 1024;
@@ -4600,7 +4600,8 @@
       }
 
       function availableBreakSlots(userId, dateValue, slotDuration) {
-        if (!userId || !dateValue || dateValue < todayIso || isSunday(dateValue) || isSaturday(dateValue) || slotDuration < 15) return [];
+        const pastDateBlocked = dateValue < todayIso && !state.lateEvidenceUploadsEnabled;
+        if (!userId || !dateValue || pastDateBlocked || isSunday(dateValue) || isSaturday(dateValue) || slotDuration < 15) return [];
         const schedule = workScheduleForDate(dateValue, userId);
         const firstMinute = timeToMinutes(schedule.start);
         const lastMinute = timeToMinutes(schedule.end);
@@ -4616,7 +4617,9 @@
 
       function availabilityBlockedReason(dateValue, userId, slotDuration, forBreak = false) {
         if (!dateValue) return "Selecciona una fecha para consultar la agenda.";
-        if (forBreak && dateValue < todayIso) return "Los breaks anteriores quedan protegidos. Elige hoy o una fecha futura.";
+        if (forBreak && dateValue < todayIso && !state.lateEvidenceUploadsEnabled) {
+          return "Los breaks anteriores estan protegidos. Pablo debe encender el permiso para fechas anteriores.";
+        }
         if (isSunday(dateValue)) return "El domingo no forma parte de la jornada laboral.";
         if (forBreak && isSaturday(dateValue)) return "Los sabados no tienen break programado por la jornada corta.";
         const schedule = workScheduleForDate(dateValue, userId);
@@ -5958,8 +5961,8 @@
         els.lateEvidencePolicyToggle.checked = enabled;
         els.lateEvidencePolicyState.textContent = enabled ? "Encendido" : "Apagado";
         els.lateEvidencePolicyText.textContent = enabled
-          ? "Los trainers pueden subir sustentos de tareas anteriores hasta que Pablo apague este permiso."
-          : "La carga de fechas pasadas esta bloqueada para todos los trainers.";
+          ? "Los trainers pueden subir sustentos y modificar su break de dias anteriores hasta que Pablo apague este permiso."
+          : "Los sustentos y la modificacion de breaks anteriores estan bloqueados para todos los trainers.";
       }
 
       function render() {
@@ -6083,8 +6086,14 @@
           els.breakDate.value = nearestBreakDay(todayIso);
           setMessage(els.breakSettingsMessage, "", "");
         }
-        els.breakDate.min = todayIso;
-        if (!els.breakDate.value || els.breakDate.value < todayIso) els.breakDate.value = nearestBreakDay(todayIso);
+        if (state.lateEvidenceUploadsEnabled) {
+          els.breakDate.removeAttribute("min");
+        } else {
+          els.breakDate.min = todayIso;
+        }
+        if (!els.breakDate.value || (els.breakDate.value < todayIso && !state.lateEvidenceUploadsEnabled)) {
+          els.breakDate.value = nearestBreakDay(todayIso);
+        }
         const editorKey = `${state.activeUserId}|${els.breakDate.value}`;
         const loadSaved = forceSaved || editorKey !== breakEditorKey;
         const settings = breakSettingsForUser(state.activeUserId, els.breakDate.value);
@@ -8187,11 +8196,11 @@
             setMessage(
               els.lateEvidencePolicyMessage,
               enabled
-                ? "Permiso encendido. Los trainers ya pueden cargar sustentos de fechas anteriores."
-                : "Permiso apagado. Las fechas anteriores vuelven a estar bloqueadas.",
+                ? "Permiso encendido. Los trainers ya pueden cargar sustentos y modificar breaks de fechas anteriores."
+                : "Permiso apagado. Los sustentos y breaks anteriores vuelven a estar bloqueados.",
               "ok"
             );
-            showToast(enabled ? "Sustentos anteriores habilitados." : "Sustentos anteriores bloqueados.", "success");
+            showToast(enabled ? "Sustentos y breaks anteriores habilitados." : "Sustentos y breaks anteriores bloqueados.", "success");
           } catch (error) {
             renderLateEvidencePolicy();
             setMessage(els.lateEvidencePolicyMessage, error.message, "err");
@@ -8453,7 +8462,7 @@
             breakEnd: selectedSlot.endTime
           };
           const normalized = normalizeWorkSettings(requested);
-          if (dateValue < todayIso || isSunday(dateValue) || isSaturday(dateValue)) {
+          if ((dateValue < todayIso && !state.lateEvidenceUploadsEnabled) || isSunday(dateValue) || isSaturday(dateValue)) {
             setMessage(els.breakSettingsMessage, availabilityBlockedReason(dateValue, state.activeUserId, Number(els.breakDuration.value), true), "err");
             return;
           }

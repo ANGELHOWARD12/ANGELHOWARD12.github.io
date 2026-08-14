@@ -216,7 +216,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "23-cloud-resilience2",
+    version: "23-cloud-resilience3",
     schema: SCHEMA_VERSION,
     r2: r2StorageEnabled(env),
     migration: {
@@ -1310,11 +1310,11 @@ async function getState(db, user, context) {
 
 async function setLateEvidencePolicy(request, db, user, context) {
   if (user.role !== "Coordinador") {
-    return json({ ok: false, message: "Solo Pablo puede cambiar el permiso de sustentos anteriores." }, 403);
+    return json({ ok: false, message: "Solo Pablo puede cambiar el permiso para fechas anteriores." }, 403);
   }
   const body = await readJson(request);
   if (typeof body.enabled !== "boolean") {
-    return json({ ok: false, message: "Selecciona si la carga de sustentos anteriores debe estar encendida o apagada." }, 400);
+    return json({ ok: false, message: "Selecciona si el permiso para sustentos y breaks anteriores debe estar encendido o apagado." }, 400);
   }
 
   const data = await loadData(db);
@@ -1341,10 +1341,10 @@ async function setLateEvidencePolicy(request, db, user, context) {
     db,
     (trainers.results || []).map((trainer) => ({
       userId: trainer.id,
-      title: enabled ? "Sustentos anteriores habilitados" : "Sustentos anteriores bloqueados",
+      title: enabled ? "Fechas anteriores habilitadas" : "Fechas anteriores bloqueadas",
       body: enabled
-        ? "Pablo habilito temporalmente la carga de evidencias para tareas de dias anteriores."
-        : "La carga de evidencias vuelve a estar disponible solamente para las tareas del dia.",
+        ? "Pablo habilito temporalmente la carga de sustentos y la modificacion de breaks de dias anteriores."
+        : "Los sustentos y los breaks anteriores vuelven a estar protegidos.",
       url: "/?view=evidenceView",
       sourceKey: `late-evidence-policy:${enabled ? "on" : "off"}:${changedAt}:${trainer.id}`
     }))
@@ -3236,9 +3236,11 @@ async function putState(request, db, user, context) {
   const personalBreakDates = submitted.breakSettingsByUserDate?.[user.id];
   if (personalBreakDates && typeof personalBreakDates === "object" && !Array.isArray(personalBreakDates)) {
     const normalizedDates = normalizeBreakSettingsByUserDate({ [user.id]: personalBreakDates });
+    const today = dateIsoInLima(Date.now());
     const conflictFreeDates = Object.fromEntries(
       Object.entries(normalizedDates[user.id] || {}).filter(
         ([dateValue, settings]) =>
+          (dateValue >= today || current.lateEvidenceUploadsEnabled) &&
           !hasTaskConflict(current.tasks, user.id, dateValue, settings.breakStart, settings.breakEnd)
       )
     );
