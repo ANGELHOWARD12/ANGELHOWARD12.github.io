@@ -454,6 +454,66 @@
         width: 8px;
       }
 
+      .cloud-status {
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--muted);
+        display: inline-flex;
+        font-size: 12px;
+        font-weight: 900;
+        gap: 7px;
+        padding: 8px 11px;
+        white-space: nowrap;
+      }
+
+      .cloud-status::before {
+        background: currentColor;
+        border-radius: 50%;
+        content: "";
+        height: 8px;
+        width: 8px;
+      }
+
+      .cloud-status[data-state="online"] {
+        background: var(--green-soft);
+        border-color: #83d3b3;
+        color: #087653;
+      }
+
+      .cloud-status[data-state="syncing"] {
+        background: #fff5d7;
+        border-color: #ecc65c;
+        color: #815800;
+      }
+
+      .cloud-status[data-state="error"],
+      .cloud-status[data-state="offline"] {
+        background: #ffe8ea;
+        border-color: #e79aa1;
+        color: var(--red);
+      }
+
+      .storage-grid {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .storage-meter {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        display: grid;
+        gap: 5px;
+        padding: 10px;
+      }
+
+      .storage-meter progress {
+        accent-color: var(--blue);
+        width: 100%;
+      }
+
       .shell {
         margin: 0 auto;
         max-width: 1440px;
@@ -1955,6 +2015,15 @@
           width: 100%;
         }
 
+        #cloudStatusIndicator {
+          grid-column: 1 / -1;
+          justify-content: center;
+        }
+
+        .storage-grid {
+          grid-template-columns: 1fr;
+        }
+
         .dashboard {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
@@ -2207,6 +2276,7 @@
       <div class="session">
         <span id="sessionName" class="muted"></span>
         <span id="sessionRole" class="pill"></span>
+        <span id="cloudStatusIndicator" class="cloud-status" data-state="syncing" title="Estado de conexion con la nube">Conectando</span>
         <button id="notificationButton" class="ghost notification-button" type="button">
           <span class="notification-dot"></span>
           <span id="notificationButtonText">Activar notificaciones</span>
@@ -2681,9 +2751,25 @@
             </div>
             <div id="teamList" class="list"></div>
             <div id="backupTools" class="note stack">
-              <strong>Respaldo temporal</strong>
-              <p class="muted">Mientras no haya base de datos, estos botones ayudan a mover informacion entre equipos.</p>
+              <strong>Salud y respaldo de la nube</strong>
+              <p id="storageStatusText" class="muted">Consultando D1 y R2...</p>
+              <div class="storage-grid">
+                <div class="storage-meter">
+                  <strong>D1</strong>
+                  <span id="d1StorageText" class="muted">Consultando...</span>
+                  <progress id="d1StorageMeter" max="100" value="0"></progress>
+                </div>
+                <div class="storage-meter">
+                  <strong>R2</strong>
+                  <span id="r2StorageText" class="muted">Consultando...</span>
+                  <progress id="r2StorageMeter" max="100" value="0"></progress>
+                </div>
+              </div>
+              <p id="storageAlert" class="message" aria-live="polite"></p>
+              <p id="backupStatusText" class="muted">El respaldo semanal se genera automaticamente.</p>
               <div class="actions">
+                <button id="refreshStorageStatus" class="small" type="button">Actualizar estado</button>
+                <button id="createCloudBackup" class="small" type="button">Respaldar ahora</button>
                 <button id="exportData" class="small" type="button">Exportar datos</button>
                 <label class="small" style="display:inline-flex;align-items:center;gap:8px">
                   Importar datos
@@ -3069,12 +3155,15 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = "23-cloud-resilience1";
+      const APP_VERSION = "23-cloud-resilience2";
       const MAX_EVIDENCE_FILES = 8;
       const MAX_EVIDENCE_FILE_BYTES = 15_000_000;
+      const EVIDENCE_MULTIPART_PART_BYTES = 5 * 1024 * 1024;
       const EVIDENCE_SELECTION_TASK_KEY = "lgtask-evidence-task-v1";
       const EVIDENCE_SELECTION_DATE_KEY = "lgtask-evidence-date-v1";
       const EVIDENCE_PENDING_SUBMISSION_KEY = "lgtask-evidence-pending-v1";
+      const STORAGE_STATUS_CACHE_KEY = "lgtask-storage-status-v1";
+      const OFFLINE_SYNC_KEY = "lgtask-offline-sync-v1";
       const NOTIFICATION_TASKS_KEY = "lgtask-notified-tasks-v1";
       const ALLOWED_VIEW_IDS = ["tasksView", "evidenceView", "teamView", "announcementsView", "infoView"];
       const EVIDENCE_FILE_EXTENSIONS = new Set([
@@ -3239,11 +3328,14 @@
       let evidenceOpenInFlight = false;
       let pendingEvidenceSubmission = (() => {
         try {
-          return JSON.parse(sessionStorage.getItem(EVIDENCE_PENDING_SUBMISSION_KEY) || "null");
+          return JSON.parse(localStorage.getItem(EVIDENCE_PENDING_SUBMISSION_KEY) || "null");
         } catch {
           return null;
         }
       })();
+      let cloudStatus = navigator.onLine ? "syncing" : "offline";
+      let lastStorageStatusAt = 0;
+      let storageStatusInFlight = null;
       let selectedEvidenceTaskId = sessionStorage.getItem(EVIDENCE_SELECTION_TASK_KEY) || "";
       let selectedEvidenceDate = sessionStorage.getItem(EVIDENCE_SELECTION_DATE_KEY) || "";
       let taskCreateInFlight = false;
@@ -3294,6 +3386,7 @@
         registrationMessage: document.querySelector("#registrationMessage"),
         sessionName: document.querySelector("#sessionName"),
         sessionRole: document.querySelector("#sessionRole"),
+        cloudStatusIndicator: document.querySelector("#cloudStatusIndicator"),
         notificationButton: document.querySelector("#notificationButton"),
         notificationButtonText: document.querySelector("#notificationButtonText"),
         logoutButton: document.querySelector("#logoutButton"),
@@ -3432,6 +3525,15 @@
         passwordRecoveryList: document.querySelector("#passwordRecoveryList"),
         teamList: document.querySelector("#teamList"),
         backupTools: document.querySelector("#backupTools"),
+        storageStatusText: document.querySelector("#storageStatusText"),
+        d1StorageText: document.querySelector("#d1StorageText"),
+        d1StorageMeter: document.querySelector("#d1StorageMeter"),
+        r2StorageText: document.querySelector("#r2StorageText"),
+        r2StorageMeter: document.querySelector("#r2StorageMeter"),
+        storageAlert: document.querySelector("#storageAlert"),
+        backupStatusText: document.querySelector("#backupStatusText"),
+        refreshStorageStatus: document.querySelector("#refreshStorageStatus"),
+        createCloudBackup: document.querySelector("#createCloudBackup"),
         exportData: document.querySelector("#exportData"),
         importData: document.querySelector("#importData"),
         coordinatorAnnouncementPanel: document.querySelector("#coordinatorAnnouncementPanel"),
@@ -3704,10 +3806,108 @@
         }, 150);
       }
 
+      function setCloudStatus(nextStatus, detail = "") {
+        cloudStatus = nextStatus;
+        if (!els.cloudStatusIndicator) return;
+        const labels = {
+          online: "Nube activa",
+          syncing: "Sincronizando",
+          offline: "Sin conexion",
+          error: "Nube inestable"
+        };
+        els.cloudStatusIndicator.dataset.state = nextStatus;
+        els.cloudStatusIndicator.textContent = labels[nextStatus] || labels.syncing;
+        els.cloudStatusIndicator.title = detail || labels[nextStatus] || labels.syncing;
+      }
+
+      function formatStorageBytes(bytes) {
+        const value = Number(bytes || 0);
+        if (value < 1_000_000) return `${Math.round(value / 1000)} KB`;
+        if (value < 1_000_000_000) return `${(value / 1_000_000).toFixed(1)} MB`;
+        return `${(value / 1_000_000_000).toFixed(2)} GB`;
+      }
+
+      function renderStorageStatus(status) {
+        if (!status?.d1 || !els.storageStatusText) return;
+        const d1Used = Number(status.d1.databaseBytes || status.d1.approximatePayloadBytes || 0);
+        const d1Quota = Number(status.d1.quotaBytes || 500_000_000);
+        const r2Used = Number(status.r2?.bytes || 0);
+        const r2Quota = Number(status.r2?.freeTierBytes || 10_000_000_000);
+        const d1Percent = Math.min(100, Math.round((d1Used / d1Quota) * 100));
+        const r2Percent = Math.min(100, Math.round((r2Used / r2Quota) * 100));
+        els.d1StorageText.textContent = `${formatStorageBytes(d1Used)} de ${formatStorageBytes(d1Quota)} | ${status.d1.taskRows || 0} tareas`;
+        els.r2StorageText.textContent = `${formatStorageBytes(r2Used)} de ${formatStorageBytes(r2Quota)} gratis | ${status.r2?.objects || 0} archivos`;
+        els.d1StorageMeter.value = d1Percent;
+        els.r2StorageMeter.value = r2Percent;
+        els.storageStatusText.textContent = `D1 ${d1Percent}% | R2 ${r2Percent}% | ${status.d1.multipartUploads || 0} cargas pendientes`;
+        const warnings = [];
+        if (d1Percent >= 80) warnings.push("D1 supero el 80% de capacidad.");
+        else if (d1Percent >= 65) warnings.push("D1 se acerca al limite recomendado.");
+        if (r2Percent >= 80) warnings.push("R2 supero el 80% del nivel gratuito.");
+        if (Number(status.maintenance?.failedMigrations || 0)) warnings.push("Hay archivos antiguos pendientes de revision.");
+        setMessage(els.storageAlert, warnings.join(" "), warnings.length ? "err" : "ok");
+        if (!warnings.length) els.storageAlert.textContent = "Almacenamiento saludable.";
+        els.backupStatusText.textContent = status.backup?.generatedAt
+          ? `Ultimo respaldo: ${formatDateTime(status.backup.generatedAt)} | ${status.backup.weekId || "semana actual"}`
+          : "El primer respaldo semanal se generara automaticamente en R2.";
+      }
+
+      async function refreshStorageStatus({ force = false } = {}) {
+        if (!canViewAll() || !state.activeUserId) return null;
+        if (!force && Date.now() - lastStorageStatusAt < 60 * 60 * 1000) return null;
+        if (storageStatusInFlight) return storageStatusInFlight;
+        storageStatusInFlight = apiRequestWithRetry("/storage/status", { timeoutMs: 90_000 }, 3)
+          .then((data) => {
+            lastStorageStatusAt = Date.now();
+            localStorage.setItem(STORAGE_STATUS_CACHE_KEY, JSON.stringify({ at: lastStorageStatusAt, storage: data.storage }));
+            renderStorageStatus(data.storage);
+            return data.storage;
+          })
+          .catch((error) => {
+            setMessage(els.storageAlert, `No se pudo consultar el almacenamiento: ${error.message}`, "err");
+            return null;
+          })
+          .finally(() => {
+            storageStatusInFlight = null;
+          });
+        return storageStatusInFlight;
+      }
+
+      function persistOfflineState(snapshot) {
+        if (canViewAll()) return;
+        localStorage.setItem(
+          OFFLINE_SYNC_KEY,
+          JSON.stringify({ userId: state.activeUserId, queuedAt: Date.now(), state: snapshot })
+        );
+        serviceWorkerRegistration?.sync?.register("lgtask-cloud-sync").catch(() => {});
+      }
+
+      async function replayOfflineState() {
+        if (!navigator.onLine || !state.activeUserId || canViewAll()) return false;
+        let queued;
+        try {
+          queued = JSON.parse(localStorage.getItem(OFFLINE_SYNC_KEY) || "null");
+        } catch {
+          queued = null;
+        }
+        if (!queued || queued.userId !== state.activeUserId || Date.now() - Number(queued.queuedAt || 0) > 24 * 60 * 60 * 1000) {
+          localStorage.removeItem(OFFLINE_SYNC_KEY);
+          return false;
+        }
+        setCloudStatus("syncing", "Recuperando cambios guardados sin conexion");
+        const data = await apiRequestWithRetry("/state", { method: "PUT", body: JSON.stringify({ state: queued.state }) }, 5);
+        localStorage.removeItem(OFFLINE_SYNC_KEY);
+        applyCloudState(data.state);
+        render();
+        showToast("Los cambios guardados sin conexion ya se sincronizaron.", "success");
+        return true;
+      }
+
       async function apiRequest(path, options = {}) {
         const { timeoutMs = 45_000, ...fetchOptions } = options;
         const controller = new AbortController();
         const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+        if (fetchOptions.method && fetchOptions.method !== "GET") setCloudStatus("syncing");
         try {
           const response = await fetch(`${API_BASE}${path}`, {
             credentials: "same-origin",
@@ -3721,8 +3921,10 @@
             error.status = response.status;
             throw error;
           }
+          setCloudStatus("online");
           return data;
         } catch (error) {
+          setCloudStatus(error.status && error.status < 500 ? "online" : navigator.onLine ? "error" : "offline", error.message);
           if (error.name === "AbortError") {
             const timeoutError = new Error("La nube demoro demasiado en responder. LGTASK volvera a intentarlo automaticamente.");
             timeoutError.status = 0;
@@ -3771,8 +3973,13 @@
               error.status = response.status;
               throw error;
             }
+            setCloudStatus("online");
             return data;
           } catch (error) {
+            setCloudStatus(
+              error.status && error.status < 500 ? "online" : navigator.onLine ? "error" : "offline",
+              error.message
+            );
             lastError = error;
             if (error.name === "AbortError") {
               lastError = new Error("La carga demoro demasiado. LGTASK volvera a intentarlo automaticamente.");
@@ -4010,7 +4217,13 @@
           syncQueued = false;
           const snapshotRevision = stateRevision;
           const snapshot = JSON.parse(JSON.stringify(state));
-          finalData = await apiRequest("/state", { method: "PUT", body: JSON.stringify({ state: snapshot }) });
+          try {
+            finalData = await apiRequest("/state", { method: "PUT", body: JSON.stringify({ state: snapshot }) });
+            if (!canViewAll()) localStorage.removeItem(OFFLINE_SYNC_KEY);
+          } catch (error) {
+            persistOfflineState(snapshot);
+            throw error;
+          }
           if (stateRevision === snapshotRevision) {
             applyCloudState(finalData.state);
             render();
@@ -5779,6 +5992,7 @@
         els.trainerFilterWrap.classList.toggle("hidden", !canViewAll());
         els.coordinatorTeamPanel.classList.toggle("hidden", !canViewAll());
         els.backupTools.classList.toggle("hidden", !canViewAll());
+        els.createCloudBackup.classList.toggle("hidden", !isCoordinator());
         els.coordinatorAnnouncementPanel.classList.toggle("hidden", !canViewAll());
         els.cloudPlanPanel.classList.toggle("hidden", !canViewAll());
         els.evidenceFilters.classList.toggle("hidden", !canViewAll());
@@ -5792,6 +6006,18 @@
           : "Organiza tus propias tareas de la semana. Solo puedes asignarlas a tu usuario.";
         els.taskSubmitButton.textContent = canViewAll() ? "Asignar tarea" : "Agregar a mi semana";
         els.taskOwner.disabled = !isCoordinator();
+        if (canViewAll() && !lastStorageStatusAt) {
+          try {
+            const cached = JSON.parse(localStorage.getItem(STORAGE_STATUS_CACHE_KEY) || "null");
+            if (cached?.storage) {
+              lastStorageStatusAt = Number(cached.at || 0);
+              renderStorageStatus(cached.storage);
+            }
+          } catch {
+            localStorage.removeItem(STORAGE_STATUS_CACHE_KEY);
+          }
+          refreshStorageStatus().catch(() => {});
+        }
         activateView(activeViewId);
 
         refreshSelects();
@@ -6018,9 +6244,9 @@
       function rememberPendingEvidenceSubmission(submission) {
         pendingEvidenceSubmission = submission || null;
         if (pendingEvidenceSubmission) {
-          sessionStorage.setItem(EVIDENCE_PENDING_SUBMISSION_KEY, JSON.stringify(pendingEvidenceSubmission));
+          localStorage.setItem(EVIDENCE_PENDING_SUBMISSION_KEY, JSON.stringify(pendingEvidenceSubmission));
         } else {
-          sessionStorage.removeItem(EVIDENCE_PENDING_SUBMISSION_KEY);
+          localStorage.removeItem(EVIDENCE_PENDING_SUBMISSION_KEY);
         }
       }
 
@@ -7772,17 +7998,58 @@
       }
 
       async function uploadPreparedEvidenceFile(taskId, prepared, onChunk) {
-        onChunk?.(1, 1);
-        const query = new URLSearchParams({
-          taskId,
-          fileName: prepared.fileName,
-          size: String(prepared.file.size)
-        });
-        return apiBinaryRequestWithRetry(
-          `/evidence/upload/r2?${query.toString()}`,
-          prepared.file,
-          prepared.mimeType
-        );
+        if (prepared.file.size <= EVIDENCE_MULTIPART_PART_BYTES) {
+          onChunk?.(1, 1);
+          const query = new URLSearchParams({
+            taskId,
+            fileName: prepared.fileName,
+            size: String(prepared.file.size)
+          });
+          return apiBinaryRequestWithRetry(
+            `/evidence/upload/r2?${query.toString()}`,
+            prepared.file,
+            prepared.mimeType
+          );
+        }
+
+        const clientKey = `${taskId}:${prepared.fileName}:${prepared.file.size}:${prepared.file.lastModified || 0}`;
+        const initialized = await apiRequestWithRetry("/evidence/upload/r2/init", {
+          method: "POST",
+          body: JSON.stringify({
+            taskId,
+            fileName: prepared.fileName,
+            mimeType: prepared.mimeType,
+            size: prepared.file.size,
+            clientKey
+          }),
+          timeoutMs: 60_000
+        }, 5);
+        const partSize = Number(initialized.partSize || EVIDENCE_MULTIPART_PART_BYTES);
+        const totalParts = Math.ceil(prepared.file.size / partSize);
+        const uploadedParts = new Set((initialized.uploadedParts || []).map(Number));
+        for (let partNumber = 1; partNumber <= totalParts; partNumber += 1) {
+          if (!uploadedParts.has(partNumber)) {
+            const start = (partNumber - 1) * partSize;
+            const part = prepared.file.slice(start, Math.min(prepared.file.size, start + partSize), prepared.mimeType);
+            const query = new URLSearchParams({
+              uploadId: initialized.uploadId,
+              partNumber: String(partNumber),
+              size: String(part.size)
+            });
+            await apiBinaryRequestWithRetry(
+              `/evidence/upload/r2/part?${query.toString()}`,
+              part,
+              prepared.mimeType,
+              5
+            );
+          }
+          onChunk?.(partNumber, totalParts);
+        }
+        return apiRequestWithRetry("/evidence/upload/r2/complete", {
+          method: "POST",
+          body: JSON.stringify({ uploadId: initialized.uploadId }),
+          timeoutMs: 90_000
+        }, 6);
       }
 
       function addEventListeners() {
@@ -7839,6 +8106,8 @@
             setMessage(els.loginMessage, "", "");
             setMessage(els.overtimeMessage, "", "");
             render();
+            await replayOfflineState().catch((error) => setCloudStatus(navigator.onLine ? "error" : "offline", error.message));
+            refreshStorageStatus().catch(() => {});
             syncNotificationSubscription().catch(() => {});
           } catch (error) {
             setMessage(els.loginMessage, error.message, "err");
@@ -8736,6 +9005,48 @@
           render();
         });
 
+        els.refreshStorageStatus.addEventListener("click", async () => {
+          els.refreshStorageStatus.disabled = true;
+          await refreshStorageStatus({ force: true });
+          els.refreshStorageStatus.disabled = false;
+        });
+
+        els.createCloudBackup.addEventListener("click", async () => {
+          els.createCloudBackup.disabled = true;
+          els.createCloudBackup.textContent = "Respaldando...";
+          try {
+            await apiRequestWithRetry("/storage/backup", { method: "POST", body: "{}", timeoutMs: 120_000 }, 3);
+            lastStorageStatusAt = 0;
+            await refreshStorageStatus({ force: true });
+            showToast("Respaldo guardado correctamente en R2.", "success");
+          } catch (error) {
+            showToast(error.message, "error");
+          } finally {
+            els.createCloudBackup.disabled = false;
+            els.createCloudBackup.textContent = "Respaldar ahora";
+          }
+        });
+
+        window.addEventListener("offline", () => {
+          setCloudStatus("offline", "Los cambios del trainer se conservaran para sincronizarlos al volver la conexion.");
+          showToast("Sin conexion. LGTASK conservara los cambios pendientes.", "error");
+        });
+        window.addEventListener("online", () => {
+          setCloudStatus("syncing", "La conexion regreso. Sincronizando cambios pendientes.");
+          replayOfflineState()
+            .then(() => refreshStateFromServer({ quiet: true }))
+            .then(() => {
+              render();
+              if (pendingEvidenceSubmission) showToast("Hay un sustento cargado pendiente de confirmar.", "success");
+            })
+            .catch((error) => setCloudStatus("error", error.message));
+        });
+        document.addEventListener("visibilitychange", () => {
+          if (!document.hidden && state.activeUserId && navigator.onLine) {
+            refreshStateFromServer({ quiet: true }).then(() => render()).catch(() => {});
+          }
+        });
+
         els.exportData.addEventListener("click", () => {
           const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
           const url = URL.createObjectURL(blob);
@@ -8779,9 +9090,15 @@
             }
             window.location.reload();
           });
+          navigator.serviceWorker.addEventListener("message", (event) => {
+            if (event.data?.type !== "CLOUD_ONLINE") return;
+            replayOfflineState().catch(() => {});
+          });
         }
         await registerServiceWorker();
         await refreshStateFromServer();
+        await replayOfflineState().catch((error) => setCloudStatus(navigator.onLine ? "error" : "offline", error.message));
+        await refreshStorageStatus().catch(() => {});
         await syncNotificationSubscription().catch(() => {});
         window.setInterval(() => {
           if (
@@ -8794,7 +9111,7 @@
           ) {
             refreshStateFromServer().catch(() => {});
           }
-        }, 5000);
+        }, 30000);
       }
 
       bootstrap();

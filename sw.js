@@ -1,4 +1,4 @@
-const CACHE_NAME = "lgtask-shell-v23-cloud-resilience1";
+const CACHE_NAME = "lgtask-shell-v23-cloud-resilience2";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -106,6 +106,16 @@ self.addEventListener("periodicsync", (event) => {
     fetch("/cloud/state", { credentials: "include", cache: "no-store" })
       .then(() => new Promise((resolve) => setTimeout(resolve, 1200)))
       .then(showPendingNotifications)
+      .catch(() => {})
+  );
+});
+
+self.addEventListener("sync", (event) => {
+  if (event.tag !== "lgtask-cloud-sync") return;
+  event.waitUntil(
+    fetch("/cloud/state", { credentials: "include", cache: "no-store" })
+      .then(() => self.clients.matchAll({ type: "window", includeUncontrolled: true }))
+      .then((clients) => clients.forEach((client) => client.postMessage({ type: "CLOUD_ONLINE" })))
       .catch(() => {})
   );
 });
