@@ -118,7 +118,7 @@ export async function onRequest(context) {
 
     if (route === "health" && request.method === "GET") {
       scheduleMaintenance(env.DB, env, context);
-      return json({ ok: true, version: "23-cloud-resilience2", schema: SCHEMA_VERSION, r2: r2StorageEnabled(env) });
+      return healthStatus(env.DB, env);
     }
     if (route === "auth/register" && request.method === "POST") return register(request, env.DB);
     if (route === "auth/login" && request.method === "POST") return login(request, env.DB);
@@ -190,6 +190,32 @@ export async function onRequest(context) {
     console.error("LG Task API", error);
     return json({ ok: false, message: "No se pudo completar la operacion en la nube." }, 500);
   }
+}
+
+async function healthStatus(db, env) {
+  const [pendingResult, failedResult, maintenanceResult] = await db.batch([
+    db.prepare(
+      `SELECT COUNT(*) AS count FROM evidence_files files
+       WHERE NOT EXISTS (SELECT 1 FROM evidence_storage storage WHERE storage.file_id = files.id)
+         AND (LENGTH(files.photo_base64) > 0 OR EXISTS (
+           SELECT 1 FROM evidence_file_chunks chunks WHERE chunks.file_id = files.id
+         ))`
+    ),
+    db.prepare("SELECT COUNT(*) AS count FROM app_settings WHERE key LIKE 'storage_migration_failed:%'"),
+    db.prepare("SELECT value, updated_at FROM app_settings WHERE key = ?").bind(MAINTENANCE_SETTING_KEY)
+  ]);
+  return json({
+    ok: true,
+    version: "23-cloud-resilience2",
+    schema: SCHEMA_VERSION,
+    r2: r2StorageEnabled(env),
+    migration: {
+      pendingFiles: Number(pendingResult?.results?.[0]?.count || 0),
+      failedFiles: Number(failedResult?.results?.[0]?.count || 0),
+      state: clean(maintenanceResult?.results?.[0]?.value) || "pending",
+      updatedAt: Number(maintenanceResult?.results?.[0]?.updated_at || 0)
+    }
+  });
 }
 
 async function ensureSchema(db) {
