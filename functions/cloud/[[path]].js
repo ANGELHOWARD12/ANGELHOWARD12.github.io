@@ -118,7 +118,7 @@ export async function onRequest(context) {
     }
 
     if (route === "health" && request.method === "GET") {
-      scheduleMaintenance(env.DB, env, context);
+      await runMaintenance(env.DB, env);
       return healthStatus(env.DB, env);
     }
     if (route === "auth/register" && request.method === "POST") return register(request, env.DB);
@@ -539,7 +539,7 @@ async function migrateOneLegacyEvidence(db, env) {
            SELECT 1 FROM app_settings setting WHERE setting.key = 'storage_migration_failed:' || files.id
        )
        ORDER BY files.created_at ASC
-       LIMIT 2`
+       LIMIT 1`
     )
     .all();
   if (!candidates.results?.length) return { migrated: false, failed: false };
