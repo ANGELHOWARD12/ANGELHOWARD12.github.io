@@ -526,7 +526,10 @@ async function migrateOneLegacyEvidence(db, env) {
   if (!r2StorageEnabled(env)) return { migrated: false, failed: false };
   const candidates = await db
     .prepare(
-      `SELECT files.*
+      `SELECT files.id, files.task_id, files.owner_id, files.submitted_by_id,
+              files.file_name, files.mime_type, files.created_at,
+              LENGTH(files.photo_base64) AS photo_base64_length,
+              SUBSTR(files.photo_base64, -2) AS photo_base64_tail
        FROM evidence_files files
        WHERE NOT EXISTS (SELECT 1 FROM evidence_storage storage WHERE storage.file_id = files.id)
          AND (LENGTH(files.photo_base64) > 0 OR EXISTS (
@@ -552,8 +555,8 @@ async function migrateOneLegacyEvidence(db, env) {
         if (!task) throw new Error("Referenced task not found");
         const file = { id: candidate.id, fileName: candidate.file_name, mimeType: candidate.mime_type };
         let completed = true;
-        if (candidate.photo_base64) {
-          await uploadEvidenceToR2(env, db, task, file, candidate.photo_base64);
+        if (Number(candidate.photo_base64_length || 0) > 0) {
+          completed = await migrateBase64EvidenceStep(env, db, task, file, candidate);
         } else {
           completed = await migrateChunkedEvidenceStep(env, db, task, file);
         }
@@ -582,6 +585,96 @@ async function migrateOneLegacyEvidence(db, env) {
     failed: results.some((result) => result.failed),
     progressed: results.some((result) => result.progressed)
   };
+}
+
+async function migrateBase64EvidenceStep(env, db, task, file, candidate) {
+  const base64Length = Number(candidate.photo_base64_length || 0);
+  const tail = String(candidate.photo_base64_tail || "");
+  const padding = tail.endsWith("==") ? 2 : tail.endsWith("=") ? 1 : 0;
+  const totalBytes = Math.floor((base64Length * 3) / 4) - padding;
+  if (base64Length < 4 || totalBytes < 1 || totalBytes > MAX_FILE_BYTES) {
+    throw new Error("PERMANENT: Invalid legacy Base64 file size");
+  }
+  const partBase64Chars = 7_200_000;
+  const totalGroups = Math.ceil(base64Length / partBase64Chars);
+  const settingKey = `storage_migration_progress:${file.id}`;
+  const saved = await db.prepare("SELECT value FROM app_settings WHERE key = ?").bind(settingKey).first();
+  let progress;
+  if (saved?.value) {
+    progress = JSON.parse(saved.value);
+  } else {
+    const { objectKey, parentPath } = await r2EvidenceDescriptor(db, task, file);
+    const upload = await env.EVIDENCE_BUCKET.createMultipartUpload(objectKey, {
+      httpMetadata: { contentType: file.mimeType },
+      customMetadata: { fileId: clean(file.id), taskId: clean(task.id), ownerId: clean(task.ownerId) }
+    });
+    progress = {
+      source: "base64",
+      objectKey,
+      parentPath,
+      r2UploadId: upload.uploadId,
+      totalBytes,
+      totalGroups,
+      parts: []
+    };
+    await db
+      .prepare("INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)")
+      .bind(settingKey, JSON.stringify(progress), Date.now())
+      .run();
+  }
+  if (
+    clean(progress.source) !== "base64" ||
+    Number(progress.totalBytes) !== totalBytes ||
+    Number(progress.totalGroups) !== totalGroups
+  ) {
+    throw new Error("PERMANENT: Legacy Base64 changed during migration");
+  }
+
+  const groupIndex = progress.parts.length;
+  if (groupIndex < totalGroups) {
+    const offset = groupIndex * partBase64Chars;
+    const row = await db
+      .prepare("SELECT SUBSTR(photo_base64, ?, ?) AS part_base64 FROM evidence_files WHERE id = ?")
+      .bind(offset + 1, partBase64Chars, file.id)
+      .first();
+    const partBase64 = String(row?.part_base64 || "");
+    if (!partBase64 || (groupIndex < totalGroups - 1 && partBase64.length !== partBase64Chars)) {
+      throw new Error("PERMANENT: Legacy Base64 part is incomplete");
+    }
+    const bytes = decodeEvidenceBase64(partBase64);
+    if (groupIndex < totalGroups - 1 && bytes.byteLength < R2_MULTIPART_PART_BYTES) {
+      throw new Error("PERMANENT: Legacy Base64 multipart part is too small");
+    }
+    const uploaded = await env.EVIDENCE_BUCKET
+      .resumeMultipartUpload(progress.objectKey, progress.r2UploadId)
+      .uploadPart(groupIndex + 1, bytes);
+    progress.parts.push({ partNumber: groupIndex + 1, etag: uploaded.etag });
+    await db
+      .prepare("UPDATE app_settings SET value = ?, updated_at = ? WHERE key = ?")
+      .bind(JSON.stringify(progress), Date.now(), settingKey)
+      .run();
+  }
+  if (progress.parts.length < totalGroups) return false;
+
+  let storedObject;
+  try {
+    storedObject = await env.EVIDENCE_BUCKET
+      .resumeMultipartUpload(progress.objectKey, progress.r2UploadId)
+      .complete(progress.parts);
+  } catch (error) {
+    storedObject = await env.EVIDENCE_BUCKET.head(progress.objectKey).catch(() => null);
+    if (!storedObject || Number(storedObject.size || 0) !== totalBytes) throw error;
+  }
+  if (Number(storedObject?.size || 0) !== totalBytes) throw new Error("PERMANENT: Incomplete Base64 R2 migration");
+  await db
+    .prepare(
+      `INSERT OR REPLACE INTO evidence_storage
+       (file_id, provider, drive_id, drive_item_id, parent_path, size_bytes, sha256, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, '', ?)`
+    )
+    .bind(file.id, R2_STORAGE_PROVIDER, "EVIDENCE_BUCKET", progress.objectKey, progress.parentPath, totalBytes, Date.now())
+    .run();
+  return true;
 }
 
 async function migrateChunkedEvidenceStep(env, db, task, file) {
