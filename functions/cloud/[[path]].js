@@ -120,12 +120,12 @@ export async function onRequest(context) {
 
     if (route === "health" && request.method === "GET") {
       await runMaintenance(env.DB, env);
-      return healthStatus(env.DB, env);
+      return await healthStatus(env.DB, env);
     }
-    if (route === "auth/register" && request.method === "POST") return register(request, env.DB);
-    if (route === "auth/login" && request.method === "POST") return login(request, env.DB);
-    if (route === "auth/logout" && request.method === "POST") return logout(request, env.DB);
-    if (route === "auth/recovery" && request.method === "POST") return requestRecovery(request, env.DB);
+    if (route === "auth/register" && request.method === "POST") return await register(request, env.DB);
+    if (route === "auth/login" && request.method === "POST") return await login(request, env.DB);
+    if (route === "auth/logout" && request.method === "POST") return await logout(request, env.DB);
+    if (route === "auth/recovery" && request.method === "POST") return await requestRecovery(request, env.DB);
 
     const session = await authenticate(request, env.DB);
     if (!session) return json({ ok: false, message: "Sesion no valida." }, 401);
@@ -140,57 +140,64 @@ export async function onRequest(context) {
       return json({ ok: false, message: "La cuenta observadora es de solo lectura." }, 403);
     }
 
-    if (route === "notifications/config" && request.method === "GET") return notificationConfig(env.DB);
+    if (route === "notifications/config" && request.method === "GET") return await notificationConfig(env.DB);
     if (route === "notifications/subscribe" && request.method === "POST") {
-      return subscribeNotifications(request, env.DB, session.user, context);
+      return await subscribeNotifications(request, env.DB, session.user, context);
     }
     if (route === "notifications/unsubscribe" && request.method === "POST") {
-      return unsubscribeNotifications(request, env.DB, session.user);
+      return await unsubscribeNotifications(request, env.DB, session.user);
     }
     if (route === "notifications/pending" && request.method === "GET") {
-      return pendingNotifications(env.DB, session.user);
+      return await pendingNotifications(env.DB, session.user);
     }
-    if (route === "storage/status" && request.method === "GET") return storageStatus(env.DB, session.user, env);
-    if (route === "storage/backup" && request.method === "POST") return createStorageBackup(env.DB, session.user, env);
+    if (route === "storage/status" && request.method === "GET") return await storageStatus(env.DB, session.user, env);
+    if (route === "storage/backup" && request.method === "POST") return await createStorageBackup(env.DB, session.user, env);
     if (route === "evidence/upload/r2" && request.method === "POST") {
-      return uploadEvidenceDirectToR2(request, env.DB, session.user, env);
+      return await uploadEvidenceDirectToR2(request, env.DB, session.user, env);
     }
     if (route === "evidence/upload/r2/init" && request.method === "POST") {
-      return initR2MultipartUpload(request, env.DB, session.user, env);
+      return await initR2MultipartUpload(request, env.DB, session.user, env);
     }
     if (route === "evidence/upload/r2/part" && request.method === "POST") {
-      return uploadR2MultipartPart(request, env.DB, session.user, env);
+      return await uploadR2MultipartPart(request, env.DB, session.user, env);
     }
     if (route === "evidence/upload/r2/complete" && request.method === "POST") {
-      return completeR2MultipartUpload(request, env.DB, session.user, env);
+      return await completeR2MultipartUpload(request, env.DB, session.user, env);
     }
-    if (route === "evidence/upload" && request.method === "POST") return uploadEvidence(request, env.DB, session.user, env);
-    if (route === "evidence/upload/init" && request.method === "POST") return initEvidenceUpload(request, env.DB, session.user);
-    if (route === "evidence/upload/chunk" && request.method === "POST") return uploadEvidenceChunk(request, env.DB, session.user);
-    if (route === "evidence/upload/complete" && request.method === "POST") return completeEvidenceUpload(request, env.DB, session.user, env);
+    if (route === "evidence/upload" && request.method === "POST") return await uploadEvidence(request, env.DB, session.user, env);
+    if (route === "evidence/upload/init" && request.method === "POST") return await initEvidenceUpload(request, env.DB, session.user);
+    if (route === "evidence/upload/chunk" && request.method === "POST") return await uploadEvidenceChunk(request, env.DB, session.user);
+    if (route === "evidence/upload/complete" && request.method === "POST") return await completeEvidenceUpload(request, env.DB, session.user, env);
     const evidenceFileMatch = route.match(/^evidence\/([^/]+)\/(?:file|photo)$/);
-    if (evidenceFileMatch && request.method === "GET") return evidenceFile(env.DB, session.user, evidenceFileMatch[1], env);
-    if (route === "tasks/evidence" && request.method === "POST") return submitTaskEvidence(request, env.DB, session.user, context);
-    if (route === "tasks/create" && request.method === "POST") return createTask(request, env.DB, session.user, context);
-    if (route === "tasks/evidence-authorize" && request.method === "POST") return authorizeLateTaskEvidence(request, env.DB, session.user, context);
-    if (route === "tasks/review" && request.method === "POST") return reviewTaskEvidence(request, env.DB, session.user, context);
-    if (route === "tasks/delete" && request.method === "POST") return deleteTaskAndArchive(request, env.DB, session.user, context, env);
-    if (route === "schedule/overtime" && request.method === "POST") return saveOvertimeSchedule(request, env.DB, session.user, context);
-    if (route === "schedule/overtime-request" && request.method === "POST") return requestOvertimeSchedule(request, env.DB, session.user, context);
-    if (route === "schedule/overtime-review" && request.method === "POST") return reviewOvertimeSchedule(request, env.DB, session.user, context);
-    if (route === "state" && request.method === "GET") return getState(env.DB, session.user, context);
-    if (route === "state" && request.method === "PUT") return putState(request, env.DB, session.user, context);
+    if (evidenceFileMatch && request.method === "GET") return await evidenceFile(env.DB, session.user, evidenceFileMatch[1], env);
+    if (route === "tasks/evidence" && request.method === "POST") return await submitTaskEvidence(request, env.DB, session.user, context);
+    if (route === "tasks/create" && request.method === "POST") return await createTask(request, env.DB, session.user, context);
+    if (route === "tasks/evidence-authorize" && request.method === "POST") return await authorizeLateTaskEvidence(request, env.DB, session.user, context);
+    if (route === "tasks/review" && request.method === "POST") return await reviewTaskEvidence(request, env.DB, session.user, context);
+    if (route === "tasks/delete" && request.method === "POST") return await deleteTaskAndArchive(request, env.DB, session.user, context, env);
+    if (route === "schedule/overtime" && request.method === "POST") return await saveOvertimeSchedule(request, env.DB, session.user, context);
+    if (route === "schedule/overtime-request" && request.method === "POST") return await requestOvertimeSchedule(request, env.DB, session.user, context);
+    if (route === "schedule/overtime-review" && request.method === "POST") return await reviewOvertimeSchedule(request, env.DB, session.user, context);
+    if (route === "state" && request.method === "GET") return await getState(env.DB, session.user, context);
+    if (route === "state" && request.method === "PUT") return await putState(request, env.DB, session.user, context);
     if (route === "settings/late-evidence" && request.method === "POST") {
-      return setLateEvidencePolicy(request, env.DB, session.user, context);
+      return await setLateEvidencePolicy(request, env.DB, session.user, context);
     }
-    if (route === "info/updates" && request.method === "POST") return saveInfoUpdate(request, env.DB, session.user);
-    if (route === "admin/users" && request.method === "POST") return createUser(request, env.DB, session.user);
-    if (route === "admin/reset-password" && request.method === "POST") return resetPassword(request, env.DB, session.user);
+    if (route === "info/updates" && request.method === "POST") return await saveInfoUpdate(request, env.DB, session.user);
+    if (route === "admin/users" && request.method === "POST") return await createUser(request, env.DB, session.user);
+    if (route === "admin/reset-password" && request.method === "POST") return await resetPassword(request, env.DB, session.user);
 
     return json({ ok: false, message: "Ruta no encontrada." }, 404);
   } catch (error) {
     console.error("LG Task API", error);
-    return json({ ok: false, message: "No se pudo completar la operacion en la nube." }, 500);
+    const status = Number(error?.status || 500);
+    return json(
+      {
+        ok: false,
+        message: status < 500 ? clean(error?.message) || "La solicitud no es valida." : "No se pudo completar la operacion en la nube."
+      },
+      status >= 400 && status < 600 ? status : 500
+    );
   }
 }
 
@@ -4164,8 +4171,19 @@ function publicUser(row) {
 
 async function readJson(request, maxLength = 100000) {
   const text = await request.text();
-  if (text.length > maxLength) throw new Error("Solicitud demasiado grande");
-  return text ? JSON.parse(text) : {};
+  if (text.length > maxLength) {
+    const error = new Error("La solicitud es demasiado grande.");
+    error.status = 413;
+    throw error;
+  }
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    const error = new Error("El formato de la solicitud no es valido.");
+    error.status = 400;
+    throw error;
+  }
 }
 
 function sameOrigin(request) {
