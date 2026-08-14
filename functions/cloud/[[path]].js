@@ -3,6 +3,7 @@ const SESSION_DAYS = 14;
 const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb9775180ea780b71";
 const MICROSOFT_STORAGE_PROVIDER = "onedrive";
 const R2_STORAGE_PROVIDER = "r2";
+const R2_SEGMENTED_STORAGE_PROVIDER = "r2-segmented";
 const MAINTENANCE_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const STALE_MAINTENANCE_MS = 3 * 60 * 1000;
 const ABANDONED_UPLOAD_TTL_MS = 10 * 60 * 1000;
@@ -556,9 +557,9 @@ async function migrateOneLegacyEvidence(db, env) {
         const file = { id: candidate.id, fileName: candidate.file_name, mimeType: candidate.mime_type };
         let completed = true;
         if (Number(candidate.photo_base64_length || 0) > 0) {
-          completed = await migrateBase64EvidenceStep(env, db, task, file, candidate);
+          completed = await migrateBase64EvidenceSegmentStep(env, db, task, file, candidate);
         } else {
-          completed = await migrateChunkedEvidenceStep(env, db, task, file);
+          completed = await migrateChunkedEvidenceSegmentStep(env, db, task, file);
         }
         if (!completed) return { migrated: false, failed: false, progressed: true };
         await db.batch([
@@ -585,6 +586,171 @@ async function migrateOneLegacyEvidence(db, env) {
     failed: results.some((result) => result.failed),
     progressed: results.some((result) => result.progressed)
   };
+}
+
+async function legacySegmentProgress(env, db, task, file, source, totalBytes, totalSegments) {
+  const settingKey = `storage_migration_progress:${file.id}`;
+  const saved = await db.prepare("SELECT value FROM app_settings WHERE key = ?").bind(settingKey).first();
+  let progress = null;
+  if (saved?.value) {
+    progress = JSON.parse(saved.value);
+    if (progress.mode !== "segments") {
+      if (progress.objectKey && progress.r2UploadId) {
+        await env.EVIDENCE_BUCKET.resumeMultipartUpload(progress.objectKey, progress.r2UploadId).abort().catch(() => {});
+      }
+      await db.prepare("DELETE FROM app_settings WHERE key = ?").bind(settingKey).run();
+      progress = null;
+    }
+  }
+  if (!progress) {
+    const { objectKey, parentPath } = await r2EvidenceDescriptor(db, task, file);
+    progress = {
+      mode: "segments",
+      source,
+      objectKey,
+      manifestKey: `${objectKey}.manifest.json`,
+      parentPath,
+      totalBytes,
+      totalSegments,
+      segments: []
+    };
+    await db
+      .prepare("INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)")
+      .bind(settingKey, JSON.stringify(progress), Date.now())
+      .run();
+  }
+  if (
+    progress.source !== source ||
+    Number(progress.totalBytes) !== totalBytes ||
+    Number(progress.totalSegments) !== totalSegments
+  ) {
+    throw new Error("PERMANENT: Legacy evidence changed during segmented migration");
+  }
+  return { settingKey, progress };
+}
+
+async function saveLegacyR2Segment(env, db, file, settingKey, progress, bytes) {
+  const segmentIndex = progress.segments.length;
+  const segmentKey = `${progress.objectKey}.segments/${String(segmentIndex).padStart(4, "0")}`;
+  await env.EVIDENCE_BUCKET.put(segmentKey, bytes, {
+    httpMetadata: { contentType: "application/octet-stream" },
+    customMetadata: { fileId: clean(file.id), segment: String(segmentIndex) }
+  });
+  progress.segments.push({ key: segmentKey, size: bytes.byteLength });
+  await db
+    .prepare("UPDATE app_settings SET value = ?, updated_at = ? WHERE key = ?")
+    .bind(JSON.stringify(progress), Date.now(), settingKey)
+    .run();
+}
+
+async function completeLegacyR2Segments(env, db, file, progress) {
+  const storedBytes = progress.segments.reduce((total, segment) => total + Number(segment.size || 0), 0);
+  if (storedBytes !== Number(progress.totalBytes)) throw new Error("PERMANENT: Segmented R2 size mismatch");
+  const manifest = {
+    version: 1,
+    fileId: clean(file.id),
+    mimeType: clean(file.mimeType),
+    size: Number(progress.totalBytes),
+    segments: progress.segments
+  };
+  await env.EVIDENCE_BUCKET.put(progress.manifestKey, JSON.stringify(manifest), {
+    httpMetadata: { contentType: "application/json" },
+    customMetadata: { type: "evidence-manifest", fileId: clean(file.id) }
+  });
+  await db
+    .prepare(
+      `INSERT OR REPLACE INTO evidence_storage
+       (file_id, provider, drive_id, drive_item_id, parent_path, size_bytes, sha256, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, '', ?)`
+    )
+    .bind(
+      file.id,
+      R2_SEGMENTED_STORAGE_PROVIDER,
+      "EVIDENCE_BUCKET",
+      progress.manifestKey,
+      progress.parentPath,
+      progress.totalBytes,
+      Date.now()
+    )
+    .run();
+  return true;
+}
+
+async function migrateBase64EvidenceSegmentStep(env, db, task, file, candidate) {
+  const base64Length = Number(candidate.photo_base64_length || 0);
+  const tail = String(candidate.photo_base64_tail || "");
+  const padding = tail.endsWith("==") ? 2 : tail.endsWith("=") ? 1 : 0;
+  const totalBytes = Math.floor((base64Length * 3) / 4) - padding;
+  if (base64Length < 4 || totalBytes < 1 || totalBytes > MAX_FILE_BYTES) {
+    throw new Error("PERMANENT: Invalid legacy Base64 file size");
+  }
+  const segmentBase64Chars = 900_000;
+  const totalSegments = Math.ceil(base64Length / segmentBase64Chars);
+  const { settingKey, progress } = await legacySegmentProgress(
+    env,
+    db,
+    task,
+    file,
+    "base64-segments",
+    totalBytes,
+    totalSegments
+  );
+  const segmentIndex = progress.segments.length;
+  if (segmentIndex < totalSegments) {
+    const row = await db
+      .prepare("SELECT SUBSTR(photo_base64, ?, ?) AS part_base64 FROM evidence_files WHERE id = ?")
+      .bind(segmentIndex * segmentBase64Chars + 1, segmentBase64Chars, file.id)
+      .first();
+    const partBase64 = String(row?.part_base64 || "");
+    if (!partBase64 || (segmentIndex < totalSegments - 1 && partBase64.length !== segmentBase64Chars)) {
+      throw new Error("PERMANENT: Legacy Base64 segment is incomplete");
+    }
+    await saveLegacyR2Segment(env, db, file, settingKey, progress, decodeEvidenceBase64(partBase64));
+  }
+  if (progress.segments.length < totalSegments) return false;
+  return completeLegacyR2Segments(env, db, file, progress);
+}
+
+async function migrateChunkedEvidenceSegmentStep(env, db, task, file) {
+  const chunks = await db
+    .prepare(
+      `SELECT chunk_index, LENGTH(chunk_base64) AS base64_length,
+              SUBSTR(chunk_base64, -2) AS base64_tail
+       FROM evidence_file_chunks WHERE file_id = ? ORDER BY chunk_index ASC`
+    )
+    .bind(file.id)
+    .all();
+  const chunkRows = chunks.results || [];
+  if (!chunkRows.length || chunkRows.some((chunk, index) => Number(chunk.chunk_index) !== index)) {
+    throw new Error("PERMANENT: Incomplete legacy chunks");
+  }
+  const decodedLength = (chunk) => {
+    const tail = String(chunk.base64_tail || "");
+    const padding = tail.endsWith("==") ? 2 : tail.endsWith("=") ? 1 : 0;
+    return Math.floor((Number(chunk.base64_length || 0) * 3) / 4) - padding;
+  };
+  const totalBytes = chunkRows.reduce((total, chunk) => total + decodedLength(chunk), 0);
+  if (totalBytes < 1 || totalBytes > MAX_FILE_BYTES) throw new Error("PERMANENT: Invalid legacy chunk size");
+  const { settingKey, progress } = await legacySegmentProgress(
+    env,
+    db,
+    task,
+    file,
+    "chunk-segments",
+    totalBytes,
+    chunkRows.length
+  );
+  const segmentIndex = progress.segments.length;
+  if (segmentIndex < chunkRows.length) {
+    const row = await db
+      .prepare("SELECT chunk_base64 FROM evidence_file_chunks WHERE file_id = ? AND chunk_index = ?")
+      .bind(file.id, segmentIndex)
+      .first();
+    if (!row?.chunk_base64) throw new Error("PERMANENT: Legacy chunk segment is incomplete");
+    await saveLegacyR2Segment(env, db, file, settingKey, progress, decodeEvidenceBase64(row.chunk_base64));
+  }
+  if (progress.segments.length < chunkRows.length) return false;
+  return completeLegacyR2Segments(env, db, file, progress);
 }
 
 async function migrateBase64EvidenceStep(env, db, task, file, candidate) {
@@ -1951,6 +2117,68 @@ async function r2FileResponse(env, storage, row) {
   return new Response(object.body, { status: 200, headers });
 }
 
+async function r2SegmentedFileResponse(env, storage, row) {
+  if (!r2StorageEnabled(env)) return json({ ok: false, message: "R2 no esta disponible." }, 503);
+  const manifestObject = await env.EVIDENCE_BUCKET.get(clean(storage.drive_item_id));
+  if (!manifestObject) return json({ ok: false, message: "Manifiesto de archivo no encontrado en R2." }, 404);
+  let manifest;
+  try {
+    manifest = JSON.parse(await manifestObject.text());
+  } catch {
+    return json({ ok: false, message: "El manifiesto del archivo no es valido." }, 409);
+  }
+  const segments = Array.isArray(manifest.segments) ? manifest.segments : [];
+  const totalSize = segments.reduce((total, segment) => total + Number(segment.size || 0), 0);
+  if (!segments.length || totalSize !== Number(storage.size_bytes || manifest.size || 0)) {
+    return json({ ok: false, message: "El archivo segmentado esta incompleto." }, 409);
+  }
+  let segmentIndex = 0;
+  let activeReader = null;
+  const stream = new ReadableStream({
+    async pull(controller) {
+      try {
+        while (segmentIndex < segments.length) {
+          if (!activeReader) {
+            const object = await env.EVIDENCE_BUCKET.get(clean(segments[segmentIndex].key));
+            if (!object) throw new Error("Missing R2 evidence segment");
+            activeReader = object.body.getReader();
+          }
+          const chunk = await activeReader.read();
+          if (chunk.done) {
+            activeReader = null;
+            segmentIndex += 1;
+            continue;
+          }
+          controller.enqueue(chunk.value);
+          return;
+        }
+        controller.close();
+      } catch (error) {
+        controller.error(error);
+      }
+    },
+    async cancel() {
+      if (activeReader) await activeReader.cancel().catch(() => {});
+    }
+  });
+  const safeName = String(row.file_name || "sustento.jpg").replace(/["\r\n]/g, "-");
+  const disposition =
+    String(row.mime_type).startsWith("image/") ||
+    String(row.mime_type).startsWith("video/") ||
+    row.mime_type === "application/pdf"
+      ? "inline"
+      : "attachment";
+  return new Response(stream, {
+    headers: {
+      "Content-Type": row.mime_type,
+      "Content-Disposition": `${disposition}; filename="${safeName}"`,
+      "Cache-Control": "private, max-age=300",
+      "Content-Length": String(totalSize),
+      "X-Content-Type-Options": "nosniff"
+    }
+  });
+}
+
 async function uploadEvidenceToOneDrive(env, db, task, file, fileBase64) {
   const owner = await db.prepare("SELECT name FROM users WHERE id = ?").bind(clean(task.ownerId)).first();
   const trainerName = oneDriveSafeName(owner?.name, "Trainer");
@@ -2229,6 +2457,7 @@ async function evidenceFile(db, user, fileId, env) {
 
   const storage = await db.prepare("SELECT * FROM evidence_storage WHERE file_id = ?").bind(row.id).first();
   if (storage?.provider === R2_STORAGE_PROVIDER) return r2FileResponse(env, storage, row);
+  if (storage?.provider === R2_SEGMENTED_STORAGE_PROVIDER) return r2SegmentedFileResponse(env, storage, row);
   if (storage?.provider === MICROSOFT_STORAGE_PROVIDER) return oneDriveFileResponse(env, storage, row);
 
   let fileBase64 = row.photo_base64 || "";
@@ -2651,10 +2880,31 @@ async function deleteR2EvidenceItems(env, items) {
   }
 }
 
+async function deleteSegmentedR2EvidenceItems(env, items) {
+  if (!r2StorageEnabled(env) || !items.length) return;
+  for (const item of items) {
+    const manifestKey = clean(item.drive_item_id);
+    if (!manifestKey) continue;
+    try {
+      const manifestObject = await env.EVIDENCE_BUCKET.get(manifestKey);
+      const manifest = manifestObject ? JSON.parse(await manifestObject.text()) : null;
+      const keys = [manifestKey, ...(manifest?.segments || []).map((segment) => clean(segment.key)).filter(Boolean)];
+      await env.EVIDENCE_BUCKET.delete(keys);
+    } catch (error) {
+      console.error("Segmented R2 evidence deletion", error);
+    }
+  }
+}
+
 async function deleteExternalEvidenceItems(env, items) {
   const r2Items = items.filter((item) => item.provider === R2_STORAGE_PROVIDER);
+  const segmentedR2Items = items.filter((item) => item.provider === R2_SEGMENTED_STORAGE_PROVIDER);
   const oneDriveItems = items.filter((item) => item.provider === MICROSOFT_STORAGE_PROVIDER);
-  await Promise.all([deleteR2EvidenceItems(env, r2Items), deleteOneDriveEvidenceItems(env, oneDriveItems)]);
+  await Promise.all([
+    deleteR2EvidenceItems(env, r2Items),
+    deleteSegmentedR2EvidenceItems(env, segmentedR2Items),
+    deleteOneDriveEvidenceItems(env, oneDriveItems)
+  ]);
 }
 
 async function deleteTaskEvidenceFiles(db, taskId, env, context) {
