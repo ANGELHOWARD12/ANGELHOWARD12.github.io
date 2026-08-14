@@ -4,6 +4,7 @@ const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb
 const MICROSOFT_STORAGE_PROVIDER = "onedrive";
 const R2_STORAGE_PROVIDER = "r2";
 const MAINTENANCE_INTERVAL_MS = 12 * 60 * 60 * 1000;
+const STALE_MAINTENANCE_MS = 3 * 60 * 1000;
 const ABANDONED_UPLOAD_TTL_MS = 10 * 60 * 1000;
 const ABANDONED_MULTIPART_TTL_MS = 24 * 60 * 60 * 1000;
 const DELIVERED_NOTIFICATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
@@ -458,9 +459,10 @@ async function runMaintenance(db, env) {
     .prepare(
       `INSERT INTO app_settings (key, value, updated_at) VALUES (?, 'running', ?)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-       WHERE app_settings.updated_at < ?`
+       WHERE app_settings.updated_at < ?
+          OR (app_settings.value = 'running' AND app_settings.updated_at < ?)`
     )
-    .bind(MAINTENANCE_SETTING_KEY, now, now - MAINTENANCE_INTERVAL_MS)
+    .bind(MAINTENANCE_SETTING_KEY, now, now - MAINTENANCE_INTERVAL_MS, now - STALE_MAINTENANCE_MS)
     .run();
   if (Number(claim?.meta?.changes || 0) === 0) return;
 
@@ -471,11 +473,7 @@ async function runMaintenance(db, env) {
     SELECT ef.id FROM evidence_files ef
     WHERE ef.created_at < ?
       AND NOT EXISTS (
-        SELECT 1
-        FROM task_records task,
-             json_each(task.data, '$.evidence') evidence,
-             json_each(evidence.value, '$.files') file
-        WHERE json_extract(file.value, '$.id') = ef.id
+        SELECT 1 FROM task_records task WHERE task.id = ef.task_id
       )`;
 
   const abandonedStoredItems = await db
@@ -535,11 +533,7 @@ async function migrateOneLegacyEvidence(db, env) {
            SELECT 1 FROM evidence_file_chunks chunks WHERE chunks.file_id = files.id
          ))
          AND EXISTS (
-           SELECT 1
-           FROM task_records task,
-                json_each(task.data, '$.evidence') evidence,
-                json_each(evidence.value, '$.files') file
-           WHERE json_extract(file.value, '$.id') = files.id
+           SELECT 1 FROM task_records task WHERE task.id = files.task_id AND task.archived = 0
          )
          AND NOT EXISTS (
            SELECT 1 FROM app_settings setting WHERE setting.key = 'storage_migration_failed:' || files.id
