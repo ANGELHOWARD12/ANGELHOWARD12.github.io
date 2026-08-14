@@ -5,11 +5,14 @@ const MICROSOFT_STORAGE_PROVIDER = "onedrive";
 const R2_STORAGE_PROVIDER = "r2";
 const MAINTENANCE_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const ABANDONED_UPLOAD_TTL_MS = 10 * 60 * 1000;
+const ABANDONED_MULTIPART_TTL_MS = 24 * 60 * 60 * 1000;
 const DELIVERED_NOTIFICATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const UNDELIVERED_NOTIFICATION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const MAINTENANCE_SETTING_KEY = "storage_maintenance_r2_direct_v6_paused";
-const LEGACY_EVIDENCE_MIGRATION_ENABLED = false;
-const SCHEMA_VERSION = "23-storage-resilience-1";
+const MAINTENANCE_SETTING_KEY = "storage_maintenance_structured_v1";
+const LEGACY_EVIDENCE_MIGRATION_ENABLED = true;
+const R2_MULTIPART_PART_BYTES = 5 * 1024 * 1024;
+const WEEKLY_BACKUP_RETENTION = 12;
+const SCHEMA_VERSION = "23-structured-storage-1";
 const OBSERVER_ACCESS_LEVEL = "observer";
 const OBSERVER_EMAIL = "giuliana.parra@lgtask.local";
 
@@ -113,7 +116,10 @@ export async function onRequest(context) {
       return json({ ok: false, message: "Solicitud no permitida." }, 403);
     }
 
-    if (route === "health" && request.method === "GET") return json({ ok: true, version: 23 });
+    if (route === "health" && request.method === "GET") {
+      scheduleMaintenance(env.DB, env, context);
+      return json({ ok: true, version: "23-cloud-resilience2", schema: SCHEMA_VERSION, r2: r2StorageEnabled(env) });
+    }
     if (route === "auth/register" && request.method === "POST") return register(request, env.DB);
     if (route === "auth/login" && request.method === "POST") return login(request, env.DB);
     if (route === "auth/logout" && request.method === "POST") return logout(request, env.DB);
@@ -143,8 +149,18 @@ export async function onRequest(context) {
       return pendingNotifications(env.DB, session.user);
     }
     if (route === "storage/status" && request.method === "GET") return storageStatus(env.DB, session.user, env);
+    if (route === "storage/backup" && request.method === "POST") return createStorageBackup(env.DB, session.user, env);
     if (route === "evidence/upload/r2" && request.method === "POST") {
       return uploadEvidenceDirectToR2(request, env.DB, session.user, env);
+    }
+    if (route === "evidence/upload/r2/init" && request.method === "POST") {
+      return initR2MultipartUpload(request, env.DB, session.user, env);
+    }
+    if (route === "evidence/upload/r2/part" && request.method === "POST") {
+      return uploadR2MultipartPart(request, env.DB, session.user, env);
+    }
+    if (route === "evidence/upload/r2/complete" && request.method === "POST") {
+      return completeR2MultipartUpload(request, env.DB, session.user, env);
     }
     if (route === "evidence/upload" && request.method === "POST") return uploadEvidence(request, env.DB, session.user, env);
     if (route === "evidence/upload/init" && request.method === "POST") return initEvidenceUpload(request, env.DB, session.user);
@@ -265,6 +281,39 @@ async function ensureSchema(db) {
       value TEXT NOT NULL,
       updated_at INTEGER NOT NULL
     )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS task_records (
+      id TEXT PRIMARY KEY,
+      owner_id TEXT NOT NULL DEFAULT '',
+      due_date TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT '',
+      archived INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL DEFAULT 0,
+      data TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS task_history_records (
+      task_id TEXT NOT NULL,
+      entry_index INTEGER NOT NULL,
+      data TEXT NOT NULL,
+      PRIMARY KEY (task_id, entry_index),
+      FOREIGN KEY (task_id) REFERENCES task_records(id) ON DELETE CASCADE
+    )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS r2_multipart_uploads (
+      id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
+      owner_id TEXT NOT NULL,
+      submitted_by_id TEXT NOT NULL,
+      client_key TEXT NOT NULL,
+      file_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      object_key TEXT NOT NULL,
+      parent_path TEXT NOT NULL DEFAULT '',
+      r2_upload_id TEXT NOT NULL,
+      parts_json TEXT NOT NULL DEFAULT '[]',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`),
     db.prepare("INSERT OR IGNORE INTO app_data (id, data, updated_at) VALUES (1, ?, 0)").bind(JSON.stringify(EMPTY_DATA)),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at)"),
@@ -273,7 +322,13 @@ async function ensureSchema(db) {
     db.prepare("CREATE INDEX IF NOT EXISTS idx_evidence_chunks_file ON evidence_file_chunks(file_id)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_evidence_storage_item ON evidence_storage(drive_item_id)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_notification_subscriptions_user ON notification_subscriptions(user_id)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_user_notifications_pending ON user_notifications(user_id, delivered_at)")
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_user_notifications_pending ON user_notifications(user_id, delivered_at)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_task_records_owner_date ON task_records(owner_id, due_date)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_task_records_status_date ON task_records(status, due_date)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_task_records_archive_created ON task_records(archived, created_at)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_task_history_task ON task_history_records(task_id, entry_index)"),
+    db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_r2_multipart_client ON r2_multipart_uploads(submitted_by_id, task_id, client_key)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_r2_multipart_created ON r2_multipart_uploads(created_at)")
   ]);
   const userColumns = await db.prepare("PRAGMA table_info(users)").all();
   if (!(userColumns.results || []).some((column) => column.name === "access_level")) {
@@ -287,11 +342,80 @@ async function ensureSchema(db) {
     .prepare("UPDATE users SET access_level = ?, zone = 'Administracion general' WHERE email = ?")
     .bind(OBSERVER_ACCESS_LEVEL, OBSERVER_EMAIL)
     .run();
+  await migrateStructuredTasks(db);
   await db
     .prepare("INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES ('schema_version', ?, ?)")
     .bind(SCHEMA_VERSION, Date.now())
     .run();
   schemaReady = true;
+}
+
+async function migrateStructuredTasks(db) {
+  const source = await db
+    .prepare(
+      `SELECT
+         COALESCE(json_array_length(data, '$.tasks'), 0) AS active_count,
+         COALESCE(json_array_length(data, '$.deletedTasks'), 0) AS archived_count
+       FROM app_data WHERE id = 1`
+    )
+    .first();
+  const expected = Number(source?.active_count || 0) + Number(source?.archived_count || 0);
+  if (expected > 0) {
+    const now = Date.now();
+    await db.batch([
+      db.prepare(
+        `INSERT OR REPLACE INTO task_records
+         (id, owner_id, due_date, status, archived, created_at, data, updated_at)
+         SELECT json_extract(task.value, '$.id'),
+                COALESCE(json_extract(task.value, '$.ownerId'), ''),
+                COALESCE(json_extract(task.value, '$.dueDate'), ''),
+                COALESCE(json_extract(task.value, '$.status'), ''),
+                0,
+                COALESCE(json_extract(task.value, '$.createdAt'), 0),
+                json_remove(task.value, '$.history'), ?
+         FROM app_data data, json_each(data.data, '$.tasks') task
+         WHERE data.id = 1 AND COALESCE(json_extract(task.value, '$.id'), '') <> ''`
+      ).bind(now),
+      db.prepare(
+        `INSERT OR REPLACE INTO task_records
+         (id, owner_id, due_date, status, archived, created_at, data, updated_at)
+         SELECT json_extract(task.value, '$.id'),
+                COALESCE(json_extract(task.value, '$.ownerId'), ''),
+                COALESCE(json_extract(task.value, '$.dueDate'), ''),
+                COALESCE(json_extract(task.value, '$.status'), ''),
+                1,
+                COALESCE(json_extract(task.value, '$.deletedAt'), json_extract(task.value, '$.createdAt'), 0),
+                json_remove(task.value, '$.history'), ?
+         FROM app_data data, json_each(data.data, '$.deletedTasks') task
+         WHERE data.id = 1 AND COALESCE(json_extract(task.value, '$.id'), '') <> ''`
+      ).bind(now),
+      db.prepare(
+        `INSERT OR REPLACE INTO task_history_records (task_id, entry_index, data)
+         SELECT json_extract(task.value, '$.id'), CAST(history.key AS INTEGER), history.value
+         FROM app_data data,
+              json_each(data.data, '$.tasks') task,
+              json_each(task.value, '$.history') history
+         WHERE data.id = 1 AND COALESCE(json_extract(task.value, '$.id'), '') <> ''`
+      ),
+      db.prepare(
+        `INSERT OR REPLACE INTO task_history_records (task_id, entry_index, data)
+         SELECT json_extract(task.value, '$.id'), CAST(history.key AS INTEGER), history.value
+         FROM app_data data,
+              json_each(data.data, '$.deletedTasks') task,
+              json_each(task.value, '$.history') history
+         WHERE data.id = 1 AND COALESCE(json_extract(task.value, '$.id'), '') <> ''`
+      )
+    ]);
+  }
+
+  const stored = await db.prepare("SELECT COUNT(*) AS count FROM task_records").first();
+  if (Number(stored?.count || 0) < expected) {
+    throw new Error(`Structured task migration incomplete: expected ${expected}, stored ${Number(stored?.count || 0)}`);
+  }
+  await db
+    .prepare("UPDATE app_data SET data = json_remove(data, '$.tasks', '$.deletedTasks'), updated_at = ? WHERE id = 1")
+    .bind(Date.now())
+    .run();
 }
 
 function scheduleMaintenance(db, env, context) {
@@ -322,11 +446,10 @@ async function runMaintenance(db, env) {
     WHERE ef.created_at < ?
       AND NOT EXISTS (
         SELECT 1
-        FROM app_data a,
-             json_each(a.data, '$.tasks') task,
-             json_each(task.value, '$.evidence') evidence,
+        FROM task_records task,
+             json_each(task.data, '$.evidence') evidence,
              json_each(evidence.value, '$.files') file
-        WHERE a.id = 1 AND json_extract(file.value, '$.id') = ef.id
+        WHERE json_extract(file.value, '$.id') = ef.id
       )`;
 
   const abandonedStoredItems = await db
@@ -341,6 +464,7 @@ async function runMaintenance(db, env) {
   if (abandonedStoredItems.results?.length) {
     await deleteExternalEvidenceItems(env, abandonedStoredItems.results);
   }
+  await cleanupAbandonedMultipartUploads(db, env, now - ABANDONED_MULTIPART_TTL_MS);
 
   await db.batch([
     db.prepare("DELETE FROM evidence_file_chunks WHERE file_id IN (SELECT file_id FROM evidence_storage)"),
@@ -364,6 +488,10 @@ async function runMaintenance(db, env) {
     return;
   }
 
+  await ensureWeeklyBackup(db, env).catch((error) => {
+    console.error("Weekly R2 backup", error);
+  });
+
   await db
     .prepare("UPDATE app_settings SET value = 'complete', updated_at = ? WHERE key = ?")
     .bind(Date.now(), MAINTENANCE_SETTING_KEY)
@@ -382,11 +510,10 @@ async function migrateOneLegacyEvidence(db, env) {
          ))
          AND EXISTS (
            SELECT 1
-           FROM app_data data,
-                json_each(data.data, '$.tasks') task,
-                json_each(task.value, '$.evidence') evidence,
+           FROM task_records task,
+                json_each(task.data, '$.evidence') evidence,
                 json_each(evidence.value, '$.files') file
-           WHERE data.id = 1 AND json_extract(file.value, '$.id') = files.id
+           WHERE json_extract(file.value, '$.id') = files.id
          )
          AND NOT EXISTS (
            SELECT 1 FROM app_settings setting WHERE setting.key = 'storage_migration_failed:' || files.id
@@ -430,6 +557,103 @@ async function migrateOneLegacyEvidence(db, env) {
   };
 }
 
+async function cleanupAbandonedMultipartUploads(db, env, cutoff) {
+  const rows = await db
+    .prepare("SELECT id, object_key, r2_upload_id FROM r2_multipart_uploads WHERE updated_at < ? LIMIT 50")
+    .bind(cutoff)
+    .all();
+  for (const row of rows.results || []) {
+    if (r2StorageEnabled(env)) {
+      await env.EVIDENCE_BUCKET.resumeMultipartUpload(row.object_key, row.r2_upload_id).abort().catch(() => {});
+    }
+    await db.prepare("DELETE FROM r2_multipart_uploads WHERE id = ?").bind(row.id).run();
+  }
+}
+
+function isoWeekId(dateValue) {
+  const date = new Date(`${dateValue}T12:00:00Z`);
+  const weekday = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - weekday);
+  const year = date.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(year, 0, 1));
+  const week = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+  return `${year}-W${String(week).padStart(2, "0")}`;
+}
+
+async function ensureWeeklyBackup(db, env, { force = false } = {}) {
+  if (!r2StorageEnabled(env)) throw new Error("R2 storage is not configured");
+  const generatedAt = Date.now();
+  const dateValue = dateIsoInLima(generatedAt);
+  const weekId = isoWeekId(dateValue);
+  const markerKey = `weekly_backup:${weekId}`;
+  const existing = await db.prepare("SELECT value FROM app_settings WHERE key = ?").bind(markerKey).first();
+  if (existing && !force) {
+    try {
+      return JSON.parse(existing.value);
+    } catch {
+      return { weekId, objectKey: clean(existing.value), generatedAt: 0 };
+    }
+  }
+
+  const data = await loadData(db);
+  const [usersResult, filesResult] = await db.batch([
+    db.prepare(
+      `SELECT id, name, email, zone, role, status, access_level, created_at
+       FROM users ORDER BY created_at ASC`
+    ),
+    db.prepare(
+      `SELECT files.id, files.task_id, files.owner_id, files.submitted_by_id,
+              files.file_name, files.mime_type, files.created_at,
+              storage.provider, storage.drive_item_id AS object_key,
+              storage.parent_path, storage.size_bytes, storage.sha256
+       FROM evidence_files files
+       LEFT JOIN evidence_storage storage ON storage.file_id = files.id
+       ORDER BY files.created_at ASC`
+    )
+  ]);
+  const objectKey = `backups/${weekId.slice(0, 4)}/${weekId}/lgtask-${dateValue}-${generatedAt}.json`;
+  const backup = {
+    product: "LGTASK",
+    schemaVersion: SCHEMA_VERSION,
+    weekId,
+    generatedAt,
+    data,
+    users: usersResult.results || [],
+    evidenceFiles: filesResult.results || []
+  };
+  const body = JSON.stringify(backup);
+  await env.EVIDENCE_BUCKET.put(objectKey, body, {
+    httpMetadata: { contentType: "application/json" },
+    customMetadata: { type: "weekly-backup", weekId, generatedAt: String(generatedAt) }
+  });
+  const result = { weekId, objectKey, generatedAt, bytes: new TextEncoder().encode(body).byteLength };
+  await db
+    .prepare("INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)")
+    .bind(markerKey, JSON.stringify(result), generatedAt)
+    .run();
+
+  const listed = await env.EVIDENCE_BUCKET.list({ prefix: "backups/", limit: 1000 });
+  const oldBackups = [...listed.objects]
+    .sort((left, right) => new Date(right.uploaded || 0) - new Date(left.uploaded || 0))
+    .slice(WEEKLY_BACKUP_RETENTION)
+    .map((item) => item.key);
+  if (oldBackups.length) await env.EVIDENCE_BUCKET.delete(oldBackups);
+  return result;
+}
+
+async function createStorageBackup(db, user, env) {
+  if (user.role !== "Coordinador") {
+    return json({ ok: false, message: "Solo Pablo puede generar respaldos manuales." }, 403);
+  }
+  try {
+    const backup = await ensureWeeklyBackup(db, env, { force: true });
+    return json({ ok: true, backup });
+  } catch (error) {
+    console.error("Manual R2 backup", error);
+    return json({ ok: false, message: "No se pudo crear el respaldo en R2." }, 503);
+  }
+}
+
 async function storageStatus(db, user, env) {
   if (user.role !== "Coordinador" && !isObserverUser(user)) {
     return json({ ok: false, message: "Solo administracion puede consultar el almacenamiento." }, 403);
@@ -444,6 +668,11 @@ async function storageStatus(db, user, env) {
          (SELECT COALESCE(SUM(LENGTH(photo_base64)), 0) FROM evidence_files) AS legacy_base64_bytes,
          (SELECT COALESCE(SUM(LENGTH(chunk_base64)), 0) FROM evidence_file_chunks) AS temporary_base64_bytes,
          (SELECT COALESCE(LENGTH(data), 0) FROM app_data WHERE id = 1) AS app_data_bytes,
+         (SELECT COUNT(*) FROM task_records) AS task_rows,
+         (SELECT COALESCE(SUM(LENGTH(data)), 0) FROM task_records) AS task_data_bytes,
+         (SELECT COUNT(*) FROM task_history_records) AS history_rows,
+         (SELECT COALESCE(SUM(LENGTH(data)), 0) FROM task_history_records) AS history_data_bytes,
+         (SELECT COUNT(*) FROM r2_multipart_uploads) AS multipart_uploads,
          (SELECT COUNT(*) FROM sessions WHERE expires_at < ?) AS expired_sessions,
          (SELECT COUNT(*) FROM user_notifications WHERE delivered_at > 0 AND created_at < ?) AS old_notifications`
     )
@@ -506,6 +735,20 @@ async function storageStatus(db, user, env) {
   const failedMigrations = await db
     .prepare("SELECT COUNT(*) AS count FROM app_settings WHERE key LIKE 'storage_migration_failed:%'")
     .first();
+  const lastBackup = await db
+    .prepare("SELECT value, updated_at FROM app_settings WHERE key LIKE 'weekly_backup:%' ORDER BY updated_at DESC LIMIT 1")
+    .first();
+  let backup = null;
+  try {
+    backup = lastBackup?.value ? JSON.parse(lastBackup.value) : null;
+  } catch {
+    backup = lastBackup?.value ? { objectKey: lastBackup.value, generatedAt: Number(lastBackup.updated_at || 0) } : null;
+  }
+  const appDataBytes = Number(counts?.app_data_bytes || 0);
+  const taskDataBytes = Number(counts?.task_data_bytes || 0);
+  const historyDataBytes = Number(counts?.history_data_bytes || 0);
+  const legacyBase64Bytes = Number(counts?.legacy_base64_bytes || 0);
+  const temporaryBase64Bytes = Number(counts?.temporary_base64_bytes || 0);
   return json({
     ok: true,
     storage: {
@@ -517,15 +760,19 @@ async function storageStatus(db, user, env) {
         referencedTemporaryFiles: temporaryFiles.length - unreferencedTemporaryFiles.length,
         unreferencedTemporaryFiles: unreferencedTemporaryFiles.length,
         unreferencedTemporaryBytes: unreferencedTemporaryFiles.reduce((total, file) => total + Number(file.bytes || 0), 0),
-        legacyBase64Bytes: Number(counts?.legacy_base64_bytes || 0),
-        temporaryBase64Bytes: Number(counts?.temporary_base64_bytes || 0),
-        appDataBytes: Number(counts?.app_data_bytes || 0),
+        legacyBase64Bytes,
+        temporaryBase64Bytes,
+        appDataBytes,
+        taskRows: Number(counts?.task_rows || 0),
+        taskDataBytes,
+        historyRows: Number(counts?.history_rows || 0),
+        historyDataBytes,
+        multipartUploads: Number(counts?.multipart_uploads || 0),
         approximatePayloadBytes:
-          Number(counts?.legacy_base64_bytes || 0) +
-          Number(counts?.temporary_base64_bytes || 0) +
-          Number(counts?.app_data_bytes || 0),
+          legacyBase64Bytes + temporaryBase64Bytes + appDataBytes + taskDataBytes + historyDataBytes,
         databaseBytes: pageCount && pageSize ? pageCount * pageSize : 0,
         reusableBytes: freePages && pageSize ? freePages * pageSize : 0,
+        quotaBytes: 500_000_000,
         expiredSessions: Number(counts?.expired_sessions || 0),
         oldNotifications: Number(counts?.old_notifications || 0)
       },
@@ -533,13 +780,15 @@ async function storageStatus(db, user, env) {
         enabled: r2StorageEnabled(env),
         objects: r2Objects,
         bytes: r2Bytes,
-        complete: r2Complete
+        complete: r2Complete,
+        freeTierBytes: 10_000_000_000
       },
       maintenance: {
         state: clean(maintenance?.value) || "pending",
         updatedAt: Number(maintenance?.updated_at || 0),
         failedMigrations: Number(failedMigrations?.count || 0)
-      }
+      },
+      backup
     }
   });
 }
@@ -1181,7 +1430,7 @@ async function uploadEvidenceDirectToR2(request, db, user, env) {
   const extension = fileName.includes(".") ? fileName.split(".").pop().toLowerCase() : "";
   const mimeType = clean(request.headers.get("Content-Type")).split(";", 1)[0].toLowerCase() || mimeTypeForExtension(extension);
   const declaredSize = Number(url.searchParams.get("size") || request.headers.get("Content-Length") || 0);
-  const contentLength = Number(request.headers.get("Content-Length") || 0);
+  const contentLength = Number(request.headers.get("Content-Length") || url.searchParams.get("size") || 0);
   if (
     !request.body ||
     !ALLOWED_FILE_EXTENSIONS.has(extension) ||
@@ -1239,6 +1488,209 @@ async function uploadEvidenceDirectToR2(request, db, user, env) {
   return json({
     ok: true,
     file: { id: fileId, name: fileName, mimeType, createdAt, url: `/cloud/evidence/${fileId}/file` }
+  }, 201);
+}
+
+async function initR2MultipartUpload(request, db, user, env) {
+  if (!r2StorageEnabled(env)) {
+    return json({ ok: false, message: "El almacenamiento R2 no esta configurado." }, 503);
+  }
+  const body = await readJson(request, 20_000);
+  const taskId = clean(body.taskId);
+  const data = await loadData(db);
+  const task = data.tasks.find((item) => clean(item.id) === taskId);
+  if (!task) return json({ ok: false, message: "La tarea ya no existe." }, 404);
+  if (user.role !== "Coordinador" && clean(task.ownerId) !== clean(user.id)) {
+    return json({ ok: false, message: "No puedes subir sustentos para esa tarea." }, 403);
+  }
+  const today = dateIsoInLima(Date.now());
+  if (!taskAllowsEvidenceUpload(task, today, data.lateEvidenceUploadsEnabled)) {
+    return json({ ok: false, message: evidenceUploadWindowError(task, today, data.lateEvidenceUploadsEnabled) }, 409);
+  }
+
+  const fileName = clean(body.fileName).replace(/[\\/:*?"<>|]/g, "-").slice(0, 120) || "archivo-sustento";
+  const extension = fileName.includes(".") ? fileName.split(".").pop().toLowerCase() : "";
+  const mimeType = clean(body.mimeType).split(";", 1)[0].toLowerCase() || mimeTypeForExtension(extension);
+  const sizeBytes = Number(body.size);
+  const clientKey = clean(body.clientKey).slice(0, 220);
+  if (
+    !clientKey ||
+    !ALLOWED_FILE_EXTENSIONS.has(extension) ||
+    !ALLOWED_FILE_MIME_TYPES.has(mimeType) ||
+    !Number.isInteger(sizeBytes) ||
+    sizeBytes <= R2_MULTIPART_PART_BYTES ||
+    sizeBytes > MAX_FILE_BYTES
+  ) {
+    return json({ ok: false, message: "El archivo no tiene un formato o tamano permitido." }, 400);
+  }
+
+  const existing = await db
+    .prepare(
+      `SELECT id, size_bytes, parts_json FROM r2_multipart_uploads
+       WHERE submitted_by_id = ? AND task_id = ? AND client_key = ?`
+    )
+    .bind(user.id, taskId, clientKey)
+    .first();
+  if (existing && Number(existing.size_bytes) === sizeBytes) {
+    return json({
+      ok: true,
+      uploadId: existing.id,
+      partSize: R2_MULTIPART_PART_BYTES,
+      uploadedParts: JSON.parse(existing.parts_json || "[]").map((part) => Number(part.partNumber))
+    });
+  }
+  if (existing) {
+    const stale = await db.prepare("SELECT object_key, r2_upload_id FROM r2_multipart_uploads WHERE id = ?").bind(existing.id).first();
+    if (stale) await env.EVIDENCE_BUCKET.resumeMultipartUpload(stale.object_key, stale.r2_upload_id).abort().catch(() => {});
+    await db.prepare("DELETE FROM r2_multipart_uploads WHERE id = ?").bind(existing.id).run();
+  }
+
+  const fileId = crypto.randomUUID();
+  const descriptor = await r2EvidenceDescriptor(db, task, { id: fileId, fileName, mimeType });
+  const multipart = await env.EVIDENCE_BUCKET.createMultipartUpload(descriptor.objectKey, {
+    httpMetadata: { contentType: mimeType },
+    customMetadata: { fileId, taskId: clean(task.id), ownerId: clean(task.ownerId) }
+  });
+  const now = Date.now();
+  try {
+    await db
+      .prepare(
+        `INSERT INTO r2_multipart_uploads
+         (id, task_id, owner_id, submitted_by_id, client_key, file_name, mime_type, size_bytes,
+          object_key, parent_path, r2_upload_id, parts_json, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?)`
+      )
+      .bind(
+        fileId,
+        task.id,
+        task.ownerId,
+        user.id,
+        clientKey,
+        fileName,
+        mimeType,
+        sizeBytes,
+        descriptor.objectKey,
+        descriptor.parentPath,
+        multipart.uploadId,
+        now,
+        now
+      )
+      .run();
+  } catch (error) {
+    await multipart.abort().catch(() => {});
+    throw error;
+  }
+  return json({ ok: true, uploadId: fileId, partSize: R2_MULTIPART_PART_BYTES, uploadedParts: [] }, 201);
+}
+
+async function uploadR2MultipartPart(request, db, user, env) {
+  if (!r2StorageEnabled(env)) return json({ ok: false, message: "R2 no esta disponible." }, 503);
+  const url = new URL(request.url);
+  const uploadId = clean(url.searchParams.get("uploadId"));
+  const partNumber = Number(url.searchParams.get("partNumber"));
+  const row = await db.prepare("SELECT * FROM r2_multipart_uploads WHERE id = ?").bind(uploadId).first();
+  if (!row) return json({ ok: false, message: "La carga vencio o ya fue completada." }, 404);
+  if (clean(row.submitted_by_id) !== clean(user.id)) {
+    return json({ ok: false, message: "No puedes continuar esta carga." }, 403);
+  }
+  const totalParts = Math.ceil(Number(row.size_bytes) / R2_MULTIPART_PART_BYTES);
+  const expectedBytes = partNumber === totalParts
+    ? Number(row.size_bytes) - R2_MULTIPART_PART_BYTES * (totalParts - 1)
+    : R2_MULTIPART_PART_BYTES;
+  const contentLength = Number(request.headers.get("Content-Length") || url.searchParams.get("size") || 0);
+  if (!request.body || !Number.isInteger(partNumber) || partNumber < 1 || partNumber > totalParts || contentLength !== expectedBytes) {
+    return json({ ok: false, message: "El bloque de carga esta incompleto." }, 400);
+  }
+  let uploadedPart;
+  try {
+    uploadedPart = await env.EVIDENCE_BUCKET
+      .resumeMultipartUpload(row.object_key, row.r2_upload_id)
+      .uploadPart(partNumber, request.body);
+  } catch (error) {
+    console.error("R2 multipart part", uploadId, partNumber, error);
+    return json({ ok: false, message: "R2 no pudo recibir este bloque. Se reintentara sin empezar de cero." }, 503);
+  }
+  const parts = JSON.parse(row.parts_json || "[]").filter((part) => Number(part.partNumber) !== partNumber);
+  parts.push({ partNumber, etag: uploadedPart.etag });
+  parts.sort((left, right) => left.partNumber - right.partNumber);
+  await db
+    .prepare("UPDATE r2_multipart_uploads SET parts_json = ?, updated_at = ? WHERE id = ?")
+    .bind(JSON.stringify(parts), Date.now(), uploadId)
+    .run();
+  return json({ ok: true, partNumber }, 201);
+}
+
+async function completeR2MultipartUpload(request, db, user, env) {
+  if (!r2StorageEnabled(env)) return json({ ok: false, message: "R2 no esta disponible." }, 503);
+  const body = await readJson(request, 10_000);
+  const uploadId = clean(body.uploadId);
+  const completedFile = await db
+    .prepare("SELECT id, file_name, mime_type, created_at FROM evidence_files WHERE id = ?")
+    .bind(uploadId)
+    .first();
+  if (completedFile) {
+    return json({
+      ok: true,
+      file: {
+        id: completedFile.id,
+        name: completedFile.file_name,
+        mimeType: completedFile.mime_type,
+        createdAt: Number(completedFile.created_at),
+        url: `/cloud/evidence/${completedFile.id}/file`
+      }
+    });
+  }
+  const row = await db.prepare("SELECT * FROM r2_multipart_uploads WHERE id = ?").bind(uploadId).first();
+  if (!row) return json({ ok: false, message: "La carga vencio y debe iniciarse nuevamente." }, 404);
+  if (clean(row.submitted_by_id) !== clean(user.id)) {
+    return json({ ok: false, message: "No puedes completar esta carga." }, 403);
+  }
+  const parts = JSON.parse(row.parts_json || "[]").sort((left, right) => left.partNumber - right.partNumber);
+  const totalParts = Math.ceil(Number(row.size_bytes) / R2_MULTIPART_PART_BYTES);
+  if (parts.length !== totalParts || parts.some((part, index) => Number(part.partNumber) !== index + 1 || !clean(part.etag))) {
+    return json({ ok: false, message: "Aun faltan bloques del archivo por subir." }, 409);
+  }
+
+  let storedObject;
+  try {
+    storedObject = await env.EVIDENCE_BUCKET.resumeMultipartUpload(row.object_key, row.r2_upload_id).complete(parts);
+  } catch (error) {
+    storedObject = await env.EVIDENCE_BUCKET.head(row.object_key).catch(() => null);
+    if (!storedObject || Number(storedObject.size || 0) !== Number(row.size_bytes)) {
+      console.error("R2 multipart complete", uploadId, error);
+      return json({ ok: false, message: "R2 no pudo finalizar el archivo. Vuelve a intentarlo." }, 503);
+    }
+  }
+  if (Number(storedObject?.size || 0) !== Number(row.size_bytes)) {
+    await env.EVIDENCE_BUCKET.delete(row.object_key).catch(() => {});
+    return json({ ok: false, message: "La carga quedo incompleta y fue descartada." }, 409);
+  }
+  const createdAt = Date.now();
+  try {
+    await db.batch([
+      db
+        .prepare(
+          `INSERT OR IGNORE INTO evidence_files
+           (id, task_id, owner_id, submitted_by_id, file_name, mime_type, photo_base64, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, '', ?)`
+        )
+        .bind(row.id, row.task_id, row.owner_id, row.submitted_by_id, row.file_name, row.mime_type, createdAt),
+      db
+        .prepare(
+          `INSERT OR REPLACE INTO evidence_storage
+           (file_id, provider, drive_id, drive_item_id, parent_path, size_bytes, sha256, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, '', ?)`
+        )
+        .bind(row.id, R2_STORAGE_PROVIDER, "EVIDENCE_BUCKET", row.object_key, row.parent_path, row.size_bytes, createdAt),
+      db.prepare("DELETE FROM r2_multipart_uploads WHERE id = ?").bind(row.id)
+    ]);
+  } catch (error) {
+    console.error("R2 multipart metadata", uploadId, error);
+    return json({ ok: false, message: "El archivo llego a R2, pero falta registrar su confirmacion. Reintenta." }, 503);
+  }
+  return json({
+    ok: true,
+    file: { id: row.id, name: row.file_name, mimeType: row.mime_type, createdAt, url: `/cloud/evidence/${row.id}/file` }
   }, 201);
 }
 
@@ -3036,10 +3488,40 @@ function hasTaskConflict(tasks, ownerId, dateValue, startTime, endTime, excludeT
 }
 
 async function loadData(db) {
-  const row = await db.prepare("SELECT data FROM app_data WHERE id = 1").first();
+  const [appResult, taskResult, historyResult] = await db.batch([
+    db.prepare("SELECT data FROM app_data WHERE id = 1"),
+    db.prepare("SELECT id, archived, data FROM task_records ORDER BY archived ASC, created_at DESC, id ASC"),
+    db.prepare("SELECT task_id, entry_index, data FROM task_history_records ORDER BY task_id ASC, entry_index ASC")
+  ]);
   try {
-    const parsed = JSON.parse(row?.data || "{}");
-    return {
+    const parsed = JSON.parse(appResult?.results?.[0]?.data || "{}");
+    const historyByTask = new Map();
+    for (const row of historyResult?.results || []) {
+      try {
+        const history = historyByTask.get(row.task_id) || [];
+        history[Number(row.entry_index)] = JSON.parse(row.data || "{}");
+        historyByTask.set(row.task_id, history);
+      } catch {
+        console.error("Invalid task history row", row.task_id, row.entry_index);
+      }
+    }
+    const storedTasks = [];
+    const storedDeletedTasks = [];
+    for (const row of taskResult?.results || []) {
+      try {
+        const task = {
+          ...JSON.parse(row.data || "{}"),
+          id: row.id,
+          history: (historyByTask.get(row.id) || []).filter(Boolean)
+        };
+        (Number(row.archived) ? storedDeletedTasks : storedTasks).push(task);
+      } catch {
+        console.error("Invalid task record", row.id);
+      }
+    }
+    const tasks = storedTasks.length || storedDeletedTasks.length ? storedTasks : parsed.tasks || [];
+    const deletedTasks = storedTasks.length || storedDeletedTasks.length ? storedDeletedTasks : parsed.deletedTasks || [];
+    const data = {
       ...structuredClone(EMPTY_DATA),
       ...parsed,
       version: 23,
@@ -3048,16 +3530,28 @@ async function loadData(db) {
       breakSettingsByUserDate: normalizeBreakSettingsByUserDate(parsed.breakSettingsByUserDate),
       workScheduleByUserDate: normalizeWorkScheduleByUserDate(parsed.workScheduleByUserDate),
       overtimeRequests: normalizeOvertimeRequests(parsed.overtimeRequests),
-      tasks: (parsed.tasks || []).map((task) => ({ ...task, category: normalizeTaskCategory(task.category) })),
-      deletedTasks: (parsed.deletedTasks || []).map((task) => ({ ...task, category: normalizeTaskCategory(task.category) })),
+      tasks: tasks.map((task) => ({ ...task, category: normalizeTaskCategory(task.category) })),
+      deletedTasks: deletedTasks.map((task) => ({ ...task, category: normalizeTaskCategory(task.category) })),
       lgUpdates: normalizeLgUpdates(parsed.lgUpdates),
       lateEvidenceUploadsEnabled: Boolean(parsed.lateEvidenceUploadsEnabled),
       lateEvidencePolicyHistory: Array.isArray(parsed.lateEvidencePolicyHistory)
         ? parsed.lateEvidencePolicyHistory.slice(0, 100)
         : []
     };
+    Object.defineProperty(data, "__taskSnapshot", {
+      configurable: true,
+      enumerable: false,
+      value: createTaskSnapshot(data)
+    });
+    return data;
   } catch {
-    return structuredClone(EMPTY_DATA);
+    const data = structuredClone(EMPTY_DATA);
+    Object.defineProperty(data, "__taskSnapshot", {
+      configurable: true,
+      enumerable: false,
+      value: new Map()
+    });
+    return data;
   }
 }
 
@@ -3071,8 +3565,6 @@ async function saveData(db, data) {
     overtimeRequests: normalizeOvertimeRequests(data.overtimeRequests),
     registrationRequests: data.registrationRequests || [],
     passwordRecoveryRequests: data.passwordRecoveryRequests || [],
-    tasks: data.tasks || [],
-    deletedTasks: data.deletedTasks || [],
     announcements: data.announcements || [],
     supportRequests: data.supportRequests || [],
     dailyMotivations: data.dailyMotivations || [],
@@ -3082,7 +3574,91 @@ async function saveData(db, data) {
       ? data.lateEvidencePolicyHistory.slice(0, 100)
       : []
   };
-  await db.prepare("UPDATE app_data SET data = ?, updated_at = ? WHERE id = 1").bind(JSON.stringify(payload), Date.now()).run();
+  const now = Date.now();
+  const previous = data.__taskSnapshot instanceof Map ? data.__taskSnapshot : new Map();
+  const current = createTaskSnapshot(data);
+  const statements = [
+    db.prepare("UPDATE app_data SET data = ?, updated_at = ? WHERE id = 1").bind(JSON.stringify(payload), now)
+  ];
+
+  for (const [taskId, snapshot] of current) {
+    const before = previous.get(taskId);
+    if (!before || before.record !== snapshot.record || before.archived !== snapshot.archived) {
+      statements.push(
+        db
+          .prepare(
+            `INSERT INTO task_records (id, owner_id, due_date, status, archived, created_at, data, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               owner_id = excluded.owner_id,
+               due_date = excluded.due_date,
+               status = excluded.status,
+               archived = excluded.archived,
+               created_at = excluded.created_at,
+               data = excluded.data,
+               updated_at = excluded.updated_at`
+          )
+          .bind(
+            taskId,
+            clean(snapshot.task.ownerId),
+            clean(snapshot.task.dueDate),
+            clean(snapshot.task.status),
+            snapshot.archived,
+            Number(snapshot.task.deletedAt || snapshot.task.createdAt || now),
+            snapshot.record,
+            now
+          )
+      );
+    }
+    if (!before || before.history !== snapshot.history) {
+      statements.push(db.prepare("DELETE FROM task_history_records WHERE task_id = ?").bind(taskId));
+      if (snapshot.history !== "[]") {
+        statements.push(
+          db
+            .prepare(
+              `INSERT INTO task_history_records (task_id, entry_index, data)
+               SELECT ?, CAST(key AS INTEGER), value FROM json_each(?)`
+            )
+            .bind(taskId, snapshot.history)
+        );
+      }
+    }
+  }
+
+  for (const taskId of previous.keys()) {
+    if (current.has(taskId)) continue;
+    statements.push(db.prepare("DELETE FROM task_history_records WHERE task_id = ?").bind(taskId));
+    statements.push(db.prepare("DELETE FROM task_records WHERE id = ?").bind(taskId));
+  }
+
+  await db.batch(statements);
+  Object.defineProperty(data, "__taskSnapshot", {
+    configurable: true,
+    enumerable: false,
+    value: current
+  });
+}
+
+function createTaskSnapshot(data) {
+  const snapshot = new Map();
+  const addTasks = (tasks, archived) => {
+    for (const source of Array.isArray(tasks) ? tasks : []) {
+      const taskId = clean(source?.id);
+      if (!taskId) continue;
+      const task = { ...source };
+      const history = Array.isArray(task.history) ? task.history : [];
+      delete task.history;
+      snapshot.set(taskId, {
+        task: source,
+        archived,
+        record: JSON.stringify(task),
+        history: JSON.stringify(history)
+      });
+    }
+  };
+  addTasks(data.tasks, 0);
+  addTasks(data.deletedTasks, 1);
+  return snapshot;
 }
 
 function isObserverUser(user) {
