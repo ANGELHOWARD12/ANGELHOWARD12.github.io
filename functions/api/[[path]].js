@@ -4,6 +4,7 @@ const COORDINATOR_CODE_HASH = "e62163b1947feab8e4db70a99cffd5fb9c9f66d5e8901a4fb
 const MICROSOFT_STORAGE_PROVIDER = "onedrive";
 const R2_STORAGE_PROVIDER = "r2";
 const MAINTENANCE_INTERVAL_MS = 12 * 60 * 60 * 1000;
+const STALE_MAINTENANCE_MS = 3 * 60 * 1000;
 const ABANDONED_UPLOAD_TTL_MS = 10 * 60 * 1000;
 const ABANDONED_MULTIPART_TTL_MS = 24 * 60 * 60 * 1000;
 const DELIVERED_NOTIFICATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
@@ -117,8 +118,8 @@ export async function onRequest(context) {
     }
 
     if (route === "health" && request.method === "GET") {
-      scheduleMaintenance(env.DB, env, context);
-      return json({ ok: true, version: "23-cloud-resilience2", schema: SCHEMA_VERSION, r2: r2StorageEnabled(env) });
+      await runMaintenance(env.DB, env);
+      return healthStatus(env.DB, env);
     }
     if (route === "auth/register" && request.method === "POST") return register(request, env.DB);
     if (route === "auth/login" && request.method === "POST") return login(request, env.DB);
@@ -190,6 +191,32 @@ export async function onRequest(context) {
     console.error("LG Task API", error);
     return json({ ok: false, message: "No se pudo completar la operacion en la nube." }, 500);
   }
+}
+
+async function healthStatus(db, env) {
+  const [pendingResult, failedResult, maintenanceResult] = await db.batch([
+    db.prepare(
+      `SELECT COUNT(*) AS count FROM evidence_files files
+       WHERE NOT EXISTS (SELECT 1 FROM evidence_storage storage WHERE storage.file_id = files.id)
+         AND (LENGTH(files.photo_base64) > 0 OR EXISTS (
+           SELECT 1 FROM evidence_file_chunks chunks WHERE chunks.file_id = files.id
+         ))`
+    ),
+    db.prepare("SELECT COUNT(*) AS count FROM app_settings WHERE key LIKE 'storage_migration_failed:%'"),
+    db.prepare("SELECT value, updated_at FROM app_settings WHERE key = ?").bind(MAINTENANCE_SETTING_KEY)
+  ]);
+  return json({
+    ok: true,
+    version: "23-cloud-resilience2",
+    schema: SCHEMA_VERSION,
+    r2: r2StorageEnabled(env),
+    migration: {
+      pendingFiles: Number(pendingResult?.results?.[0]?.count || 0),
+      failedFiles: Number(failedResult?.results?.[0]?.count || 0),
+      state: clean(maintenanceResult?.results?.[0]?.value) || "pending",
+      updatedAt: Number(maintenanceResult?.results?.[0]?.updated_at || 0)
+    }
+  });
 }
 
 async function ensureSchema(db) {
@@ -432,9 +459,10 @@ async function runMaintenance(db, env) {
     .prepare(
       `INSERT INTO app_settings (key, value, updated_at) VALUES (?, 'running', ?)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-       WHERE app_settings.updated_at < ?`
+       WHERE app_settings.updated_at < ?
+          OR (app_settings.value = 'running' AND app_settings.updated_at < ?)`
     )
-    .bind(MAINTENANCE_SETTING_KEY, now, now - MAINTENANCE_INTERVAL_MS)
+    .bind(MAINTENANCE_SETTING_KEY, now, now - MAINTENANCE_INTERVAL_MS, now - STALE_MAINTENANCE_MS)
     .run();
   if (Number(claim?.meta?.changes || 0) === 0) return;
 
@@ -445,11 +473,7 @@ async function runMaintenance(db, env) {
     SELECT ef.id FROM evidence_files ef
     WHERE ef.created_at < ?
       AND NOT EXISTS (
-        SELECT 1
-        FROM task_records task,
-             json_each(task.data, '$.evidence') evidence,
-             json_each(evidence.value, '$.files') file
-        WHERE json_extract(file.value, '$.id') = ef.id
+        SELECT 1 FROM task_records task WHERE task.id = ef.task_id
       )`;
 
   const abandonedStoredItems = await db
@@ -509,17 +533,13 @@ async function migrateOneLegacyEvidence(db, env) {
            SELECT 1 FROM evidence_file_chunks chunks WHERE chunks.file_id = files.id
          ))
          AND EXISTS (
-           SELECT 1
-           FROM task_records task,
-                json_each(task.data, '$.evidence') evidence,
-                json_each(evidence.value, '$.files') file
-           WHERE json_extract(file.value, '$.id') = files.id
+           SELECT 1 FROM task_records task WHERE task.id = files.task_id AND task.archived = 0
          )
          AND NOT EXISTS (
            SELECT 1 FROM app_settings setting WHERE setting.key = 'storage_migration_failed:' || files.id
        )
        ORDER BY files.created_at ASC
-       LIMIT 2`
+       LIMIT 1`
     )
     .all();
   if (!candidates.results?.length) return { migrated: false, failed: false };
