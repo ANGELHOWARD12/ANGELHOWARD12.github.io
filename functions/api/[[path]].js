@@ -202,7 +202,7 @@ export async function onRequest(context) {
 }
 
 async function healthStatus(db, env) {
-  const [pendingResult, failedResult, maintenanceResult] = await db.batch([
+  const [pendingResult, failedResult, maintenanceResult, backupResult] = await db.batch([
     db.prepare(
       `SELECT COUNT(*) AS count FROM evidence_files files
        WHERE NOT EXISTS (SELECT 1 FROM evidence_storage storage WHERE storage.file_id = files.id)
@@ -211,7 +211,8 @@ async function healthStatus(db, env) {
          ))`
     ),
     db.prepare("SELECT COUNT(*) AS count FROM app_settings WHERE key LIKE 'storage_migration_failed:%'"),
-    db.prepare("SELECT value, updated_at FROM app_settings WHERE key = ?").bind(MAINTENANCE_SETTING_KEY)
+    db.prepare("SELECT value, updated_at FROM app_settings WHERE key = ?").bind(MAINTENANCE_SETTING_KEY),
+    db.prepare("SELECT updated_at FROM app_settings WHERE key LIKE 'weekly_backup:%' ORDER BY updated_at DESC LIMIT 1")
   ]);
   return json({
     ok: true,
@@ -223,6 +224,10 @@ async function healthStatus(db, env) {
       failedFiles: Number(failedResult?.results?.[0]?.count || 0),
       state: clean(maintenanceResult?.results?.[0]?.value) || "pending",
       updatedAt: Number(maintenanceResult?.results?.[0]?.updated_at || 0)
+    },
+    backup: {
+      ready: Number(backupResult?.results?.[0]?.updated_at || 0) > 0,
+      updatedAt: Number(backupResult?.results?.[0]?.updated_at || 0)
     }
   });
 }
