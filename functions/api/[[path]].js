@@ -216,7 +216,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "23-cloud-resilience3",
+    version: "23-cloud-resilience4",
     schema: SCHEMA_VERSION,
     r2: r2StorageEnabled(env),
     migration: {

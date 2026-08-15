@@ -3147,6 +3147,7 @@
     <script>
       const STORAGE_KEY = "lg-task-hub-ui-v1";
       const API_BASE = "/cloud";
+      const API_FALLBACK_BASE = "/api";
       const PUBLIC_APP_ORIGIN = "https://lgtask.pages.dev";
       const WORKDAY_START = "08:30";
       const WEEKDAY_END = "19:00";
@@ -3155,7 +3156,7 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = "23-cloud-resilience3";
+      const APP_VERSION = "23-cloud-resilience4";
       const MAX_EVIDENCE_FILES = 8;
       const MAX_EVIDENCE_FILE_BYTES = 15_000_000;
       const EVIDENCE_MULTIPART_PART_BYTES = 5 * 1024 * 1024;
@@ -3904,27 +3905,52 @@
       }
 
       async function apiRequest(path, options = {}) {
-        const { timeoutMs = 45_000, ...fetchOptions } = options;
+        const { timeoutMs = 45_000, allowFallback = false, quietTransient = false, ...fetchOptions } = options;
         const controller = new AbortController();
         const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
         if (fetchOptions.method && fetchOptions.method !== "GET") setCloudStatus("syncing");
         try {
-          const response = await fetch(`${API_BASE}${path}`, {
-            credentials: "same-origin",
-            headers: { "Content-Type": "application/json", ...(fetchOptions.headers || {}) },
-            ...fetchOptions,
-            signal: fetchOptions.signal || controller.signal
-          });
+          const method = String(fetchOptions.method || "GET").toUpperCase();
+          const apiBases = method === "GET" || allowFallback ? [API_BASE, API_FALLBACK_BASE] : [API_BASE];
+          let response;
+          let networkError;
+          for (const [index, apiBase] of apiBases.entries()) {
+            try {
+              response = await fetch(`${apiBase}${path}`, {
+                credentials: "same-origin",
+                headers: { "Content-Type": "application/json", ...(fetchOptions.headers || {}) },
+                ...fetchOptions,
+                signal: fetchOptions.signal || controller.signal
+              });
+              const temporaryGatewayFailure = [502, 503, 504].includes(response.status);
+              if (!temporaryGatewayFailure || index === apiBases.length - 1) break;
+            } catch (error) {
+              networkError = error;
+              if (error.name === "AbortError" || index === apiBases.length - 1) throw error;
+            }
+          }
+          if (!response) throw networkError || new Error("La nube no respondio.");
           const data = await response.json().catch(() => ({}));
           if (!response.ok) {
-            const error = new Error(data.message || `No se pudo conectar con la nube (HTTP ${response.status}).`);
+            const temporaryMessage = [502, 503, 504].includes(response.status)
+              ? "Cloudflare esta tardando en responder. LGTASK seguira reintentando la conexion."
+              : `No se pudo conectar con la nube (HTTP ${response.status}).`;
+            const error = new Error(data.message || temporaryMessage);
             error.status = response.status;
             throw error;
           }
           setCloudStatus("online");
           return data;
         } catch (error) {
-          setCloudStatus(error.status && error.status < 500 ? "online" : navigator.onLine ? "error" : "offline", error.message);
+          const transient = !error.status || error.status >= 500;
+          const status = quietTransient && transient && navigator.onLine
+            ? "syncing"
+            : error.status && error.status < 500
+              ? "online"
+              : navigator.onLine
+                ? "error"
+                : "offline";
+          setCloudStatus(status, quietTransient && transient ? "Reconectando automaticamente con la nube" : error.message);
           if (error.name === "AbortError") {
             const timeoutError = new Error("La nube demoro demasiado en responder. LGTASK volvera a intentarlo automaticamente.");
             timeoutError.status = 0;
@@ -3944,7 +3970,7 @@
         let lastError;
         for (let attempt = 1; attempt <= attempts; attempt += 1) {
           try {
-            return await apiRequest(path, options);
+            return await apiRequest(path, { ...options, quietTransient: attempt < attempts });
           } catch (error) {
             lastError = error;
             if (attempt >= attempts || (error.status && error.status < 500)) throw error;
@@ -8108,8 +8134,9 @@
             const data = await apiRequestWithRetry("/auth/login", {
               method: "POST",
               body: JSON.stringify({ email: els.loginEmail.value, password: els.loginPassword.value }),
-              timeoutMs: 30_000
-            }, 5);
+              timeoutMs: 30_000,
+              allowFallback: true
+            }, 7);
             applyCloudState(data.state);
             els.loginPassword.value = "";
             setMessage(els.loginMessage, "", "");
