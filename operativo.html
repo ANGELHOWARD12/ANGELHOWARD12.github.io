@@ -3311,7 +3311,7 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = "26-coordinator-week-premium1";
+      const APP_VERSION = "27-uppercase-users1";
       const TEAM_TRAINING = "Training";
       const TEAM_AUDIOVISUAL = "Audiovisuales";
       const MAX_EVIDENCE_FILES = 8;
@@ -3916,6 +3916,10 @@
       function normalizeState(nextState) {
         nextState.version = 25;
         nextState.users = nextState.users?.length ? nextState.users : structuredClone(initialState.users);
+        nextState.users = nextState.users.map((user) => ({
+          ...user,
+          name: clean(user.name).toUpperCase()
+        }));
         nextState.registrationRequests = nextState.registrationRequests || [];
         nextState.passwordRecoveryRequests = nextState.passwordRecoveryRequests || [];
         nextState.workSettings = normalizeWorkSettings(nextState.workSettings);

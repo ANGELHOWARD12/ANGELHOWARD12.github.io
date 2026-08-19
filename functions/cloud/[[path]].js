@@ -14,7 +14,7 @@ const MAINTENANCE_SETTING_KEY = "storage_maintenance_structured_v1";
 const LEGACY_EVIDENCE_MIGRATION_ENABLED = true;
 const R2_MULTIPART_PART_BYTES = 5 * 1024 * 1024;
 const WEEKLY_BACKUP_RETENTION = 12;
-const SCHEMA_VERSION = "25-master-autonomy-1";
+const SCHEMA_VERSION = "27-uppercase-users-1";
 const OBSERVER_ACCESS_LEVEL = "observer";
 const OBSERVER_EMAIL = "giuliana.parra@lgtask.local";
 const PRIMARY_COORDINATOR_EMAIL = "pablo.ramos@lgtask.local";
@@ -23,7 +23,7 @@ const TEAM_AUDIOVISUAL = "Audiovisuales";
 const ORGANIZATION_USERS = [
   {
     id: "org-master-nykol-ruiz",
-    name: "Nykol Ruiz",
+    name: "NYKOL RUIZ",
     email: "nykol.ruiz@lgtask.local",
     role: "Trainer",
     team: TEAM_TRAINING,
@@ -34,7 +34,7 @@ const ORGANIZATION_USERS = [
   },
   {
     id: "org-master-ronald-chavez",
-    name: "Ronald Chavez",
+    name: "RONALD CHAVEZ",
     email: "ronald.chavez@lgtask.local",
     role: "Trainer",
     team: TEAM_TRAINING,
@@ -45,7 +45,7 @@ const ORGANIZATION_USERS = [
   },
   {
     id: "org-master-alejandro-cotrina",
-    name: "Alejandro Cotrina",
+    name: "ALEJANDRO COTRINA",
     email: "alejandro.cotrina@lgtask.local",
     role: "Coordinador",
     team: TEAM_AUDIOVISUAL,
@@ -56,7 +56,7 @@ const ORGANIZATION_USERS = [
   },
   {
     id: "org-av-ariana-perez",
-    name: "Ariana Perez",
+    name: "ARIANA PEREZ",
     email: "ariana.perez@lgtask.local",
     role: "Trainer",
     team: TEAM_AUDIOVISUAL,
@@ -67,7 +67,7 @@ const ORGANIZATION_USERS = [
   },
   {
     id: "org-av-abel-barrantes",
-    name: "Abel Barrantes",
+    name: "ABEL BARRANTES",
     email: "abel.barrantes@lgtask.local",
     role: "Trainer",
     team: TEAM_AUDIOVISUAL,
@@ -78,7 +78,7 @@ const ORGANIZATION_USERS = [
   },
   {
     id: "org-av-fernando-bedrinana",
-    name: "Fernando Bedrinana",
+    name: "FERNANDO BEDRINANA",
     email: "fernando.bedrinana@lgtask.local",
     role: "Trainer",
     team: TEAM_AUDIOVISUAL,
@@ -89,7 +89,7 @@ const ORGANIZATION_USERS = [
   },
   {
     id: "org-av-nathaly-fuentes",
-    name: "Nathaly Fuentes",
+    name: "NATHALY FUENTES",
     email: "nathaly.fuentes@lgtask.local",
     role: "Trainer",
     team: TEAM_AUDIOVISUAL,
@@ -299,7 +299,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "26-coordinator-week-premium1",
+    version: "27-uppercase-users1",
     schema: SCHEMA_VERSION,
     r2: r2StorageEnabled(env),
     migration: {
@@ -483,6 +483,7 @@ async function ensureSchema(db) {
     .prepare("UPDATE users SET team = ?, job_title = 'Coordinador de Entrenamiento', member_type = 'master' WHERE email = ?")
     .bind(TEAM_TRAINING, PRIMARY_COORDINATOR_EMAIL)
     .run();
+  await db.prepare("UPDATE users SET name = UPPER(TRIM(name)) WHERE name <> UPPER(TRIM(name))").run();
   await db.batch(
     ORGANIZATION_USERS.map((profile) =>
       db
@@ -1337,7 +1338,7 @@ async function storageStatus(db, user, env) {
 
 async function register(request, db) {
   const body = await readJson(request);
-  const name = clean(body.name);
+  const name = clean(body.name).toUpperCase();
   const email = clean(body.email).toLowerCase();
   const zone = clean(body.zone);
   const role = body.role === "Coordinador" ? "Coordinador" : "Trainer";
@@ -4054,6 +4055,7 @@ async function createUser(request, db, actor) {
   const passwordData = await hashPassword(password);
   const createdAt = Date.now();
   const userId = crypto.randomUUID();
+  const name = clean(body.name).toUpperCase();
   const team = userTeam(actor);
   const jobTitle = clean(body.jobTitle).slice(0, 120) || (team === TEAM_AUDIOVISUAL ? "Creador de Contenido" : "Trainer");
   const memberType = team === TEAM_AUDIOVISUAL ? "audiovisual" : "trainer";
@@ -4063,13 +4065,13 @@ async function createUser(request, db, actor) {
        (id, name, email, zone, role, status, password_hash, password_salt, created_at, access_level, team, job_title, member_type)
        VALUES (?, ?, ?, ?, 'Trainer', 'Activo', ?, ?, ?, '', ?, ?, ?)`
     )
-    .bind(userId, clean(body.name), email, clean(body.zone), passwordData.hash, passwordData.salt, createdAt, team, jobTitle, memberType)
+    .bind(userId, name, email, clean(body.zone), passwordData.hash, passwordData.salt, createdAt, team, jobTitle, memberType)
     .run();
   return json({
     ok: true,
     user: publicUser({
       id: userId,
-      name: clean(body.name),
+      name,
       email,
       zone: clean(body.zone),
       role: "Trainer",

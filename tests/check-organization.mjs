@@ -21,7 +21,8 @@ for (const email of expectedEmails) {
 }
 
 for (const marker of [
-  'const SCHEMA_VERSION = "25-master-autonomy-1"',
+  'const SCHEMA_VERSION = "27-uppercase-users-1"',
+  'UPDATE users SET name = UPPER(TRIM(name))',
   '["team", "TEXT NOT NULL DEFAULT',
   '["job_title", "TEXT NOT NULL DEFAULT',
   '["member_type", "TEXT NOT NULL DEFAULT',
@@ -50,14 +51,14 @@ for (const marker of [
   'function isSelfManagedMasterTask(task)',
   'function hasCoordinatorPersonalWeek()',
   'function updateMasterTask(taskId)',
-  'const APP_VERSION = "26-coordinator-week-premium1"'
+  'const APP_VERSION = "27-uppercase-users1"'
 ]) {
   if (!html.includes(marker)) throw new Error(`Falta la interfaz organizacional: ${marker}`);
 }
 
 if (cloud !== api) throw new Error("Las rutas /cloud y /api no son identicas");
 if (html !== operative) throw new Error("index.html y operativo.html no son identicos");
-if (!sw.includes('lgtask-shell-v26-coordinator-week-premium1')) throw new Error("El cache del Service Worker no fue actualizado");
+if (!sw.includes('lgtask-shell-v27-uppercase-users1')) throw new Error("El cache del Service Worker no fue actualizado");
 
 console.log("OrganizationProfiles=7");
 console.log("TeamIsolation=OK");
