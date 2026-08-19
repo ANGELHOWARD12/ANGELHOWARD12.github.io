@@ -14,9 +14,91 @@ const MAINTENANCE_SETTING_KEY = "storage_maintenance_structured_v1";
 const LEGACY_EVIDENCE_MIGRATION_ENABLED = true;
 const R2_MULTIPART_PART_BYTES = 5 * 1024 * 1024;
 const WEEKLY_BACKUP_RETENTION = 12;
-const SCHEMA_VERSION = "23-structured-storage-1";
+const SCHEMA_VERSION = "24-org-teams-1";
 const OBSERVER_ACCESS_LEVEL = "observer";
 const OBSERVER_EMAIL = "giuliana.parra@lgtask.local";
+const PRIMARY_COORDINATOR_EMAIL = "pablo.ramos@lgtask.local";
+const TEAM_TRAINING = "Training";
+const TEAM_AUDIOVISUAL = "Audiovisuales";
+const ORGANIZATION_USERS = [
+  {
+    id: "org-master-nykol-ruiz",
+    name: "Nykol Ruiz",
+    email: "nykol.ruiz@lgtask.local",
+    role: "Trainer",
+    team: TEAM_TRAINING,
+    jobTitle: "Master Trainer HS",
+    memberType: "master",
+    salt: "5mAD4vip7tnBdEorr_yyGw",
+    hash: "2dvHhzW1XhdoqJ6q-tSoqawg9S3vHZuTu2TvHWOh3-Q"
+  },
+  {
+    id: "org-master-ronald-chavez",
+    name: "Ronald Chavez",
+    email: "ronald.chavez@lgtask.local",
+    role: "Trainer",
+    team: TEAM_TRAINING,
+    jobTitle: "Master Trainer TV",
+    memberType: "master",
+    salt: "-JcPKjV6Dpos-bRGq4NkgQ",
+    hash: "6vSvzRaKzrZCgw-fq8dfU9ONjOnpjwm3_8vMYbHBO08"
+  },
+  {
+    id: "org-master-alejandro-cotrina",
+    name: "Alejandro Cotrina",
+    email: "alejandro.cotrina@lgtask.local",
+    role: "Coordinador",
+    team: TEAM_AUDIOVISUAL,
+    jobTitle: "Coordinador Audiovisual",
+    memberType: "master",
+    salt: "FD1wPgxZyy94gFvpsM_3YQ",
+    hash: "7zlb3nk1N467QpagpEUZUeErwAgPbSMGsce38fgjUos"
+  },
+  {
+    id: "org-av-ariana-perez",
+    name: "Ariana Perez",
+    email: "ariana.perez@lgtask.local",
+    role: "Trainer",
+    team: TEAM_AUDIOVISUAL,
+    jobTitle: "Creadora de Contenido",
+    memberType: "audiovisual",
+    salt: "FAv04x26nqTU8AHbbRJb3Q",
+    hash: "9c1liZu0X1GdW0XPPNX_55Dj1qw5HZuIIX4VtjRbftw"
+  },
+  {
+    id: "org-av-abel-barrantes",
+    name: "Abel Barrantes",
+    email: "abel.barrantes@lgtask.local",
+    role: "Trainer",
+    team: TEAM_AUDIOVISUAL,
+    jobTitle: "Creador de Contenido",
+    memberType: "audiovisual",
+    salt: "AfnB1a4QbSujNCC63YaLCw",
+    hash: "2wrchK-w7Eo6MR3c3uPcZ8VnIvwY1ygg-Rq3UyVE8VU"
+  },
+  {
+    id: "org-av-fernando-bedrinana",
+    name: "Fernando Bedrinana",
+    email: "fernando.bedrinana@lgtask.local",
+    role: "Trainer",
+    team: TEAM_AUDIOVISUAL,
+    jobTitle: "Creador de Contenido",
+    memberType: "audiovisual",
+    salt: "yq4FgSz9-8FP9agCtsGQmw",
+    hash: "hBoCgmrEp0lG70-LtB7JdnK3fZZ4ZtWO6lsANNz-T5o"
+  },
+  {
+    id: "org-av-nathaly-fuentes",
+    name: "Nathaly Fuentes",
+    email: "nathaly.fuentes@lgtask.local",
+    role: "Trainer",
+    team: TEAM_AUDIOVISUAL,
+    jobTitle: "Creadora de Contenido",
+    memberType: "audiovisual",
+    salt: "f3rT7wdXGFqP0UeMtlsuHA",
+    hash: "98O4qYOFs6hHKX-4a40IqFinRUI-D1FVV4Xpz9b2zB8"
+  }
+];
 
 let microsoftTokenCache = { token: "", expiresAt: 0 };
 let schemaReady = false;
@@ -179,7 +261,7 @@ export async function onRequest(context) {
     if (route === "schedule/overtime-request" && request.method === "POST") return await requestOvertimeSchedule(request, env.DB, session.user, context);
     if (route === "schedule/overtime-review" && request.method === "POST") return await reviewOvertimeSchedule(request, env.DB, session.user, context);
     if (route === "state" && request.method === "GET") return await getState(env.DB, session.user, context);
-    if (route === "state" && request.method === "PUT") return await putState(request, env.DB, session.user, context);
+    if (route === "state" && request.method === "PUT") return await putState(request, env.DB, session.user, context, env);
     if (route === "settings/late-evidence" && request.method === "POST") {
       return await setLateEvidencePolicy(request, env.DB, session.user, context);
     }
@@ -216,7 +298,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "23-cloud-resilience4",
+    version: "24-org-teams1",
     schema: SCHEMA_VERSION,
     r2: r2StorageEnabled(env),
     migration: {
@@ -378,10 +460,58 @@ async function ensureSchema(db) {
       if (!String(error?.message || error).toLowerCase().includes("duplicate column")) throw error;
     }
   }
+  for (const [column, definition] of [
+    ["team", "TEXT NOT NULL DEFAULT 'Training'"],
+    ["job_title", "TEXT NOT NULL DEFAULT ''"],
+    ["member_type", "TEXT NOT NULL DEFAULT 'trainer'"]
+  ]) {
+    if (!(userColumns.results || []).some((item) => item.name === column)) {
+      try {
+        await db.prepare(`ALTER TABLE users ADD COLUMN ${column} ${definition}`).run();
+      } catch (error) {
+        if (!String(error?.message || error).toLowerCase().includes("duplicate column")) throw error;
+      }
+    }
+  }
+  await db.prepare("CREATE INDEX IF NOT EXISTS idx_users_team_status ON users(team, status, role)").run();
   await db
-    .prepare("UPDATE users SET access_level = ?, zone = 'Administracion general' WHERE email = ?")
+    .prepare("UPDATE users SET access_level = ?, zone = 'Administracion general', team = 'Todos', job_title = 'Admin', member_type = 'admin' WHERE email = ?")
     .bind(OBSERVER_ACCESS_LEVEL, OBSERVER_EMAIL)
     .run();
+  await db
+    .prepare("UPDATE users SET team = ?, job_title = 'Coordinador de Entrenamiento', member_type = 'master' WHERE email = ?")
+    .bind(TEAM_TRAINING, PRIMARY_COORDINATOR_EMAIL)
+    .run();
+  await db.batch(
+    ORGANIZATION_USERS.map((profile) =>
+      db
+        .prepare(
+          `INSERT OR IGNORE INTO users
+           (id, name, email, zone, role, status, password_hash, password_salt, created_at, access_level, team, job_title, member_type)
+           VALUES (?, ?, ?, ?, ?, 'Activo', ?, ?, ?, '', ?, ?, ?)`
+        )
+        .bind(
+          profile.id,
+          profile.name,
+          profile.email,
+          profile.team,
+          profile.role,
+          profile.hash,
+          profile.salt,
+          Date.now(),
+          profile.team,
+          profile.jobTitle,
+          profile.memberType
+        )
+    )
+  );
+  await db.batch(
+    ORGANIZATION_USERS.map((profile) =>
+      db
+        .prepare("UPDATE users SET team = ?, job_title = ?, member_type = ? WHERE email = ?")
+        .bind(profile.team, profile.jobTitle, profile.memberType, profile.email)
+    )
+  );
   await migrateStructuredTasks(db);
   await db
     .prepare("INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES ('schema_version', ?, ?)")
@@ -1009,7 +1139,7 @@ async function ensureWeeklyBackup(db, env, { force = false } = {}) {
   const data = await loadData(db);
   const [usersResult, filesResult] = await db.batch([
     db.prepare(
-      `SELECT id, name, email, zone, role, status, access_level, created_at
+      `SELECT id, name, email, zone, role, status, access_level, team, job_title, member_type, created_at
        FROM users ORDER BY created_at ASC`
     ),
     db.prepare(
@@ -1053,7 +1183,7 @@ async function ensureWeeklyBackup(db, env, { force = false } = {}) {
 }
 
 async function createStorageBackup(db, user, env) {
-  if (user.role !== "Coordinador") {
+  if (!isPrimaryCoordinatorUser(user)) {
     return json({ ok: false, message: "Solo Pablo puede generar respaldos manuales." }, 403);
   }
   try {
@@ -1066,7 +1196,7 @@ async function createStorageBackup(db, user, env) {
 }
 
 async function storageStatus(db, user, env) {
-  if (user.role !== "Coordinador" && !isObserverUser(user)) {
+  if (!isPrimaryCoordinatorUser(user) && !isObserverUser(user)) {
     return json({ ok: false, message: "Solo administracion puede consultar el almacenamiento." }, 403);
   }
 
@@ -1309,7 +1439,7 @@ async function getState(db, user, context) {
 }
 
 async function setLateEvidencePolicy(request, db, user, context) {
-  if (user.role !== "Coordinador") {
+  if (!isPrimaryCoordinatorUser(user)) {
     return json({ ok: false, message: "Solo Pablo puede cambiar el permiso para fechas anteriores." }, 403);
   }
   const body = await readJson(request);
@@ -1829,7 +1959,7 @@ async function uploadEvidenceDirectToR2(request, db, user, env) {
   const data = await loadData(db);
   const task = data.tasks.find((item) => clean(item.id) === taskId);
   if (!task) return json({ ok: false, message: "La tarea ya no existe." }, 404);
-  if (user.role !== "Coordinador" && clean(task.ownerId) !== clean(user.id)) {
+  if (clean(task.ownerId) !== clean(user.id) && !(await coordinatorCanManageOwner(db, user, task.ownerId))) {
     return json({ ok: false, message: "No puedes subir sustentos para esa tarea." }, 403);
   }
   const today = dateIsoInLima(Date.now());
@@ -1911,7 +2041,7 @@ async function initR2MultipartUpload(request, db, user, env) {
   const data = await loadData(db);
   const task = data.tasks.find((item) => clean(item.id) === taskId);
   if (!task) return json({ ok: false, message: "La tarea ya no existe." }, 404);
-  if (user.role !== "Coordinador" && clean(task.ownerId) !== clean(user.id)) {
+  if (clean(task.ownerId) !== clean(user.id) && !(await coordinatorCanManageOwner(db, user, task.ownerId))) {
     return json({ ok: false, message: "No puedes subir sustentos para esa tarea." }, 403);
   }
   const today = dateIsoInLima(Date.now());
@@ -2265,7 +2395,7 @@ async function uploadEvidence(request, db, user, env) {
   const data = await loadData(db);
   const task = data.tasks.find((item) => item.id === taskId);
   if (!task) return json({ ok: false, message: "La tarea ya no existe." }, 404);
-  if (user.role !== "Coordinador" && task.ownerId !== user.id) {
+  if (task.ownerId !== user.id && !(await coordinatorCanManageOwner(db, user, task.ownerId))) {
     return json({ ok: false, message: "No puedes subir sustentos para esa tarea." }, 403);
   }
   if (!taskAllowsEvidenceUpload(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled)) {
@@ -2319,7 +2449,7 @@ async function initEvidenceUpload(request, db, user) {
   const data = await loadData(db);
   const task = data.tasks.find((item) => item.id === taskId);
   if (!task) return json({ ok: false, message: "La tarea ya no existe." }, 404);
-  if (user.role !== "Coordinador" && task.ownerId !== user.id) {
+  if (task.ownerId !== user.id && !(await coordinatorCanManageOwner(db, user, task.ownerId))) {
     return json({ ok: false, message: "No puedes subir sustentos para esa tarea." }, 403);
   }
   if (!taskAllowsEvidenceUpload(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled)) {
@@ -2361,7 +2491,7 @@ async function uploadEvidenceChunk(request, db, user) {
   const chunkBase64 = String(body.chunkBase64 || "");
   const row = await db.prepare("SELECT task_id, owner_id, submitted_by_id FROM evidence_files WHERE id = ?").bind(fileId).first();
   if (!row) return json({ ok: false, message: "La carga ya no existe." }, 404);
-  if (user.role !== "Coordinador" && row.submitted_by_id !== user.id && row.owner_id !== user.id) {
+  if (row.submitted_by_id !== user.id && row.owner_id !== user.id && !(await coordinatorCanManageOwner(db, user, row.owner_id))) {
     return json({ ok: false, message: "No puedes completar esta carga." }, 403);
   }
   const data = await loadData(db);
@@ -2397,7 +2527,7 @@ async function completeEvidenceUpload(request, db, user, env) {
   const expectedChunks = Number(body.chunkCount);
   const row = await db.prepare("SELECT * FROM evidence_files WHERE id = ?").bind(fileId).first();
   if (!row) return json({ ok: false, message: "La carga ya no existe." }, 404);
-  if (user.role !== "Coordinador" && row.submitted_by_id !== user.id && row.owner_id !== user.id) {
+  if (row.submitted_by_id !== user.id && row.owner_id !== user.id && !(await coordinatorCanManageOwner(db, user, row.owner_id))) {
     return json({ ok: false, message: "No puedes completar esta carga." }, 403);
   }
   const data = await loadData(db);
@@ -2463,8 +2593,8 @@ async function evidenceFile(db, user, fileId, env) {
     const task = data.tasks.find((item) => clean(item.id) === clean(row.task_id));
     observerAllowed = Boolean(task);
   }
-  const allowed =
-    user.role === "Coordinador" || observerAllowed || row.submitted_by_id === user.id || row.owner_id === user.id;
+  const coordinatorAllowed = await coordinatorCanManageOwner(db, user, row.owner_id);
+  const allowed = coordinatorAllowed || observerAllowed || row.submitted_by_id === user.id || row.owner_id === user.id;
   if (!allowed) return json({ ok: false, message: "No tienes acceso a este archivo." }, 403);
 
   const storage = await db.prepare("SELECT * FROM evidence_storage WHERE file_id = ?").bind(row.id).first();
@@ -2513,10 +2643,13 @@ async function createTask(request, db, user, context) {
   if (!title || title.length < 2) return json({ ok: false, message: "Escribe el nombre de la tarea." }, 400);
 
   const owner = await db
-    .prepare("SELECT id, name, role, status, access_level FROM users WHERE id = ? AND status = 'Activo'")
+    .prepare("SELECT id, name, email, role, status, access_level, team, job_title, member_type FROM users WHERE id = ? AND status = 'Activo'")
     .bind(ownerId)
     .first();
   if (!owner || isObserverUser(owner)) return json({ ok: false, message: "El responsable no esta disponible para tareas." }, 400);
+  if (user.role === "Coordinador" && !coordinatorCanManageUser(user, owner)) {
+    return json({ ok: false, message: "Solo puedes asignar tareas dentro de tu equipo." }, 403);
+  }
   if (user.role !== "Coordinador" && clean(owner.id) !== user.id) {
     return json({ ok: false, message: "Solo puedes crear tareas para tu propio usuario." }, 403);
   }
@@ -2718,8 +2851,10 @@ async function submitTaskEvidence(request, db, user, context) {
   });
 
   await saveData(db, data);
+  const submitter = await db.prepare("SELECT team FROM users WHERE id = ?").bind(user.id).first();
   const coordinators = await db
-    .prepare("SELECT id FROM users WHERE role = 'Coordinador' AND status = 'Activo'")
+    .prepare("SELECT id FROM users WHERE role = 'Coordinador' AND status = 'Activo' AND team = ?")
+    .bind(userTeam(submitter || user))
     .all();
   const notifications = (coordinators.results || [])
     .filter((coordinator) => clean(coordinator.id) !== user.id)
@@ -2750,6 +2885,9 @@ async function authorizeLateTaskEvidence(request, db, user, context) {
   const data = await loadData(db);
   const task = data.tasks.find((item) => clean(item.id) === taskId);
   if (!task) return json({ ok: false, message: "La tarea ya no existe." }, 404);
+  if (!(await coordinatorCanManageOwner(db, user, task.ownerId))) {
+    return json({ ok: false, message: "No puedes autorizar tareas de otro equipo." }, 403);
+  }
   const today = dateIsoInLima(Date.now());
   if (clean(task.dueDate) >= today) {
     return json({ ok: false, message: "La autorizacion tardia solo se usa para tareas de dias anteriores." }, 409);
@@ -2802,6 +2940,9 @@ async function reviewTaskEvidence(request, db, user, context) {
   const data = await loadData(db);
   const task = data.tasks.find((item) => clean(item.id) === taskId);
   if (!task) return json({ ok: false, message: "La tarea ya no existe." }, 404);
+  if (!(await coordinatorCanManageOwner(db, user, task.ownerId))) {
+    return json({ ok: false, message: "No puedes revisar tareas de otro equipo." }, 403);
+  }
   const latestEvidence = Array.isArray(task.evidence) ? task.evidence.at(-1) : null;
   if (!latestEvidence) {
     return json({ ok: false, message: "La tarea aun no tiene un sustento para revisar." }, 409);
@@ -2957,6 +3098,9 @@ async function deleteTaskAndArchive(request, db, user, context, env) {
   const taskIndex = data.tasks.findIndex((task) => clean(task.id) === taskId);
   if (taskIndex < 0) return json({ ok: false, message: "La tarea ya no existe." }, 404);
   const task = data.tasks[taskIndex];
+  if (!(await coordinatorCanManageOwner(db, user, task.ownerId))) {
+    return json({ ok: false, message: "No puedes eliminar tareas de otro equipo." }, 403);
+  }
   const archived = archiveDeletedTask(data, task, user, reason);
   data.tasks.splice(taskIndex, 1);
   await deleteTaskEvidenceFiles(db, taskId, env, context);
@@ -2986,12 +3130,12 @@ async function saveOvertimeSchedule(request, db, user, context) {
   const endTime = clean(body.endTime);
   const reason = clean(body.reason).slice(0, 300);
   const target = await db
-    .prepare("SELECT id, name, email, zone, role, status, created_at, access_level FROM users WHERE id = ? AND status = 'Activo'")
+    .prepare("SELECT id, name, email, zone, role, status, created_at, access_level, team, job_title, member_type FROM users WHERE id = ? AND status = 'Activo'")
     .bind(targetUserId)
     .first();
   if (!target || target.role !== "Trainer" || isObserverUser(target)) return json({ ok: false, message: "Selecciona un trainer activo." }, 400);
-  if (user.role !== "Coordinador" && target.id !== user.id) {
-    return json({ ok: false, message: "Solo puedes ampliar tu propia jornada." }, 403);
+  if (!coordinatorCanManageUser(user, target)) {
+    return json({ ok: false, message: "Solo puedes ampliar la jornada de integrantes de tu equipo." }, 403);
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue) || new Date(`${dateValue}T12:00:00Z`).getUTCDay() === 0) {
     return json({ ok: false, message: "Selecciona un dia laborable de lunes a sabado." }, 400);
@@ -3096,7 +3240,10 @@ async function requestOvertimeSchedule(request, db, user, context) {
   else data.overtimeRequests.unshift(overtimeRequest);
   await saveData(db, data);
 
-  const coordinators = await db.prepare("SELECT id FROM users WHERE role = 'Coordinador' AND status = 'Activo'").all();
+  const coordinators = await db
+    .prepare("SELECT id FROM users WHERE role = 'Coordinador' AND status = 'Activo' AND team = ?")
+    .bind(userTeam(user))
+    .all();
   const notifications = (coordinators.results || []).map((coordinator) => ({
     userId: coordinator.id,
     title: "Solicitud de horas extra",
@@ -3123,10 +3270,13 @@ async function reviewOvertimeSchedule(request, db, user, context) {
   if (requestIndex < 0) return json({ ok: false, message: "La solicitud ya fue revisada o no existe." }, 404);
   const overtimeRequest = data.overtimeRequests[requestIndex];
   const target = await db
-    .prepare("SELECT id, name, email, zone, role, status, created_at, access_level FROM users WHERE id = ? AND status = 'Activo'")
+    .prepare("SELECT id, name, email, zone, role, status, created_at, access_level, team, job_title, member_type FROM users WHERE id = ? AND status = 'Activo'")
     .bind(overtimeRequest.userId)
     .first();
   if (!target || target.role !== "Trainer" || isObserverUser(target)) return json({ ok: false, message: "El trainer ya no esta activo." }, 400);
+  if (!coordinatorCanManageUser(user, target)) {
+    return json({ ok: false, message: "No puedes revisar solicitudes de otro equipo." }, 403);
+  }
   const baseEnd = baseWorkdayEnd(overtimeRequest.date, target.name);
   if (
     !/^\d{4}-\d{2}-\d{2}$/.test(overtimeRequest.date) ||
@@ -3183,48 +3333,82 @@ async function stateResponse(db, user, loadedData = null) {
   const data = loadedData || (await loadData(db));
   const coordinator = user.role === "Coordinador";
   const observer = isObserverUser(user);
-  const canViewAll = coordinator || observer;
-  const userRows = canViewAll
-    ? await db.prepare("SELECT id, name, email, zone, role, status, created_at, access_level FROM users ORDER BY created_at ASC").all()
-    : await db
-        .prepare("SELECT id, name, email, zone, role, status, created_at, access_level FROM users WHERE status = 'Activo' ORDER BY role ASC, name ASC")
-        .all();
-  const users = (userRows.results || []).map(publicUser);
+  const userRows = await db
+    .prepare(
+      `SELECT id, name, email, zone, role, status, created_at, access_level, team, job_title, member_type
+       FROM users ORDER BY created_at ASC`
+    )
+    .all();
+  const allUserRows = userRows.results || [];
+  const visibleUserRows = observer
+    ? allUserRows
+    : coordinator
+      ? allUserRows.filter((row) => userTeam(row) === userTeam(user))
+      : allUserRows.filter((row) => row.status === "Activo" && userTeam(row) === userTeam(user));
+  const visibleOwnerIds = new Set(visibleUserRows.map((row) => clean(row.id)));
+  const users = visibleUserRows.map(publicUser);
+  const visibleTasks = observer
+    ? data.tasks
+    : coordinator
+      ? data.tasks.filter((task) => visibleOwnerIds.has(clean(task.ownerId)))
+      : data.tasks.filter((task) => clean(task.ownerId) === clean(user.id));
+  const visibleDeletedTasks = observer
+    ? data.deletedTasks
+    : coordinator
+      ? (data.deletedTasks || []).filter((task) => visibleOwnerIds.has(clean(task.ownerId)))
+      : (data.deletedTasks || []).filter((task) => clean(task.ownerId) === clean(user.id));
+  const visibleSchedules = observer
+    ? data.workScheduleByUserDate
+    : Object.fromEntries(
+        Object.entries(data.workScheduleByUserDate || {}).filter(([userId]) => visibleOwnerIds.has(clean(userId)))
+      );
+  const visibleOvertime = observer
+    ? data.overtimeRequests
+    : coordinator
+      ? (data.overtimeRequests || []).filter((item) => visibleOwnerIds.has(clean(item.userId)))
+      : (data.overtimeRequests || []).filter((item) => clean(item.userId) === clean(user.id));
   const state = {
     ...EMPTY_DATA,
     ...data,
     activeUserId: user.id,
     users,
-    tasks: canViewAll ? data.tasks : data.tasks.filter((task) => task.ownerId === user.id),
-    deletedTasks: canViewAll
-      ? data.deletedTasks
-      : (data.deletedTasks || []).filter((task) => task.ownerId === user.id),
-    workScheduleByUserDate: canViewAll
-      ? data.workScheduleByUserDate
-      : { [user.id]: data.workScheduleByUserDate?.[user.id] || {} },
-    overtimeRequests: canViewAll
-      ? data.overtimeRequests
-      : (data.overtimeRequests || []).filter((request) => request.userId === user.id),
-    announcements: canViewAll
+    tasks: visibleTasks,
+    deletedTasks: visibleDeletedTasks,
+    workScheduleByUserDate: visibleSchedules,
+    overtimeRequests: visibleOvertime,
+    announcements: coordinator || observer
       ? data.announcements
       : data.announcements.filter((item) => item.audience === "all" || item.targetId === user.id),
-    supportRequests: canViewAll
+    supportRequests: observer
       ? data.supportRequests
-      : data.supportRequests.filter((item) => item.fromId === user.id || item.toId === user.id),
-    passwordRecoveryRequests: coordinator ? data.passwordRecoveryRequests : [],
-    registrationRequests: coordinator ? data.registrationRequests : []
+      : (data.supportRequests || []).filter(
+          (item) =>
+            clean(item.fromId) === clean(user.id) ||
+            clean(item.toId) === clean(user.id) ||
+            (coordinator && (visibleOwnerIds.has(clean(item.fromId)) || visibleOwnerIds.has(clean(item.toId))))
+        ),
+    passwordRecoveryRequests: coordinator
+      ? (data.passwordRecoveryRequests || []).filter((item) => {
+          const target = allUserRows.find((row) => clean(row.email).toLowerCase() === clean(item.email).toLowerCase());
+          return !target || userTeam(target) === userTeam(user);
+        })
+      : [],
+    registrationRequests: coordinator
+      ? (data.registrationRequests || []).filter((item) => clean(item.team || TEAM_TRAINING) === userTeam(user))
+      : []
   };
   return json({ ok: true, state, user: publicUser(user) });
 }
 
-async function putState(request, db, user, context) {
+async function putState(request, db, user, context, env) {
   const body = await readJson(request, 6_000_000);
   const submitted = body.state || {};
   const current = await loadData(db);
   const notifications = [];
-  const activeUserRows = await db.prepare("SELECT id, name, role, access_level FROM users WHERE status = 'Activo'").all();
+  const activeUserRows = await db
+    .prepare("SELECT id, name, email, role, access_level, team, job_title, member_type FROM users WHERE status = 'Activo'")
+    .all();
   const activeUsers = activeUserRows.results || [];
-  const activeUserIds = new Set(activeUsers.map((row) => clean(row.id)));
   const userNamesById = new Map(activeUsers.map((row) => [row.id, row.name]));
   const personalBreak = submitted.breakSettingsByUser?.[user.id];
   if (validWorkSettings(personalBreak)) {
@@ -3254,21 +3438,50 @@ async function putState(request, db, user, context) {
   }
 
   if (user.role === "Coordinador") {
-    for (const key of ["registrationRequests", "passwordRecoveryRequests", "announcements", "supportRequests", "dailyMotivations"]) {
-      if (Array.isArray(submitted[key])) current[key] = submitted[key];
+    const managedUserIds = new Set(
+      activeUsers.filter((row) => coordinatorCanManageUser(user, row)).map((row) => clean(row.id))
+    );
+    if (isPrimaryCoordinatorUser(user)) {
+      for (const key of ["announcements", "dailyMotivations"]) {
+        if (Array.isArray(submitted[key])) current[key] = submitted[key];
+      }
+    }
+    if (Array.isArray(submitted.registrationRequests)) {
+      current.registrationRequests = mergeScopedItems(
+        current.registrationRequests,
+        submitted.registrationRequests,
+        (item) => clean(item.team || TEAM_TRAINING) === userTeam(user)
+      );
+    }
+    if (Array.isArray(submitted.passwordRecoveryRequests)) {
+      current.passwordRecoveryRequests = mergeScopedItems(
+        current.passwordRecoveryRequests,
+        submitted.passwordRecoveryRequests,
+        (item) => managedUserIds.has(clean(item.userId))
+      );
+    }
+    if (Array.isArray(submitted.supportRequests)) {
+      current.supportRequests = mergeScopedItems(
+        current.supportRequests,
+        submitted.supportRequests,
+        (item) => managedUserIds.has(clean(item.fromId)) || managedUserIds.has(clean(item.toId))
+      );
     }
     if (Array.isArray(submitted.tasks)) {
-      const previousTasks = new Map(current.tasks.map((task) => [clean(task.id), task]));
-      const submittedTaskIds = new Set(submitted.tasks.map((task) => clean(task.id)).filter(Boolean));
-      const removedTasks = current.tasks.filter((task) => clean(task.id) && !submittedTaskIds.has(clean(task.id)));
-      current.tasks = submitted.tasks
+      const previousManagedTasks = current.tasks.filter((task) => managedUserIds.has(clean(task.ownerId)));
+      const protectedTasks = current.tasks.filter((task) => !managedUserIds.has(clean(task.ownerId)));
+      const submittedManagedTasks = submitted.tasks.filter((task) => managedUserIds.has(clean(task.ownerId)));
+      const previousTasks = new Map(previousManagedTasks.map((task) => [clean(task.id), task]));
+      const submittedTaskIds = new Set(submittedManagedTasks.map((task) => clean(task.id)).filter(Boolean));
+      const removedTasks = previousManagedTasks.filter((task) => clean(task.id) && !submittedTaskIds.has(clean(task.id)));
+      const updatedManagedTasks = submittedManagedTasks
         .map((task) => {
           const normalizedTask = {
             ...task,
             category: normalizeTaskCategory(task.category)
           };
           const previous = previousTasks.get(clean(normalizedTask.id));
-          if (!previous && (!activeUserIds.has(clean(normalizedTask.ownerId)) || clean(normalizedTask.title).length < 2)) return null;
+          if (!previous && (!managedUserIds.has(clean(normalizedTask.ownerId)) || clean(normalizedTask.title).length < 2)) return null;
           const previousHistory = Array.isArray(previous?.history) ? previous.history : [];
           const submittedHistory = Array.isArray(normalizedTask.history) ? normalizedTask.history : previousHistory;
           const appendOnlyHistory = historyIsAppendOnly(previousHistory, submittedHistory);
@@ -3361,7 +3574,8 @@ async function putState(request, db, user, context) {
           return normalizedTask;
         })
         .filter(Boolean);
-      for (const task of current.tasks) {
+      current.tasks = [...protectedTasks, ...updatedManagedTasks];
+      for (const task of updatedManagedTasks) {
         const previous = previousTasks.get(clean(task.id));
         const assignedNow = !previous && clean(task.ownerId);
         const reassignedNow = previous && clean(previous.ownerId) !== clean(task.ownerId);
@@ -3382,13 +3596,15 @@ async function putState(request, db, user, context) {
       }
       for (const removedTask of removedTasks) {
         archiveDeletedTask(current, removedTask, user, "Tarea retirada de la agenda por el coordinador.");
-        await deleteTaskEvidenceFiles(db, clean(removedTask.id));
+        await deleteTaskEvidenceFiles(db, clean(removedTask.id), env, context);
       }
     }
   } else {
     const submittedTasks = new Map((submitted.tasks || []).map((task) => [task.id, task]));
     const activeTrainerIds = new Set(
-      activeUsers.filter((row) => row.role === "Trainer" && !isObserverUser(row)).map((row) => row.id)
+      activeUsers
+        .filter((row) => row.role === "Trainer" && !isObserverUser(row) && userTeam(row) === userTeam(user))
+        .map((row) => row.id)
     );
     current.tasks = current.tasks.map((task) => {
       if (task.ownerId !== user.id) return task;
@@ -3583,6 +3799,12 @@ function validReminderList(reminders, actorId, ownerId) {
   );
 }
 
+function mergeScopedItems(currentItems, submittedItems, isInScope) {
+  const protectedItems = (currentItems || []).filter((item) => !isInScope(item));
+  const scopedItems = (submittedItems || []).filter(isInScope);
+  return [...protectedItems, ...scopedItems];
+}
+
 async function queueNotifications(db, notifications) {
   const notifiedUsers = new Set();
   for (const item of notifications) {
@@ -3752,18 +3974,45 @@ async function createUser(request, db, actor) {
   const passwordData = await hashPassword(password);
   const createdAt = Date.now();
   const userId = crypto.randomUUID();
+  const team = userTeam(actor);
+  const jobTitle = clean(body.jobTitle).slice(0, 120) || (team === TEAM_AUDIOVISUAL ? "Creador de Contenido" : "Trainer");
+  const memberType = team === TEAM_AUDIOVISUAL ? "audiovisual" : "trainer";
   await db
-    .prepare("INSERT INTO users (id, name, email, zone, role, status, password_hash, password_salt, created_at) VALUES (?, ?, ?, ?, 'Trainer', 'Activo', ?, ?, ?)")
-    .bind(userId, clean(body.name), email, clean(body.zone), passwordData.hash, passwordData.salt, createdAt)
+    .prepare(
+      `INSERT INTO users
+       (id, name, email, zone, role, status, password_hash, password_salt, created_at, access_level, team, job_title, member_type)
+       VALUES (?, ?, ?, ?, 'Trainer', 'Activo', ?, ?, ?, '', ?, ?, ?)`
+    )
+    .bind(userId, clean(body.name), email, clean(body.zone), passwordData.hash, passwordData.salt, createdAt, team, jobTitle, memberType)
     .run();
-  return json({ ok: true, user: publicUser({ id: userId, name: clean(body.name), email, zone: clean(body.zone), role: "Trainer", status: "Activo", createdAt }) }, 201);
+  return json({
+    ok: true,
+    user: publicUser({
+      id: userId,
+      name: clean(body.name),
+      email,
+      zone: clean(body.zone),
+      role: "Trainer",
+      status: "Activo",
+      team,
+      job_title: jobTitle,
+      member_type: memberType,
+      createdAt
+    })
+  }, 201);
 }
 
 async function resetPassword(request, db, actor) {
   if (actor.role !== "Coordinador") return json({ ok: false, message: "Permiso insuficiente." }, 403);
   const body = await readJson(request);
-  const user = await db.prepare("SELECT id, name, email FROM users WHERE id = ?").bind(clean(body.userId)).first();
+  const user = await db
+    .prepare("SELECT id, name, email, role, status, access_level, team, member_type FROM users WHERE id = ?")
+    .bind(clean(body.userId))
+    .first();
   if (!user) return json({ ok: false, message: "Usuario no encontrado." }, 404);
+  if (!coordinatorCanManageUser(actor, user)) {
+    return json({ ok: false, message: "No puedes restablecer accesos de otro equipo." }, 403);
+  }
   const tempPassword = `LG${randomToken(8).replace(/[-_]/g, "A").slice(0, 8)}`;
   const passwordData = await hashPassword(tempPassword);
   await db
@@ -4162,6 +4411,40 @@ function isObserverUser(user) {
   return clean(user?.access_level).toLowerCase() === OBSERVER_ACCESS_LEVEL;
 }
 
+function userTeam(user) {
+  if (isObserverUser(user)) return "Todos";
+  return clean(user?.team) || TEAM_TRAINING;
+}
+
+function userMemberType(user) {
+  const value = clean(user?.member_type || user?.memberType).toLowerCase();
+  if (value) return value;
+  return user?.role === "Coordinador" ? "master" : "trainer";
+}
+
+function isPrimaryCoordinatorUser(user) {
+  return user?.role === "Coordinador" && clean(user?.email).toLowerCase() === PRIMARY_COORDINATOR_EMAIL;
+}
+
+function coordinatorCanManageUser(actor, target) {
+  return (
+    actor?.role === "Coordinador" &&
+    !isObserverUser(actor) &&
+    target &&
+    !isObserverUser(target) &&
+    userTeam(actor) === userTeam(target)
+  );
+}
+
+async function coordinatorCanManageOwner(db, actor, ownerId) {
+  if (actor?.role !== "Coordinador" || !clean(ownerId)) return false;
+  const target = await db
+    .prepare("SELECT id, email, role, status, access_level, team, member_type FROM users WHERE id = ? AND status = 'Activo'")
+    .bind(clean(ownerId))
+    .first();
+  return coordinatorCanManageUser(actor, target);
+}
+
 function publicUser(row) {
   const observer = isObserverUser(row);
   return {
@@ -4171,6 +4454,9 @@ function publicUser(row) {
     zone: row.zone || "",
     role: observer ? "Admin" : row.role,
     accessLevel: observer ? OBSERVER_ACCESS_LEVEL : "",
+    team: userTeam(row),
+    jobTitle: clean(row.job_title || row.jobTitle) || (observer ? "Admin" : row.role === "Coordinador" ? "Coordinador" : "Trainer"),
+    memberType: observer ? "admin" : userMemberType(row),
     status: row.status || "Activo",
     createdAt: Number(row.createdAt || row.created_at || Date.now())
   };

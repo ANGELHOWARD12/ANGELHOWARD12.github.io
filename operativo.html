@@ -624,6 +624,28 @@
         color: #fff;
       }
 
+      .organization-scope {
+        align-items: center;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-left: 4px solid var(--blue);
+        border-radius: 8px;
+        display: grid;
+        gap: 14px;
+        grid-template-columns: minmax(0, 1fr) minmax(210px, 280px);
+        margin-bottom: 16px;
+        padding: 14px 16px;
+      }
+
+      .organization-scope h2 {
+        font-size: 18px;
+        margin: 0 0 3px;
+      }
+
+      .organization-scope label {
+        margin: 0;
+      }
+
       .view {
         display: none;
       }
@@ -2075,6 +2097,10 @@
           color: var(--blue-dark);
         }
 
+        .organization-scope {
+          grid-template-columns: 1fr;
+        }
+
         .toast-region {
           bottom: calc(76px + env(safe-area-inset-bottom));
           top: auto;
@@ -2338,6 +2364,21 @@
         <button class="tab" data-view="infoView" role="tab" aria-selected="false">Info LG</button>
       </nav>
 
+      <section id="organizationScopePanel" class="organization-scope hidden" aria-label="Area de trabajo visible">
+        <div>
+          <h2 id="organizationScopeTitle">Training</h2>
+          <p id="organizationScopeDescription" class="muted">Tareas y equipo del area seleccionada.</p>
+        </div>
+        <label>
+          Area visible
+          <select id="organizationScope">
+            <option value="training">Training</option>
+            <option value="masters">Masters</option>
+            <option value="audiovisual">Audiovisuales</option>
+          </select>
+        </label>
+      </section>
+
       <section id="tasksView" class="view active">
         <section id="weeklyPlanningReminder" class="planning-reminder hidden" aria-live="polite">
           <div>
@@ -2459,7 +2500,7 @@
           <section id="coordinatorTaskPanel" class="panel stack">
             <div>
               <h2 id="taskFormTitle">Asignar tarea</h2>
-              <p id="taskFormHelp" class="muted">Pablo asigna actividades a todo el equipo. Cada trainer organiza sus propias tareas.</p>
+              <p id="taskFormHelp" class="muted">El coordinador asigna actividades a su equipo. Cada integrante organiza sus propias tareas.</p>
             </div>
             <form id="taskForm" class="form-grid">
               <label>
@@ -2576,7 +2617,7 @@
           <summary>
             <div>
             <h2>Historial de tareas eliminadas</h2>
-            <p class="muted">Pablo ve todo el historial. Cada trainer ve solamente las tareas eliminadas de su agenda.</p>
+            <p class="muted">El coordinador ve el historial de su equipo. Cada integrante ve solamente las tareas eliminadas de su agenda.</p>
             </div>
             <span class="collapsible-symbol" aria-hidden="true">+</span>
           </summary>
@@ -2678,7 +2719,7 @@
             <div class="collapsible-panel-body stack">
             <div id="cloudPlanPanel" class="note">
               <strong>Nube LGTASK conectada</strong>
-              <p class="muted">Las fotos y archivos nuevos quedan protegidos en Cloudflare R2 y Pablo puede abrirlos desde esta pantalla.</p>
+              <p class="muted">Las fotos y archivos nuevos quedan protegidos en Cloudflare R2 y el coordinador del area puede revisarlos.</p>
               <div class="cloud-path">LG Task Hub / Sustentos / trainer / fecha / tarea</div>
               <p class="muted">Cada archivo se registra por nombre de trainer, fecha y tarea.</p>
               <button id="openCloudHistory" class="small" type="button">Actualizar historial</button>
@@ -2713,8 +2754,8 @@
         <div class="two-col">
           <section id="coordinatorTeamPanel" class="panel stack">
             <div>
-              <h2>Alta de trainers</h2>
-              <p class="muted">Crear usuarios o aprobar solicitudes de registro.</p>
+              <h2>Alta de integrantes</h2>
+              <p class="muted">Cada coordinador crea y administra usuarios de su propio equipo.</p>
             </div>
             <form id="createTrainerForm" class="form-grid">
               <label>
@@ -2733,7 +2774,7 @@
                 Clave temporal
                 <input id="newTrainerPassword" type="text" value="LG2026" required />
               </label>
-              <button class="primary wide" type="submit">Crear trainer</button>
+              <button class="primary wide" type="submit">Crear integrante</button>
             </form>
             <p id="trainerMessage" class="message" aria-live="polite"></p>
             <div class="divider"></div>
@@ -3075,7 +3116,7 @@
           <p id="reviewEvidenceTaskLabel" class="muted"></p>
         </div>
         <label>
-          Observacion de Pablo
+          Observacion del coordinador
           <textarea id="reviewEvidenceNote" maxlength="1500" required></textarea>
         </label>
         <div class="actions">
@@ -3146,6 +3187,7 @@
     <script src="./vendor/jszip-3.10.1.min.js"></script>
     <script>
       const STORAGE_KEY = "lg-task-hub-ui-v1";
+      const ORGANIZATION_SCOPE_KEY = "lgtask-organization-scope-v1";
       const API_BASE = "/cloud";
       const API_FALLBACK_BASE = "/api";
       const PUBLIC_APP_ORIGIN = "https://lgtask.pages.dev";
@@ -3156,7 +3198,9 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = "23-cloud-resilience4";
+      const APP_VERSION = "24-org-teams1";
+      const TEAM_TRAINING = "Training";
+      const TEAM_AUDIOVISUAL = "Audiovisuales";
       const MAX_EVIDENCE_FILES = 8;
       const MAX_EVIDENCE_FILE_BYTES = 15_000_000;
       const EVIDENCE_MULTIPART_PART_BYTES = 5 * 1024 * 1024;
@@ -3214,7 +3258,7 @@
       ];
 
       const initialState = {
-        version: 23,
+        version: 24,
         activeUserId: "",
         selectedProduct: "oled",
         selectedWeekStart: "",
@@ -3316,7 +3360,15 @@
         { name: "ANTONIO GONZALES", aliases: ["ANTONIO GONZALES", "ANTONIO VIDAL"], chains: ["Integra", "Sodimac", "Rubi"], specialty: "Trainer General" },
         { name: "ELOY NIETO", aliases: ["ELOY NIETO"], chains: [], specialty: "ULG" },
         { name: "BRYAN TAPIA", aliases: ["BRYAN TAPIA"], chains: [], specialty: "New Hired" },
-        { name: "GIANPIERO VASQUEZ", aliases: ["GIANPIERO VASQUEZ"], chains: [], specialty: "Asesor ULG" }
+        { name: "GIANPIERO VASQUEZ", aliases: ["GIANPIERO VASQUEZ"], chains: [], specialty: "Asesor ULG", scope: "training" },
+        { name: "PABLO RAMOS", aliases: ["PABLO RAMOS"], chains: [], specialty: "Coordinador de Entrenamiento", scope: "masters", team: TEAM_TRAINING },
+        { name: "NYKOL RUIZ", aliases: ["NYKOL RUIZ"], chains: [], specialty: "Master Trainer HS", scope: "masters", team: TEAM_TRAINING },
+        { name: "RONALD CHAVEZ", aliases: ["RONALD CHAVEZ"], chains: [], specialty: "Master Trainer TV", scope: "masters", team: TEAM_TRAINING },
+        { name: "ALEJANDRO COTRINA", aliases: ["ALEJANDRO COTRINA"], chains: [], specialty: "Coordinador Audiovisual", scope: "masters", team: TEAM_AUDIOVISUAL },
+        { name: "ARIANA PEREZ", aliases: ["ARIANA PEREZ"], chains: [], specialty: "Creadora de Contenido", scope: "audiovisual", team: TEAM_AUDIOVISUAL },
+        { name: "ABEL BARRANTES", aliases: ["ABEL BARRANTES"], chains: [], specialty: "Creador de Contenido", scope: "audiovisual", team: TEAM_AUDIOVISUAL },
+        { name: "FERNANDO BEDRINANA", aliases: ["FERNANDO BEDRINANA"], chains: [], specialty: "Creador de Contenido", scope: "audiovisual", team: TEAM_AUDIOVISUAL },
+        { name: "NATHALY FUENTES", aliases: ["NATHALY FUENTES"], chains: [], specialty: "Creadora de Contenido", scope: "audiovisual", team: TEAM_AUDIOVISUAL }
       ];
 
       let state = loadState();
@@ -3353,6 +3405,9 @@
       let historyTaskId = "";
       let lateEvidenceTaskId = "";
       let infoEditingId = "";
+      let selectedOrganizationScope = ["training", "masters", "audiovisual"].includes(localStorage.getItem(ORGANIZATION_SCOPE_KEY))
+        ? localStorage.getItem(ORGANIZATION_SCOPE_KEY)
+        : "training";
       const openTaskGroups = new Set();
       const openTaskDays = new Set();
       const openTrainerWeekDays = new Set();
@@ -3365,6 +3420,10 @@
 
       const els = {
         loginScreen: document.querySelector("#loginScreen"),
+        organizationScopePanel: document.querySelector("#organizationScopePanel"),
+        organizationScopeTitle: document.querySelector("#organizationScopeTitle"),
+        organizationScopeDescription: document.querySelector("#organizationScopeDescription"),
+        organizationScope: document.querySelector("#organizationScope"),
         appHeader: document.querySelector("#appHeader"),
         appShell: document.querySelector("#appShell"),
         loginForm: document.querySelector("#loginForm"),
@@ -3733,7 +3792,7 @@
       }
 
       function normalizeState(nextState) {
-        nextState.version = 23;
+        nextState.version = 24;
         nextState.users = nextState.users?.length ? nextState.users : structuredClone(initialState.users);
         nextState.registrationRequests = nextState.registrationRequests || [];
         nextState.passwordRecoveryRequests = nextState.passwordRecoveryRequests || [];
@@ -4299,12 +4358,58 @@
         return activeUser()?.role === "Coordinador";
       }
 
+      function isPrimaryCoordinator() {
+        return isCoordinator() && clean(activeUser()?.email).toLowerCase() === "pablo.ramos@lgtask.local";
+      }
+
       function isObserver() {
         return activeUser()?.accessLevel === "observer";
       }
 
       function canViewAll() {
         return isCoordinator() || isObserver();
+      }
+
+      function userTeam(user) {
+        return clean(user?.team) || TEAM_TRAINING;
+      }
+
+      function organizationScopeUsers() {
+        const activeUsers = state.users.filter((user) => user.status === "Activo" && !isObserverUserProfile(user));
+        if (!isObserver()) return activeUsers;
+        if (selectedOrganizationScope === "masters") {
+          return activeUsers.filter((user) => clean(user.memberType).toLowerCase() === "master");
+        }
+        if (selectedOrganizationScope === "audiovisual") {
+          return activeUsers.filter((user) => userTeam(user) === TEAM_AUDIOVISUAL);
+        }
+        return activeUsers.filter(
+          (user) => userTeam(user) === TEAM_TRAINING && clean(user.memberType).toLowerCase() !== "master"
+        );
+      }
+
+      function isObserverUserProfile(user) {
+        return clean(user?.accessLevel).toLowerCase() === "observer" || user?.role === "Admin";
+      }
+
+      function organizationScopeLabel() {
+        if (!isObserver()) return userTeam(activeUser()) === TEAM_AUDIOVISUAL ? "Audiovisuales" : "Training";
+        return selectedOrganizationScope === "masters"
+          ? "Masters"
+          : selectedOrganizationScope === "audiovisual"
+            ? "Audiovisuales"
+            : "Training";
+      }
+
+      function coordinatorForUser(userId = state.activeUserId) {
+        const person = state.users.find((user) => user.id === userId) || activeUser();
+        return state.users.find(
+          (user) => user.role === "Coordinador" && user.status === "Activo" && userTeam(user) === userTeam(person)
+        ) || null;
+      }
+
+      function coordinatorNameForUser(userId = state.activeUserId) {
+        return coordinatorForUser(userId)?.name || "el coordinador";
       }
 
       function clearAdminReadOnlyMode() {
@@ -4334,7 +4439,8 @@
       }
 
       function trainers() {
-        return state.users.filter((user) => user.role === "Trainer" && user.status === "Activo");
+        const people = isObserver() ? organizationScopeUsers() : state.users;
+        return people.filter((user) => user.role === "Trainer" && user.status === "Activo" && !isObserverUserProfile(user));
       }
 
       function assignableUsers() {
@@ -4575,7 +4681,9 @@
 
       function taskSchedulingPeople() {
         return canViewAll()
-          ? state.users.filter((user) => ["Coordinador", "Trainer"].includes(user.role) && user.status === "Activo")
+          ? isObserver()
+            ? organizationScopeUsers()
+            : assignableUsers()
           : [activeUser()].filter(Boolean);
       }
 
@@ -4948,7 +5056,7 @@
                   ${entry.product ? `<p><strong>Producto revisado:</strong> ${escapeHtml(entry.product)}</p>` : ""}
                   ${entry.trainingTopic ? `<p><strong>Tema de la capacitacion:</strong> ${escapeHtml(entry.trainingTopic)}</p>` : ""}
                   ${entry.notes ? `<p><strong>Comentario:</strong> ${escapeHtml(entry.notes)}</p>` : `<p class="muted">Sin comentarios.</p>`}
-                  ${entry.reviewNote ? `<div class="note"><strong>Observacion de Pablo:</strong><p>${escapeHtml(entry.reviewNote)}</p><small>${entry.reviewedAt ? formatDateTime(entry.reviewedAt) : ""}</small></div>` : ""}
+                  ${entry.reviewNote ? `<div class="note"><strong>Observacion del coordinador:</strong><p>${escapeHtml(entry.reviewNote)}</p><small>${entry.reviewedAt ? formatDateTime(entry.reviewedAt) : ""}</small></div>` : ""}
                   ${links.length ? `<div class="actions">${links.map((link) => `<a class="small" href="${escapeHtml(link)}" target="_blank" rel="noopener">Abrir enlace</a>`).join("")}</div>` : ""}
                   ${files.length ? `<div class="evidence-file-list">${files.map((file, fileIndex) => `
                     <div class="evidence-file-row">
@@ -5337,7 +5445,7 @@
 
       function evidenceReportRows() {
         const trainerFilter = els.evidenceTrainerFilter.value || "all";
-        const rows = state.tasks.flatMap((task) => {
+        const rows = relevantTasks().flatMap((task) => {
           const evidenceItems = task.evidence || [];
           if (evidenceItems.length) {
             return evidenceItems.flatMap((evidence) => {
@@ -5424,7 +5532,7 @@
         { header: "Producto revisado", width: 22 },
         { header: "Resultado", width: 22 },
         { header: "Observaciones", width: 42 },
-        { header: "Revision de Pablo", width: 20 },
+        { header: "Revision del coordinador", width: 24 },
         { header: "Archivo adjunto", width: 28 },
         { header: "Tipo de archivo", width: 25 },
         { header: "Evidencia incluida", width: 40 },
@@ -5749,9 +5857,9 @@
         const workbook = new ExcelJS.Workbook();
         workbook.creator = "LGTASK";
         workbook.lastModifiedBy = "LGTASK";
-        workbook.company = "LG Training Peru";
+        workbook.company = `LG ${organizationScopeLabel()} Peru`;
         workbook.title = "LGTASK - Tareas cumplidas y sustentos";
-        workbook.subject = "Reporte de actividades del equipo Training LG Peru";
+        workbook.subject = `Reporte de actividades del equipo ${organizationScopeLabel()} LG Peru`;
         workbook.created = new Date();
         workbook.modified = new Date();
         workbook.calcProperties.fullCalcOnLoad = true;
@@ -5785,7 +5893,7 @@
         );
 
         const usedNames = new Set(["resumen", "_archivos internos"]);
-        const trainerIds = trainerFilter === "all" ? trainers().map((trainer) => trainer.id) : [trainerFilter];
+        const trainerIds = trainerFilter === "all" ? organizationScopeUsers().map((trainer) => trainer.id) : [trainerFilter];
         rows.forEach((row) => {
           if (!trainerIds.includes(row.trainerId)) trainerIds.push(row.trainerId);
         });
@@ -5991,6 +6099,26 @@
           : "Los sustentos y la modificacion de breaks anteriores estan bloqueados para todos los trainers.";
       }
 
+      function renderOrganizationScope() {
+        if (!els.organizationScopePanel) return;
+        els.organizationScopePanel.classList.toggle("hidden", !canViewAll());
+        if (!canViewAll()) return;
+        if (isObserver()) {
+          els.organizationScope.disabled = false;
+          els.organizationScope.value = selectedOrganizationScope;
+        } else {
+          selectedOrganizationScope = userTeam(activeUser()) === TEAM_AUDIOVISUAL ? "audiovisual" : "training";
+          els.organizationScope.value = selectedOrganizationScope;
+          els.organizationScope.disabled = true;
+        }
+        const label = organizationScopeLabel();
+        const people = organizationScopeUsers();
+        els.organizationScopeTitle.textContent = label;
+        els.organizationScopeDescription.textContent = isObserver()
+          ? `${people.length} integrante${people.length === 1 ? "" : "s"}. La vista de Giuliana es de solo lectura.`
+          : `${activeUser().name} gestiona tareas, horarios y sustentos del equipo ${label}.`;
+      }
+
       function render() {
         const user = activeUser();
         const logged = Boolean(user);
@@ -6007,6 +6135,7 @@
         els.sessionName.textContent = user.name;
         els.sessionRole.textContent = user.role;
         updateNotificationButton();
+        renderOrganizationScope();
         els.todayLabel.textContent = new Intl.DateTimeFormat("es-PE", {
           weekday: "long",
           day: "2-digit",
@@ -6020,22 +6149,24 @@
         els.trainerWeekPanel.classList.toggle("hidden", canViewAll());
         els.trainerFilterWrap.classList.toggle("hidden", !canViewAll());
         els.coordinatorTeamPanel.classList.toggle("hidden", !canViewAll());
-        els.backupTools.classList.toggle("hidden", !canViewAll());
-        els.createCloudBackup.classList.toggle("hidden", !isCoordinator());
-        els.coordinatorAnnouncementPanel.classList.toggle("hidden", !canViewAll());
+        els.backupTools.classList.toggle("hidden", !(isPrimaryCoordinator() || isObserver()));
+        els.createCloudBackup.classList.toggle("hidden", !isPrimaryCoordinator());
+        els.coordinatorAnnouncementPanel.classList.toggle("hidden", !(isPrimaryCoordinator() || isObserver()));
         els.cloudPlanPanel.classList.toggle("hidden", !canViewAll());
         els.evidenceFilters.classList.toggle("hidden", !canViewAll());
-        els.lateEvidencePolicyPanel.classList.toggle("hidden", !canViewAll());
-        els.editMotivation.classList.toggle("hidden", !canViewAll());
+        els.lateEvidencePolicyPanel.classList.toggle("hidden", !(isPrimaryCoordinator() || isObserver()));
+        els.editMotivation.classList.toggle("hidden", !isPrimaryCoordinator());
         els.lgUpdateForm.classList.remove("hidden");
-        if (!isCoordinator()) els.motivationForm.classList.add("hidden");
+        if (!isPrimaryCoordinator()) els.motivationForm.classList.add("hidden");
         els.taskFormTitle.textContent = canViewAll() ? "Asignar tarea" : "Agregar mi tarea";
         els.taskFormHelp.textContent = canViewAll()
-          ? "Pablo puede asignar tareas a cualquier trainer o a si mismo."
+          ? isObserver()
+            ? `Consulta de tareas de ${organizationScopeLabel()} sin permisos de modificacion.`
+            : `${activeUser().name} puede asignar tareas a integrantes de ${organizationScopeLabel()} o a si mismo.`
           : "Organiza tus propias tareas de la semana. Solo puedes asignarlas a tu usuario.";
         els.taskSubmitButton.textContent = canViewAll() ? "Asignar tarea" : "Agregar a mi semana";
         els.taskOwner.disabled = !isCoordinator();
-        if (canViewAll() && !lastStorageStatusAt) {
+        if ((isPrimaryCoordinator() || isObserver()) && !lastStorageStatusAt) {
           try {
             const cached = JSON.parse(localStorage.getItem(STORAGE_STATUS_CACHE_KEY) || "null");
             if (cached?.storage) {
@@ -6203,8 +6334,8 @@
         );
         els.overtimeUserWrap.classList.toggle("hidden", !canViewAll());
         els.overtimeHelp.textContent = canViewAll()
-          ? "Pablo puede ampliar directamente la jornada y aprobar o rechazar las solicitudes de los trainers."
-          : "Solicita horas extra para una fecha. El horario se habilitara solamente cuando Pablo lo apruebe.";
+          ? `${activeUser().name} puede ampliar directamente la jornada y revisar solicitudes de su equipo.`
+          : `Solicita horas extra para una fecha. El horario se habilitara cuando ${coordinatorNameForUser()} lo apruebe.`;
         if (!els.overtimeDate.value) els.overtimeDate.value = nearestWorkingDay(todayIso);
         const dateValue = els.overtimeDate.value;
         const userId = els.overtimeUser.value || state.activeUserId;
@@ -6238,7 +6369,7 @@
             : "Selecciona un trainer y una fecha valida.";
         } else if (!canViewAll() && pendingRequest) {
           const currentSchedule = workScheduleForDate(dateValue, userId);
-          els.overtimeCurrent.textContent = `Solicitud pendiente para salir a las ${pendingRequest.endTime}. Tu jornada continua hasta las ${currentSchedule.end} mientras Pablo revisa la autorizacion.`;
+          els.overtimeCurrent.textContent = `Solicitud pendiente para salir a las ${pendingRequest.endTime}. Tu jornada continua hasta las ${currentSchedule.end} mientras ${coordinatorNameForUser()} revisa la autorizacion.`;
         } else if (saved && timeToMinutes(saved.endTime) > timeToMinutes(base.end)) {
           const author = saved.updatedByName || userName(saved.updatedById);
           els.overtimeCurrent.textContent = `Jornada base ${base.start}-${base.end}. Ampliada hasta ${saved.endTime} por ${author}${saved.updatedAt ? ` el ${formatDateTime(saved.updatedAt)}` : ""}. Motivo: ${saved.reason || "Sin detalle"}.`;
@@ -6327,9 +6458,10 @@
       }
 
       function refreshSelects() {
-        const trainerOptions = trainers().map((trainer) => ({ value: trainer.id, label: `${trainer.name} - ${trainer.zone}` }));
+        const visiblePeople = isObserver() ? organizationScopeUsers() : assignableUsers();
+        const trainerOptions = visiblePeople.map((trainer) => ({ value: trainer.id, label: `${trainer.name} - ${trainer.jobTitle || trainer.zone}` }));
         const taskPeople = isObserver()
-          ? state.users.filter((user) => ["Coordinador", "Trainer"].includes(user.role) && user.status === "Activo")
+          ? organizationScopeUsers()
           : isCoordinator()
             ? assignableUsers()
             : [activeUser()].filter(Boolean);
@@ -6350,6 +6482,10 @@
       }
 
       function relevantTasks() {
+        if (isObserver()) {
+          const visibleIds = new Set(organizationScopeUsers().map((user) => user.id));
+          return state.tasks.filter((task) => visibleIds.has(task.ownerId));
+        }
         return canViewAll() ? state.tasks : state.tasks.filter((task) => task.ownerId === state.activeUserId);
       }
 
@@ -6722,7 +6858,7 @@
         `;
 
         const rosterPeople = isObserver()
-          ? state.users.filter((user) => ["Coordinador", "Trainer"].includes(user.role) && user.status === "Activo")
+          ? organizationScopeUsers()
           : assignableUsers();
         rosterPeople.forEach((person) => {
           const personSchedule = workScheduleForDate(dateValue, person.id);
@@ -6846,7 +6982,7 @@
         if (task.status === "En revision") {
           const note = document.createElement("span");
           note.className = "workflow-status";
-          note.textContent = "Sustento enviado | pendiente de aprobacion de Pablo";
+          note.textContent = `Sustento enviado | pendiente de aprobacion de ${coordinatorNameForUser(task.ownerId)}`;
           container.appendChild(note);
           renderRenameControl(container, task);
           return;
@@ -6951,7 +7087,7 @@
         const todayTasks = allTasks.filter((task) => task.dueDate === platformToday);
         const todayDone = todayTasks.filter((task) => task.status === "Cumplida").length;
         const todayPercent = todayTasks.length ? Math.round((todayDone / todayTasks.length) * 100) : 0;
-        els.dashboardTitle.textContent = canViewAll() ? "Tablero general" : `Tablero Week ${isoWeekNumber(currentWeekStart)}`;
+        els.dashboardTitle.textContent = canViewAll() ? `Tablero ${organizationScopeLabel()}` : `Tablero Week ${isoWeekNumber(currentWeekStart)}`;
         els.progressLabel.textContent = canViewAll() ? "Avance general" : "Avance semanal";
         els.progressPercent.textContent = `${percent}%`;
         els.progressBar.style.width = `${percent}%`;
@@ -6959,7 +7095,7 @@
         els.reviewCount.textContent = review;
         els.doneCount.textContent = done;
         els.trainerMetricLabel.textContent = canViewAll() ? "Trainers" : "Avance hoy";
-        els.trainerCount.textContent = canViewAll() ? trainers().length : `${todayPercent}%`;
+        els.trainerCount.textContent = canViewAll() ? organizationScopeUsers().length : `${todayPercent}%`;
         els.trainerCount.title = canViewAll() ? "Equipo activo" : `${todayDone} de ${todayTasks.length} tareas aprobadas hoy`;
       }
 
@@ -6985,8 +7121,9 @@
       }
 
       function renderDeletedTasks() {
+        const visibleIds = new Set(organizationScopeUsers().map((user) => user.id));
         const deleted = (state.deletedTasks || [])
-          .filter((task) => canViewAll() || task.ownerId === state.activeUserId)
+          .filter((task) => isObserver() ? visibleIds.has(task.ownerId) : canViewAll() || task.ownerId === state.activeUserId)
           .sort((a, b) => b.dueDate.localeCompare(a.dueDate) || Number(b.deletedAt || 0) - Number(a.deletedAt || 0));
         els.deletedTasksList.innerHTML = "";
         if (!deleted.length) {
@@ -6994,7 +7131,7 @@
             "No hay tareas eliminadas",
             canViewAll()
               ? "Las tareas que elimines quedaran registradas aqui."
-              : "Cuando Pablo elimine una tarea de tu agenda, podras verla aqui."
+              : "Cuando el coordinador elimine una tarea de tu agenda, podras verla aqui."
           );
           return;
         }
@@ -7016,7 +7153,7 @@
                 ${task.product ? `<span>Linea: ${escapeHtml(task.product)}</span>` : ""}
               </div>
               <div class="note">
-                <strong>Eliminada por ${escapeHtml(task.deletedByName || userName(task.deletedById) || "Pablo")}</strong>
+                <strong>Eliminada por ${escapeHtml(task.deletedByName || userName(task.deletedById) || "Coordinacion")}</strong>
                 <p class="muted">${escapeHtml(task.reason || "Tarea retirada de la agenda.")} | ${formatDateTime(task.deletedAt)}</p>
               </div>
             `;
@@ -7366,7 +7503,7 @@
                 ${entry.product ? `<p><strong>Producto:</strong> ${escapeHtml(entry.product)}</p>` : ""}
                 ${entry.trainingTopic ? `<p><strong>Tema de la capacitacion:</strong> ${escapeHtml(entry.trainingTopic)}</p>` : ""}
                 ${entry.notes ? `<p>${escapeHtml(entry.notes)}</p>` : ""}
-                ${entry.reviewNote ? `<div class="note"><strong>Observacion de Pablo:</strong><p>${escapeHtml(entry.reviewNote)}</p></div>` : ""}
+                ${entry.reviewNote ? `<div class="note"><strong>Observacion del coordinador:</strong><p>${escapeHtml(entry.reviewNote)}</p></div>` : ""}
                 ${links.length ? `<div class="actions">${links.map((link) => `<a class="small" href="${escapeHtml(link)}" target="_blank" rel="noopener">Abrir enlace</a>`).join("")}</div>` : ""}
                 <div class="cloud-path">${escapeHtml(cloudFolderForEvidence(entry, entry.task))}</div>
                 ${files.length ? `<div class="evidence-cloud-badge">${files.length} archivo${files.length === 1 ? "" : "s"} protegido${files.length === 1 ? "" : "s"} en la nube LGTASK</div>` : ""}
@@ -7429,15 +7566,16 @@
         return TEAM_PROFILE_DEFAULTS.find((profile) => profile.aliases.includes(normalized)) || null;
       }
 
-      function teamProfileMarkup(profile) {
+      function teamProfileMarkup(profile, user = null) {
         const chains = profile?.chains || [];
+        const specialty = clean(user?.jobTitle) || profile?.specialty || "Integrante LG";
         return `
           <div class="profile-tags">
             ${chains.length ? chains.map((chain) => `<span class="profile-tag">${escapeHtml(chain)}</span>`).join("") : `<span class="profile-tag">Sin cadena fija</span>`}
           </div>
           <div class="note">
             <strong>Funcion / especialidad</strong>
-            <p>${escapeHtml(profile?.specialty || "Trainer LG")}</p>
+            <p>${escapeHtml(specialty)}</p>
           </div>
         `;
       }
@@ -7493,7 +7631,11 @@
 
         els.teamList.innerHTML = "";
         const activeUsers = state.users.filter((user) => user.status === "Activo");
-        const visibleUsers = canViewAll() ? activeUsers : activeUsers.filter((user) => user.role === "Trainer");
+        const visibleUsers = isObserver()
+          ? organizationScopeUsers()
+          : canViewAll()
+            ? activeUsers
+            : activeUsers.filter((user) => user.role === "Trainer");
         const matchedProfiles = new Set();
         visibleUsers
           .sort((left, right) => {
@@ -7513,26 +7655,25 @@
             card.innerHTML = `
               <div class="title-row">
                 <h3>${escapeHtml(user.name)}</h3>
-                <span class="pill">${escapeHtml(user.role)}</span>
+                <span class="pill">${escapeHtml(user.jobTitle || user.role)}</span>
               </div>
               <div class="meta">
                 <span>${escapeHtml(user.zone)}</span>
+                <span>Equipo: ${escapeHtml(user.team || TEAM_TRAINING)}</span>
                 ${canViewAll() || user.id === state.activeUserId ? `<span>${escapeHtml(user.email)}</span>` : ""}
                 <span>${completed}/${assigned.length} tareas cumplidas</span>
                 ${canViewAll() || user.id === state.activeUserId ? `<span>Clave actual: protegida</span>` : ""}
               </div>
               ${
-                user.role === "Trainer"
-                  ? teamProfileMarkup(profile)
-                  : user.role === "Admin"
+                user.role === "Admin"
                     ? `<div class="note"><strong>Administracion</strong><p>Consulta de tareas realizadas y sus sustentos, sin permisos de modificacion.</p></div>`
-                    : `<div class="note"><strong>Coordinacion</strong><p>Gestion y seguimiento del equipo de trainers.</p></div>`
+                    : teamProfileMarkup(profile, user)
               }
               ${
                 canViewAll()
                   ? `<div class="note">
                       <strong>Seguridad</strong>
-                      <p class="muted">${isObserver() ? "Las contrasenas estan protegidas. Solo Pablo puede restablecerlas." : "No se muestran contrasenas actuales. Si el usuario olvido su clave, genera una temporal y enviala solo al correo registrado."}</p>
+                      <p class="muted">${isObserver() ? "Las contrasenas estan protegidas. Cada coordinador administra los accesos de su equipo." : "No se muestran contrasenas actuales. Si el usuario olvido su clave, genera una temporal y enviala solo al correo registrado."}</p>
                       ${isCoordinator() && user.passwordResetTemp ? `<p><strong>Clave temporal:</strong> ${escapeHtml(user.passwordResetTemp)}</p>` : ""}
                     </div>
                     <div class="actions"></div>`
@@ -7572,7 +7713,13 @@
             els.teamList.appendChild(card);
           });
 
-        TEAM_PROFILE_DEFAULTS.filter((profile) => !matchedProfiles.has(profile.name)).forEach((profile) => {
+        TEAM_PROFILE_DEFAULTS
+          .filter((profile) => !matchedProfiles.has(profile.name))
+          .filter((profile) => {
+            if (isObserver()) return (profile.scope || "training") === selectedOrganizationScope;
+            return (profile.team || TEAM_TRAINING) === userTeam(activeUser());
+          })
+          .forEach((profile) => {
           const card = document.createElement("article");
           card.className = "item team-profile-card is-reference";
           card.innerHTML = `
@@ -7583,8 +7730,8 @@
             ${teamProfileMarkup(profile)}
             <p class="muted">La ficha esta visible para el equipo. Se vinculara automaticamente cuando el nombre del acceso coincida.</p>
           `;
-          els.teamList.appendChild(card);
-        });
+            els.teamList.appendChild(card);
+          });
       }
 
       function renderPasswordRecoveryRequests() {
@@ -7835,7 +7982,7 @@
         if (/sustento|evidencia|foto|archivo/.test(query)) {
           return {
             view: "tasksView",
-            text: "Para enviar un sustento: pulsa Iniciar directamente en la tarjeta y luego Enviar sustento. LGTASK abrira el formulario con la tarea seleccionada. Adjunta al menos una foto o archivo, completa los datos y confirma el envio. La tarea quedara En revision hasta que Pablo la apruebe."
+            text: "Para enviar un sustento: pulsa Iniciar directamente en la tarjeta y luego Enviar sustento. Adjunta al menos un archivo y confirma el envio. La tarea quedara En revision hasta que el coordinador de tu area la apruebe."
           };
         }
         if (/mover|reprogram|cambiar.*hora|horario.*tarea/.test(query)) {
@@ -7855,13 +8002,13 @@
             view: "tasksView",
             text: isCoordinator()
               ? "En Ampliar jornada por dia selecciona trainer, fecha, nueva hora de salida y motivo. Tambien puedes aprobar o rechazar solicitudes pendientes."
-              : "En Ampliar jornada por dia selecciona fecha, hora de salida y motivo. El horario adicional se habilitara cuando Pablo apruebe la solicitud."
+              : "En Ampliar jornada por dia selecciona fecha, hora de salida y motivo. El horario adicional se habilitara cuando el coordinador de tu area apruebe la solicitud."
           };
         }
         if (/reasign|otro trainer|no puedo/.test(query)) {
           return {
             view: "tasksView",
-            text: "Abre la tarea con Ver y usa Reasignar. Indica el motivo y elige una persona disponible. El movimiento quedara registrado en el historial para seguimiento de Pablo."
+            text: "Abre la tarea con Ver y usa Reasignar. Indica el motivo y elige una persona disponible. El movimiento quedara registrado para seguimiento del coordinador."
           };
         }
         if (/producto|lanzamiento|info lg|tecnologia|hs|tv|av/.test(query)) {
@@ -7884,7 +8031,7 @@
         }
         if (/clave|contrasena|password|ingresar/.test(query)) {
           return {
-            text: "En la pantalla de ingreso usa Olvide mi clave y escribe tu correo registrado. Pablo recibira la solicitud y podra generar una clave temporal."
+            text: "En la pantalla de ingreso usa Olvide mi clave y escribe tu correo registrado. El coordinador de tu area podra generar una clave temporal."
           };
         }
         return {
@@ -8206,7 +8353,7 @@
         });
 
         els.lateEvidencePolicyToggle.addEventListener("change", async () => {
-          if (!isCoordinator()) {
+          if (!isPrimaryCoordinator()) {
             els.lateEvidencePolicyToggle.checked = Boolean(state.lateEvidenceUploadsEnabled);
             return;
           }
@@ -8264,6 +8411,18 @@
           });
         });
 
+        els.organizationScope.addEventListener("change", () => {
+          if (!isObserver()) return;
+          selectedOrganizationScope = els.organizationScope.value;
+          localStorage.setItem(ORGANIZATION_SCOPE_KEY, selectedOrganizationScope);
+          els.taskTrainerFilter.value = "all";
+          els.evidenceTrainerFilter.value = "all";
+          openTaskGroups.clear();
+          openTaskDays.clear();
+          openEvidenceDays.clear();
+          render();
+        });
+
         window.addEventListener("popstate", () => {
           const requestedView = new URLSearchParams(window.location.search).get("view");
           activeViewId = ALLOWED_VIEW_IDS.includes(requestedView) ? requestedView : "tasksView";
@@ -8282,7 +8441,7 @@
 
         els.motivationForm.addEventListener("submit", (event) => {
           event.preventDefault();
-          if (!isCoordinator() || !clean(els.motivationInput.value)) return;
+          if (!isPrimaryCoordinator() || !clean(els.motivationInput.value)) return;
           const existing = state.dailyMotivations.find((item) => item.date === todayIso);
           if (existing) {
             existing.text = clean(els.motivationInput.value);
@@ -8559,7 +8718,7 @@
             return;
           }
           els.saveOvertimeButton.disabled = true;
-          setMessage(els.overtimeMessage, isCoordinator() ? "Guardando jornada en la nube..." : "Enviando solicitud a Pablo...", "");
+          setMessage(els.overtimeMessage, isCoordinator() ? "Guardando jornada en la nube..." : "Enviando solicitud al coordinador...", "");
           try {
             window.clearTimeout(syncTimer);
             syncTimer = 0;
@@ -8575,7 +8734,7 @@
             if (!isCoordinator()) {
               setMessage(
                 els.overtimeMessage,
-                `Solicitud enviada a Pablo para ${formatDate(dateValue)} hasta las ${endTime}. El horario aun no ha cambiado.`,
+                `Solicitud enviada a ${coordinatorNameForUser()} para ${formatDate(dateValue)} hasta las ${endTime}. El horario aun no ha cambiado.`,
                 "ok"
               );
               return;
@@ -8957,7 +9116,7 @@
           els.evidenceSubmitButton.disabled = false;
           els.evidenceSubmitButton.textContent = "Enviar sustento";
           evidenceSubmitInFlight = false;
-          const successMessage = `${recoveredAfterSyncError ? "Sustento confirmado en la nube" : "Sustento guardado"} con ${uploadedFiles.length} archivo${uploadedFiles.length === 1 ? "" : "s"}. Pablo debe aprobarlo para completar la tarea.`;
+          const successMessage = `${recoveredAfterSyncError ? "Sustento confirmado en la nube" : "Sustento guardado"} con ${uploadedFiles.length} archivo${uploadedFiles.length === 1 ? "" : "s"}. El coordinador del area debe aprobarlo para completar la tarea.`;
           setEvidenceUploadProgress("Sustento guardado correctamente en la nube.", 100, "ok");
           setMessage(els.evidenceMessage, "", "");
           activateView("tasksView", { updateUrl: true, historyMode: "replace" });
@@ -9026,6 +9185,7 @@
 
         els.announcementForm.addEventListener("submit", (event) => {
           event.preventDefault();
+          if (!isPrimaryCoordinator()) return;
           state.announcements.unshift({
             id: id(),
             title: clean(els.announcementTitle.value),
@@ -9048,6 +9208,7 @@
         });
 
         els.createCloudBackup.addEventListener("click", async () => {
+          if (!isPrimaryCoordinator()) return;
           els.createCloudBackup.disabled = true;
           els.createCloudBackup.textContent = "Respaldando...";
           try {
