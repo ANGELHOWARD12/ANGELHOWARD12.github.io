@@ -14,7 +14,7 @@ const MAINTENANCE_SETTING_KEY = "storage_maintenance_structured_v1";
 const LEGACY_EVIDENCE_MIGRATION_ENABLED = true;
 const R2_MULTIPART_PART_BYTES = 5 * 1024 * 1024;
 const WEEKLY_BACKUP_RETENTION = 12;
-const SCHEMA_VERSION = "24-org-teams-1";
+const SCHEMA_VERSION = "25-master-autonomy-1";
 const OBSERVER_ACCESS_LEVEL = "observer";
 const OBSERVER_EMAIL = "giuliana.parra@lgtask.local";
 const PRIMARY_COORDINATOR_EMAIL = "pablo.ramos@lgtask.local";
@@ -254,6 +254,7 @@ export async function onRequest(context) {
     if (evidenceFileMatch && request.method === "GET") return await evidenceFile(env.DB, session.user, evidenceFileMatch[1], env);
     if (route === "tasks/evidence" && request.method === "POST") return await submitTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/create" && request.method === "POST") return await createTask(request, env.DB, session.user, context);
+    if (route === "tasks/master-update" && request.method === "POST") return await updateMasterTask(request, env.DB, session.user);
     if (route === "tasks/evidence-authorize" && request.method === "POST") return await authorizeLateTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/review" && request.method === "POST") return await reviewTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/delete" && request.method === "POST") return await deleteTaskAndArchive(request, env.DB, session.user, context, env);
@@ -298,7 +299,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "24-org-teams1",
+    version: "25-master-autonomy1",
     schema: SCHEMA_VERSION,
     r2: r2StorageEnabled(env),
     migration: {
@@ -1671,6 +1672,10 @@ function taskAllowsEvidenceUpload(task, today = dateIsoInLima(Date.now()), allow
   );
 }
 
+function userCanUploadTaskEvidence(user, task, allowPreviousDays = false) {
+  return isSelfManagedMasterTask(user, task) || taskAllowsEvidenceUpload(task, dateIsoInLima(Date.now()), allowPreviousDays);
+}
+
 function evidenceUploadWindowError(task, today = dateIsoInLima(Date.now()), allowPreviousDays = false) {
   if (clean(task?.dueDate) < today) {
     if (allowPreviousDays) return "La carga de sustentos anteriores esta habilitada por Pablo.";
@@ -1963,7 +1968,7 @@ async function uploadEvidenceDirectToR2(request, db, user, env) {
     return json({ ok: false, message: "No puedes subir sustentos para esa tarea." }, 403);
   }
   const today = dateIsoInLima(Date.now());
-  if (!taskAllowsEvidenceUpload(task, today, data.lateEvidenceUploadsEnabled)) {
+  if (!userCanUploadTaskEvidence(user, task, data.lateEvidenceUploadsEnabled)) {
     return json({ ok: false, message: evidenceUploadWindowError(task, today, data.lateEvidenceUploadsEnabled) }, 409);
   }
 
@@ -2045,7 +2050,7 @@ async function initR2MultipartUpload(request, db, user, env) {
     return json({ ok: false, message: "No puedes subir sustentos para esa tarea." }, 403);
   }
   const today = dateIsoInLima(Date.now());
-  if (!taskAllowsEvidenceUpload(task, today, data.lateEvidenceUploadsEnabled)) {
+  if (!userCanUploadTaskEvidence(user, task, data.lateEvidenceUploadsEnabled)) {
     return json({ ok: false, message: evidenceUploadWindowError(task, today, data.lateEvidenceUploadsEnabled) }, 409);
   }
 
@@ -2398,7 +2403,7 @@ async function uploadEvidence(request, db, user, env) {
   if (task.ownerId !== user.id && !(await coordinatorCanManageOwner(db, user, task.ownerId))) {
     return json({ ok: false, message: "No puedes subir sustentos para esa tarea." }, 403);
   }
-  if (!taskAllowsEvidenceUpload(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled)) {
+  if (!userCanUploadTaskEvidence(user, task, data.lateEvidenceUploadsEnabled)) {
     return json({ ok: false, message: evidenceUploadWindowError(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled) }, 409);
   }
 
@@ -2452,7 +2457,7 @@ async function initEvidenceUpload(request, db, user) {
   if (task.ownerId !== user.id && !(await coordinatorCanManageOwner(db, user, task.ownerId))) {
     return json({ ok: false, message: "No puedes subir sustentos para esa tarea." }, 403);
   }
-  if (!taskAllowsEvidenceUpload(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled)) {
+  if (!userCanUploadTaskEvidence(user, task, data.lateEvidenceUploadsEnabled)) {
     return json({ ok: false, message: evidenceUploadWindowError(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled) }, 409);
   }
 
@@ -2496,7 +2501,7 @@ async function uploadEvidenceChunk(request, db, user) {
   }
   const data = await loadData(db);
   const task = data.tasks.find((item) => clean(item.id) === clean(row.task_id));
-  if (!task || !taskAllowsEvidenceUpload(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled)) {
+  if (!task || !userCanUploadTaskEvidence(user, task, data.lateEvidenceUploadsEnabled)) {
     return json({
       ok: false,
       message: task
@@ -2532,7 +2537,7 @@ async function completeEvidenceUpload(request, db, user, env) {
   }
   const data = await loadData(db);
   const task = data.tasks.find((item) => clean(item.id) === clean(row.task_id));
-  if (!task || !taskAllowsEvidenceUpload(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled)) {
+  if (!task || !userCanUploadTaskEvidence(user, task, data.lateEvidenceUploadsEnabled)) {
     return json({
       ok: false,
       message: task
@@ -2647,7 +2652,7 @@ async function createTask(request, db, user, context) {
     .bind(ownerId)
     .first();
   if (!owner || isObserverUser(owner)) return json({ ok: false, message: "El responsable no esta disponible para tareas." }, 400);
-  if (user.role === "Coordinador" && !coordinatorCanManageUser(user, owner)) {
+  if (user.role === "Coordinador" && !coordinatorCanManageTaskUser(user, owner)) {
     return json({ ok: false, message: "Solo puedes asignar tareas dentro de tu equipo." }, 403);
   }
   if (user.role !== "Coordinador" && clean(owner.id) !== user.id) {
@@ -2684,6 +2689,7 @@ async function createTask(request, db, user, context) {
   }
 
   const createdAt = Date.now();
+  const selfManagedMaster = isMasterUser(user) && clean(ownerId) === clean(user.id);
   const task = {
     id: taskId,
     title,
@@ -2696,9 +2702,16 @@ async function createTask(request, db, user, context) {
     endTime,
     product: clean(submitted.product).slice(0, 120) || "GENERAL",
     description: clean(submitted.description).slice(0, 1500),
-    status: "Pendiente",
+    status: selfManagedMaster ? "Cumplida" : "Pendiente",
     createdAt,
-    history: [{ type: "Asignacion", toId: ownerId, byId: user.id, reason: "Tarea creada", at: createdAt }],
+    completedAt: selfManagedMaster ? createdAt : 0,
+    autoApproved: selfManagedMaster,
+    history: [
+      { type: "Asignacion", toId: ownerId, byId: user.id, reason: "Tarea creada", at: createdAt },
+      ...(selfManagedMaster
+        ? [{ type: "AutoaprobacionMaster", byId: user.id, reason: "Tarea propia registrada por un integrante Master", at: createdAt }]
+        : [])
+    ],
     evidence: [],
     reminders: []
   };
@@ -2717,6 +2730,50 @@ async function createTask(request, db, user, context) {
   return stateResponse(db, user, data);
 }
 
+async function updateMasterTask(request, db, user) {
+  const body = await readJson(request);
+  const taskId = clean(body.taskId);
+  const data = await loadData(db);
+  const task = data.tasks.find((item) => clean(item.id) === taskId);
+  if (!task) return json({ ok: false, message: "La tarea ya no existe." }, 404);
+  if (!isSelfManagedMasterTask(user, task)) {
+    return json({ ok: false, message: "Solo el Master que registro la tarea puede editar su informacion." }, 403);
+  }
+
+  const title = clean(body.title).slice(0, 140);
+  const category = normalizeTaskCategory(body.category);
+  const product = clean(body.product).slice(0, 120) || "GENERAL";
+  const description = clean(body.description).slice(0, 1500);
+  const reason = clean(body.reason).slice(0, 500);
+  if (title.length < 2 || reason.length < 3) {
+    return json({ ok: false, message: "Completa el nombre y el motivo de la edicion." }, 400);
+  }
+
+  const previous = {
+    title: clean(task.title),
+    category: normalizeTaskCategory(task.category),
+    product: clean(task.product) || "GENERAL",
+    description: clean(task.description)
+  };
+  const next = { title, category, product, description };
+  if (JSON.stringify(previous) === JSON.stringify(next)) {
+    return json({ ok: false, message: "No hay cambios para guardar." }, 409);
+  }
+
+  Object.assign(task, next);
+  task.history = Array.isArray(task.history) ? task.history : [];
+  task.history.push({
+    type: "EdicionMaster",
+    byId: user.id,
+    reason,
+    previous,
+    next,
+    at: Date.now()
+  });
+  await saveData(db, data);
+  return stateResponse(db, user, data);
+}
+
 async function submitTaskEvidence(request, db, user, context) {
   const body = await readJson(request, 1_000_000);
   const taskId = clean(body.taskId);
@@ -2727,10 +2784,11 @@ async function submitTaskEvidence(request, db, user, context) {
   if (clean(task.ownerId) !== user.id) {
     return json({ ok: false, message: "Solo el responsable de la tarea puede enviar el sustento." }, 403);
   }
-  if (task.status === "Cumplida") {
+  const selfManagedMaster = isSelfManagedMasterTask(user, task);
+  if (task.status === "Cumplida" && !selfManagedMaster) {
     return json({ ok: false, message: "La tarea ya fue aprobada y completada." }, 409);
   }
-  if (!taskAllowsEvidenceUpload(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled)) {
+  if (!userCanUploadTaskEvidence(user, task, data.lateEvidenceUploadsEnabled)) {
     return json({ ok: false, message: evidenceUploadWindowError(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled) }, 409);
   }
 
@@ -2818,12 +2876,19 @@ async function submitTaskEvidence(request, db, user, context) {
     links,
     files,
     cloudPath: clean(submittedEvidence.cloudPath).slice(0, 800),
-    review: "Pendiente"
+    review: selfManagedMaster ? "Aprobada" : "Pendiente",
+    reviewedAt: selfManagedMaster ? submittedAt : 0,
+    reviewedById: selfManagedMaster ? user.id : "",
+    reviewNote: selfManagedMaster ? "Autoaprobado por perfil Master." : ""
   };
   if (lateAuthorization) evidence.lateAuthorization = lateAuthorization;
   task.evidence.push(evidence);
   task.history = Array.isArray(task.history) ? task.history : [];
-  task.status = "En revision";
+  task.status = selfManagedMaster ? "Cumplida" : "En revision";
+  if (selfManagedMaster) {
+    task.completedAt = Number(task.completedAt || submittedAt);
+    task.autoApproved = true;
+  }
   task.blockedReason = "";
   task.blockedAt = 0;
   if (individualLateAuthorization) {
@@ -2843,10 +2908,12 @@ async function submitTaskEvidence(request, db, user, context) {
     });
   }
   task.history.push({
-    type: "Sustento",
+    type: selfManagedMaster ? "SustentoMaster" : "Sustento",
     byId: user.id,
     fromId: user.id,
-    reason: `${files.length} archivo${files.length === 1 ? "" : "s"} enviado${files.length === 1 ? "" : "s"}`,
+    reason: selfManagedMaster
+      ? `${files.length} archivo${files.length === 1 ? "" : "s"} agregado${files.length === 1 ? "" : "s"} y autoaprobado${files.length === 1 ? "" : "s"}`
+      : `${files.length} archivo${files.length === 1 ? "" : "s"} enviado${files.length === 1 ? "" : "s"}`,
     at: submittedAt
   });
 
@@ -2856,7 +2923,7 @@ async function submitTaskEvidence(request, db, user, context) {
     .prepare("SELECT id FROM users WHERE role = 'Coordinador' AND status = 'Activo' AND team = ?")
     .bind(userTeam(submitter || user))
     .all();
-  const notifications = (coordinators.results || [])
+  const notifications = selfManagedMaster ? [] : (coordinators.results || [])
     .filter((coordinator) => clean(coordinator.id) !== user.id)
     .map((coordinator) => ({
       userId: coordinator.id,
@@ -3346,16 +3413,19 @@ async function stateResponse(db, user, loadedData = null) {
       ? allUserRows.filter((row) => userTeam(row) === userTeam(user))
       : allUserRows.filter((row) => row.status === "Activo" && userTeam(row) === userTeam(user));
   const visibleOwnerIds = new Set(visibleUserRows.map((row) => clean(row.id)));
+  const visibleTaskOwnerIds = coordinator
+    ? new Set(visibleUserRows.filter((row) => coordinatorCanManageTaskUser(user, row)).map((row) => clean(row.id)))
+    : visibleOwnerIds;
   const users = visibleUserRows.map(publicUser);
   const visibleTasks = observer
     ? data.tasks
     : coordinator
-      ? data.tasks.filter((task) => visibleOwnerIds.has(clean(task.ownerId)))
+      ? data.tasks.filter((task) => visibleTaskOwnerIds.has(clean(task.ownerId)))
       : data.tasks.filter((task) => clean(task.ownerId) === clean(user.id));
   const visibleDeletedTasks = observer
     ? data.deletedTasks
     : coordinator
-      ? (data.deletedTasks || []).filter((task) => visibleOwnerIds.has(clean(task.ownerId)))
+      ? (data.deletedTasks || []).filter((task) => visibleTaskOwnerIds.has(clean(task.ownerId)))
       : (data.deletedTasks || []).filter((task) => clean(task.ownerId) === clean(user.id));
   const visibleSchedules = observer
     ? data.workScheduleByUserDate
@@ -3439,7 +3509,7 @@ async function putState(request, db, user, context, env) {
 
   if (user.role === "Coordinador") {
     const managedUserIds = new Set(
-      activeUsers.filter((row) => coordinatorCanManageUser(user, row)).map((row) => clean(row.id))
+      activeUsers.filter((row) => coordinatorCanManageTaskUser(user, row)).map((row) => clean(row.id))
     );
     if (isPrimaryCoordinatorUser(user)) {
       for (const key of ["announcements", "dailyMotivations"]) {
@@ -3603,7 +3673,13 @@ async function putState(request, db, user, context, env) {
     const submittedTasks = new Map((submitted.tasks || []).map((task) => [task.id, task]));
     const activeTrainerIds = new Set(
       activeUsers
-        .filter((row) => row.role === "Trainer" && !isObserverUser(row) && userTeam(row) === userTeam(user))
+        .filter(
+          (row) =>
+            row.role === "Trainer" &&
+            !isObserverUser(row) &&
+            userMemberType(row) !== "master" &&
+            userTeam(row) === userTeam(user)
+        )
         .map((row) => row.id)
     );
     current.tasks = current.tasks.map((task) => {
@@ -3611,7 +3687,11 @@ async function putState(request, db, user, context, env) {
       const next = submittedTasks.get(task.id);
       if (!next) return task;
       const requestedOwnerId = clean(next.ownerId);
-      const ownerChanged = requestedOwnerId && requestedOwnerId !== task.ownerId && activeTrainerIds.has(requestedOwnerId);
+      const ownerChanged =
+        !isMasterUser(user) &&
+        requestedOwnerId &&
+        requestedOwnerId !== task.ownerId &&
+        activeTrainerIds.has(requestedOwnerId);
       const nextHistory = Array.isArray(next.history) ? next.history : task.history;
       const appendOnlyHistory = historyIsAppendOnly(task.history, nextHistory);
       const lastHistory = nextHistory?.at(-1);
@@ -4422,6 +4502,18 @@ function userMemberType(user) {
   return user?.role === "Coordinador" ? "master" : "trainer";
 }
 
+function isMasterUser(user) {
+  return userMemberType(user) === "master";
+}
+
+function isSelfManagedMasterTask(user, task) {
+  return Boolean(
+    isMasterUser(user) &&
+      clean(task?.ownerId) === clean(user?.id) &&
+      clean(task?.createdById) === clean(user?.id)
+  );
+}
+
 function isPrimaryCoordinatorUser(user) {
   return user?.role === "Coordinador" && clean(user?.email).toLowerCase() === PRIMARY_COORDINATOR_EMAIL;
 }
@@ -4436,13 +4528,20 @@ function coordinatorCanManageUser(actor, target) {
   );
 }
 
+function coordinatorCanManageTaskUser(actor, target) {
+  return Boolean(
+    coordinatorCanManageUser(actor, target) &&
+      (userMemberType(target) !== "master" || clean(actor?.id) === clean(target?.id))
+  );
+}
+
 async function coordinatorCanManageOwner(db, actor, ownerId) {
   if (actor?.role !== "Coordinador" || !clean(ownerId)) return false;
   const target = await db
     .prepare("SELECT id, email, role, status, access_level, team, member_type FROM users WHERE id = ? AND status = 'Activo'")
     .bind(clean(ownerId))
     .first();
-  return coordinatorCanManageUser(actor, target);
+  return coordinatorCanManageTaskUser(actor, target);
 }
 
 function publicUser(row) {

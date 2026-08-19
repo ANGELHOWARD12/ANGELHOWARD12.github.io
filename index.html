@@ -646,6 +646,29 @@
         margin: 0;
       }
 
+      .organization-scope-tabs {
+        background: #eef3fb;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        display: grid;
+        gap: 4px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        padding: 4px;
+      }
+
+      .organization-scope-tab {
+        background: transparent;
+        border-color: transparent;
+        min-height: 42px;
+        padding: 8px 12px;
+      }
+
+      .organization-scope-tab.active {
+        background: var(--blue);
+        border-color: var(--blue);
+        color: #fff;
+      }
+
       .view {
         display: none;
       }
@@ -2366,17 +2389,14 @@
 
       <section id="organizationScopePanel" class="organization-scope hidden" aria-label="Area de trabajo visible">
         <div>
-          <h2 id="organizationScopeTitle">Training</h2>
+          <h2 id="organizationScopeTitle">Trainers</h2>
           <p id="organizationScopeDescription" class="muted">Tareas y equipo del area seleccionada.</p>
         </div>
-        <label>
-          Area visible
-          <select id="organizationScope">
-            <option value="training">Training</option>
-            <option value="masters">Masters</option>
-            <option value="audiovisual">Audiovisuales</option>
-          </select>
-        </label>
+        <nav id="organizationScopeTabs" class="organization-scope-tabs" role="tablist" aria-label="Areas supervisadas por Giuliana">
+          <button class="organization-scope-tab" type="button" role="tab" data-organization-scope="training">Trainers</button>
+          <button class="organization-scope-tab" type="button" role="tab" data-organization-scope="masters">Master</button>
+          <button class="organization-scope-tab" type="button" role="tab" data-organization-scope="audiovisual">Audiovisual</button>
+        </nav>
       </section>
 
       <section id="tasksView" class="view active">
@@ -3071,20 +3091,45 @@
     <dialog id="renameTaskDialog">
       <form id="renameTaskForm" class="stack">
         <div>
-          <h2>Corregir nombre de tarea</h2>
+          <h2 id="renameTaskHeading">Corregir nombre de tarea</h2>
           <p id="renameTaskLabel" class="muted"></p>
         </div>
         <label>
-          Nombre corregido
+          Nombre de tarea
           <input id="renameTaskTitle" type="text" maxlength="140" required />
         </label>
+        <div id="masterTaskEditFields" class="form-grid hidden">
+          <label>
+            Categoria
+            <select id="masterTaskCategory">
+              <option>PDP</option>
+              <option>Entrenamiento</option>
+              <option>ULG</option>
+              <option>Reporte</option>
+              <option>Coordinacion</option>
+            </select>
+          </label>
+          <label>
+            Linea
+            <select id="masterTaskProduct">
+              <option>HS</option>
+              <option>TV</option>
+              <option>AV</option>
+              <option>GENERAL</option>
+            </select>
+          </label>
+          <label class="wide">
+            Informacion e indicaciones
+            <textarea id="masterTaskDescription" maxlength="1500"></textarea>
+          </label>
+        </div>
         <label>
-          Motivo de la correccion
-          <textarea id="renameTaskReason" placeholder="Ej. Correccion de escritura" required></textarea>
+          Motivo del cambio
+          <textarea id="renameTaskReason" placeholder="Describe brevemente la actualizacion" required></textarea>
         </label>
-        <p class="helper">Solo cambiara el nombre. Fecha, horario, responsable, estado y evidencias permaneceran intactos.</p>
+        <p id="renameTaskHelper" class="helper">Solo cambiara el nombre. Fecha, horario, responsable, estado y evidencias permaneceran intactos.</p>
         <div class="actions">
-          <button class="primary" type="submit">Guardar correccion</button>
+          <button id="saveTaskEdit" class="primary" type="submit">Guardar correccion</button>
           <button id="cancelRenameTask" class="ghost" type="button">Cancelar</button>
         </div>
         <p id="renameTaskMessage" class="message" aria-live="polite"></p>
@@ -3098,7 +3143,7 @@
           <p id="taskPreviewSubtitle" class="muted"></p>
         </div>
         <section id="taskPreviewActionsWrap" class="task-preview-actions-wrap">
-          <strong>Acciones de la tarea</strong>
+          <strong id="taskPreviewActionsTitle">Acciones de la tarea</strong>
           <div id="taskPreviewActions" class="actions"></div>
         </section>
         <div id="taskPreviewContent" class="stack"></div>
@@ -3198,7 +3243,7 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = "24-org-teams1";
+      const APP_VERSION = "25-master-autonomy1";
       const TEAM_TRAINING = "Training";
       const TEAM_AUDIOVISUAL = "Audiovisuales";
       const MAX_EVIDENCE_FILES = 8;
@@ -3258,7 +3303,7 @@
       ];
 
       const initialState = {
-        version: 24,
+        version: 25,
         activeUserId: "",
         selectedProduct: "oled",
         selectedWeekStart: "",
@@ -3423,7 +3468,8 @@
         organizationScopePanel: document.querySelector("#organizationScopePanel"),
         organizationScopeTitle: document.querySelector("#organizationScopeTitle"),
         organizationScopeDescription: document.querySelector("#organizationScopeDescription"),
-        organizationScope: document.querySelector("#organizationScope"),
+        organizationScopeTabs: document.querySelector("#organizationScopeTabs"),
+        organizationScopeButtons: [...document.querySelectorAll("[data-organization-scope]")],
         appHeader: document.querySelector("#appHeader"),
         appShell: document.querySelector("#appShell"),
         loginForm: document.querySelector("#loginForm"),
@@ -3639,15 +3685,23 @@
         cancelDeleteTask: document.querySelector("#cancelDeleteTask"),
         renameTaskDialog: document.querySelector("#renameTaskDialog"),
         renameTaskForm: document.querySelector("#renameTaskForm"),
+        renameTaskHeading: document.querySelector("#renameTaskHeading"),
         renameTaskLabel: document.querySelector("#renameTaskLabel"),
         renameTaskTitle: document.querySelector("#renameTaskTitle"),
         renameTaskReason: document.querySelector("#renameTaskReason"),
+        renameTaskHelper: document.querySelector("#renameTaskHelper"),
+        masterTaskEditFields: document.querySelector("#masterTaskEditFields"),
+        masterTaskCategory: document.querySelector("#masterTaskCategory"),
+        masterTaskProduct: document.querySelector("#masterTaskProduct"),
+        masterTaskDescription: document.querySelector("#masterTaskDescription"),
+        saveTaskEdit: document.querySelector("#saveTaskEdit"),
         renameTaskMessage: document.querySelector("#renameTaskMessage"),
         cancelRenameTask: document.querySelector("#cancelRenameTask"),
         taskPreviewDialog: document.querySelector("#taskPreviewDialog"),
         taskPreviewTitle: document.querySelector("#taskPreviewTitle"),
         taskPreviewSubtitle: document.querySelector("#taskPreviewSubtitle"),
         taskPreviewActionsWrap: document.querySelector("#taskPreviewActionsWrap"),
+        taskPreviewActionsTitle: document.querySelector("#taskPreviewActionsTitle"),
         taskPreviewActions: document.querySelector("#taskPreviewActions"),
         taskPreviewContent: document.querySelector("#taskPreviewContent"),
         taskPreviewHistory: document.querySelector("#taskPreviewHistory"),
@@ -3792,7 +3846,7 @@
       }
 
       function normalizeState(nextState) {
-        nextState.version = 24;
+        nextState.version = 25;
         nextState.users = nextState.users?.length ? nextState.users : structuredClone(initialState.users);
         nextState.registrationRequests = nextState.registrationRequests || [];
         nextState.passwordRecoveryRequests = nextState.passwordRecoveryRequests || [];
@@ -4362,6 +4416,18 @@
         return isCoordinator() && clean(activeUser()?.email).toLowerCase() === "pablo.ramos@lgtask.local";
       }
 
+      function isMaster() {
+        return clean(activeUser()?.memberType).toLowerCase() === "master";
+      }
+
+      function isSelfManagedMasterTask(task) {
+        return Boolean(
+          isMaster() &&
+            task?.ownerId === state.activeUserId &&
+            task?.createdById === state.activeUserId
+        );
+      }
+
       function isObserver() {
         return activeUser()?.accessLevel === "observer";
       }
@@ -4381,10 +4447,10 @@
           return activeUsers.filter((user) => clean(user.memberType).toLowerCase() === "master");
         }
         if (selectedOrganizationScope === "audiovisual") {
-          return activeUsers.filter((user) => userTeam(user) === TEAM_AUDIOVISUAL);
+          return activeUsers.filter((user) => clean(user.memberType).toLowerCase() === "audiovisual");
         }
         return activeUsers.filter(
-          (user) => userTeam(user) === TEAM_TRAINING && clean(user.memberType).toLowerCase() !== "master"
+          (user) => userTeam(user) === TEAM_TRAINING && clean(user.memberType || "trainer").toLowerCase() === "trainer"
         );
       }
 
@@ -4395,10 +4461,10 @@
       function organizationScopeLabel() {
         if (!isObserver()) return userTeam(activeUser()) === TEAM_AUDIOVISUAL ? "Audiovisuales" : "Training";
         return selectedOrganizationScope === "masters"
-          ? "Masters"
+          ? "Master"
           : selectedOrganizationScope === "audiovisual"
-            ? "Audiovisuales"
-            : "Training";
+            ? "Audiovisual"
+            : "Trainers";
       }
 
       function coordinatorForUser(userId = state.activeUserId) {
@@ -4440,7 +4506,13 @@
 
       function trainers() {
         const people = isObserver() ? organizationScopeUsers() : state.users;
-        return people.filter((user) => user.role === "Trainer" && user.status === "Activo" && !isObserverUserProfile(user));
+        return people.filter(
+          (user) =>
+            user.role === "Trainer" &&
+            user.status === "Activo" &&
+            clean(user.memberType || "trainer").toLowerCase() !== "master" &&
+            !isObserverUserProfile(user)
+        );
       }
 
       function assignableUsers() {
@@ -4929,6 +5001,9 @@
         if (entry.type === "Inicio") return `${userName(entry.byId)} inicio la tarea.`;
         if (entry.type === "Asignacion") return `${userName(entry.byId)} asigno la tarea a ${userName(entry.toId)}.`;
         if (entry.type === "Sustento") return `${userName(entry.byId)} envio un sustento para revision.`;
+        if (entry.type === "AutoaprobacionMaster") return `${userName(entry.byId)} registro su tarea Master y quedo aprobada automaticamente.`;
+        if (entry.type === "SustentoMaster") return `${userName(entry.byId)} agrego un sustento, aprobado automaticamente por su perfil Master.`;
+        if (entry.type === "EdicionMaster") return `${userName(entry.byId)} actualizo la informacion de su tarea Master. Motivo: ${entry.reason || "Sin detalle"}`;
         if (entry.type === "AutorizacionSustentoTardio") {
           return `${userName(entry.byId)} habilito una carga tardia. Motivo: ${entry.reason || "Sin detalle"}`;
         }
@@ -4964,7 +5039,8 @@
         const platformToday = dateIsoInLima(Date.now());
         return Boolean(
           task &&
-            (task.dueDate === platformToday ||
+            (isSelfManagedMasterTask(task) ||
+              task.dueDate === platformToday ||
               (task.dueDate < platformToday && state.lateEvidenceUploadsEnabled) ||
               lateEvidenceAuthorizationActive(task))
         );
@@ -4976,6 +5052,9 @@
 
       function taskEvidenceDeadlineText(task) {
         if (!task) return "Selecciona una tarea para revisar el plazo de carga.";
+        if (isSelfManagedMasterTask(task)) {
+          return "Como integrante Master, puedes agregar nuevos sustentos a esta tarea en cualquier momento.";
+        }
         if (lateEvidenceAuthorizationActive(task)) {
           return "Pablo autorizo excepcionalmente un envio tardio durante el dia de hoy.";
         }
@@ -5120,21 +5199,7 @@
         anchor.addEventListener("click", () => openTaskPreviewDialog(task.id));
       }
 
-      function appendReadOnlyAction(container, label, className = "small") {
-        const button = document.createElement("button");
-        button.className = className;
-        button.type = "button";
-        button.textContent = label;
-        button.disabled = true;
-        button.title = "Cuenta Admin de solo lectura";
-        container.appendChild(button);
-      }
-
       function renderAdminReadOnlyTaskActions(task) {
-        if (task.status === "En revision") {
-          appendReadOnlyAction(els.taskPreviewActions, "Aprobar y completar", "primary");
-          appendReadOnlyAction(els.taskPreviewActions, "Rechazar", "danger");
-        }
         if (task.status === "Cumplida") {
           const check = document.createElement("span");
           check.className = "approval-check";
@@ -5142,27 +5207,19 @@
           check.innerHTML = "&#10003;";
           els.taskPreviewActions.appendChild(check);
         }
-        if (task.dueDate < dateIsoInLima(Date.now()) && task.status !== "Cumplida") {
-          if (lateEvidenceAuthorizationActive(task)) {
-            const authorized = document.createElement("span");
-            authorized.className = "workflow-status";
-            authorized.textContent = "Carga tardia habilitada hoy";
-            els.taskPreviewActions.appendChild(authorized);
-          } else {
-            appendReadOnlyAction(els.taskPreviewActions, "Habilitar sustento tardio");
-          }
-        }
-        if (task.status !== "Cumplida") {
-          appendReadOnlyAction(els.taskPreviewActions, "Mover horario");
-          if (availableTrainersForTask(task).length) appendReadOnlyAction(els.taskPreviewActions, "Reasignar");
-          appendReadOnlyAction(els.taskPreviewActions, "Recordatorio");
-        }
-        appendReadOnlyAction(els.taskPreviewActions, "Corregir nombre");
-        appendReadOnlyAction(els.taskPreviewActions, "Eliminar", "danger");
+        const status = document.createElement("span");
+        status.className = "workflow-status";
+        status.textContent = task.autoApproved
+          ? "Autoaprobada por perfil Master"
+          : task.status === "En revision"
+            ? "Pendiente de revision del coordinador responsable"
+            : taskStatusLabel(task.status);
+        els.taskPreviewActions.appendChild(status);
       }
 
       function renderTaskPreviewActions(task) {
         els.taskPreviewActions.innerHTML = "";
+        els.taskPreviewActionsTitle.textContent = isObserver() ? "Estado y seguimiento" : "Acciones de la tarea";
         if (isObserver()) {
           renderAdminReadOnlyTaskActions(task);
         } else if (isCoordinator()) {
@@ -5204,6 +5261,7 @@
           renderScheduleControl(els.taskPreviewActions, task);
           renderReassignControl(els.taskPreviewActions, task);
           renderReminderControl(els.taskPreviewActions, task);
+          renderMasterEvidenceControl(els.taskPreviewActions, task);
           renderRenameControl(els.taskPreviewActions, task);
           const deleteButton = document.createElement("button");
           deleteButton.className = "danger";
@@ -6101,22 +6159,18 @@
 
       function renderOrganizationScope() {
         if (!els.organizationScopePanel) return;
-        els.organizationScopePanel.classList.toggle("hidden", !canViewAll());
-        if (!canViewAll()) return;
-        if (isObserver()) {
-          els.organizationScope.disabled = false;
-          els.organizationScope.value = selectedOrganizationScope;
-        } else {
-          selectedOrganizationScope = userTeam(activeUser()) === TEAM_AUDIOVISUAL ? "audiovisual" : "training";
-          els.organizationScope.value = selectedOrganizationScope;
-          els.organizationScope.disabled = true;
-        }
+        els.organizationScopePanel.classList.toggle("hidden", !isObserver());
+        if (!isObserver()) return;
+        els.organizationScopeButtons.forEach((button) => {
+          const active = button.dataset.organizationScope === selectedOrganizationScope;
+          button.classList.toggle("active", active);
+          button.setAttribute("aria-selected", String(active));
+          button.tabIndex = active ? 0 : -1;
+        });
         const label = organizationScopeLabel();
         const people = organizationScopeUsers();
         els.organizationScopeTitle.textContent = label;
-        els.organizationScopeDescription.textContent = isObserver()
-          ? `${people.length} integrante${people.length === 1 ? "" : "s"}. La vista de Giuliana es de solo lectura.`
-          : `${activeUser().name} gestiona tareas, horarios y sustentos del equipo ${label}.`;
+        els.organizationScopeDescription.textContent = `${people.length} integrante${people.length === 1 ? "" : "s"}. Giuliana supervisa esta area en modo de solo lectura.`;
       }
 
       function render() {
@@ -6162,9 +6216,11 @@
         els.taskFormHelp.textContent = canViewAll()
           ? isObserver()
             ? `Consulta de tareas de ${organizationScopeLabel()} sin permisos de modificacion.`
-            : `${activeUser().name} puede asignar tareas a integrantes de ${organizationScopeLabel()} o a si mismo.`
-          : "Organiza tus propias tareas de la semana. Solo puedes asignarlas a tu usuario.";
-        els.taskSubmitButton.textContent = canViewAll() ? "Asignar tarea" : "Agregar a mi semana";
+            : `${activeUser().name} puede asignar tareas a integrantes de ${organizationScopeLabel()} o a si mismo.${isMaster() ? " Las tareas propias se aprueban automaticamente." : ""}`
+          : isMaster()
+            ? "Administra tus tareas propias. Se aprobaran automaticamente y podras editarlas o agregar sustentos despues."
+            : "Organiza tus propias tareas de la semana. Solo puedes asignarlas a tu usuario.";
+        els.taskSubmitButton.textContent = canViewAll() ? "Asignar tarea" : isMaster() ? "Registrar tarea Master" : "Agregar a mi semana";
         els.taskOwner.disabled = !isCoordinator();
         if ((isPrimaryCoordinator() || isObserver()) && !lastStorageStatusAt) {
           try {
@@ -6381,13 +6437,13 @@
       }
 
       function evidenceCandidateTasks(dateValue = els.evidenceTaskDate.value) {
-        if (canViewAll()) return [];
+        if (canViewAll() && !isMaster()) return [];
         return state.tasks
           .filter(
             (task) =>
               task.ownerId === state.activeUserId &&
               task.dueDate === dateValue &&
-              (task.status === "En proceso" || task.status === "Observada")
+              (isSelfManagedMasterTask(task) || task.status === "En proceso" || task.status === "Observada")
           )
           .sort((left, right) => (left.startTime || WORKDAY_START).localeCompare(right.startTime || WORKDAY_START));
       }
@@ -6434,7 +6490,11 @@
               .map((task) => {
                 const allowed = taskAllowsEvidenceToday(task);
                 const selected = task.id === selectedTaskId;
-                const statusText = task.status === "Observada" ? "Requiere correccion" : "Sin sustento enviado";
+                const statusText = isSelfManagedMasterTask(task)
+                  ? `${(task.evidence || []).length} sustento${(task.evidence || []).length === 1 ? "" : "s"} | autoaprobada`
+                  : task.status === "Observada"
+                    ? "Requiere correccion"
+                    : "Sin sustento enviado";
                 return `
                   <label class="evidence-task-choice ${selected ? "selected" : ""} ${allowed ? "" : "disabled"}">
                     <input type="radio" name="evidenceTaskChoice" value="${escapeHtml(task.id)}" ${selected ? "checked" : ""} ${allowed ? "" : "disabled"} />
@@ -6528,7 +6588,12 @@
       }
 
       function canReassignTask(task) {
-        return Boolean(task && task.status !== "Cumplida" && (isCoordinator() || task.ownerId === state.activeUserId));
+        return Boolean(
+          task &&
+            task.status !== "Cumplida" &&
+            !isSelfManagedMasterTask(task) &&
+            (isCoordinator() || task.ownerId === state.activeUserId)
+        );
       }
 
       function openReassignDialog(taskId) {
@@ -6601,15 +6666,58 @@
         return Boolean(task && (isCoordinator() || task.ownerId === state.activeUserId));
       }
 
+      function canEditMasterTask(task) {
+        return isSelfManagedMasterTask(task);
+      }
+
       function openRenameTaskDialog(taskId) {
         const task = state.tasks.find((item) => item.id === taskId);
         if (!canRenameTask(task)) return;
+        const masterEdit = canEditMasterTask(task);
         els.renameTaskForm.dataset.taskId = task.id;
+        els.renameTaskForm.dataset.masterEdit = String(masterEdit);
+        els.renameTaskHeading.textContent = masterEdit ? "Editar tarea Master" : "Corregir nombre de tarea";
         els.renameTaskLabel.textContent = `${userName(task.ownerId)} | ${formatDate(task.dueDate)} | ${taskTimeLabel(task)}`;
         els.renameTaskTitle.value = task.title;
+        els.masterTaskEditFields.classList.toggle("hidden", !masterEdit);
+        els.masterTaskCategory.value = normalizedTaskCategory(task.category);
+        els.masterTaskProduct.value = ["HS", "TV", "AV", "GENERAL"].includes(task.product) ? task.product : "GENERAL";
+        els.masterTaskDescription.value = task.description || "";
         els.renameTaskReason.value = "";
+        els.renameTaskHelper.textContent = masterEdit
+          ? "Puedes actualizar nombre, categoria, linea e indicaciones. La fecha, el horario y los sustentos permaneceran intactos."
+          : "Solo cambiara el nombre. Fecha, horario, responsable, estado y evidencias permaneceran intactos.";
+        els.saveTaskEdit.textContent = masterEdit ? "Guardar cambios" : "Guardar correccion";
         setMessage(els.renameTaskMessage, "", "");
         els.renameTaskDialog.showModal();
+      }
+
+      async function updateMasterTask(taskId) {
+        const task = state.tasks.find((item) => item.id === taskId);
+        if (!canEditMasterTask(task)) return false;
+        els.saveTaskEdit.disabled = true;
+        setMessage(els.renameTaskMessage, "Guardando cambios en la nube...", "");
+        try {
+          const data = await apiRequest("/tasks/master-update", {
+            method: "POST",
+            body: JSON.stringify({
+              taskId,
+              title: els.renameTaskTitle.value,
+              category: els.masterTaskCategory.value,
+              product: els.masterTaskProduct.value,
+              description: els.masterTaskDescription.value,
+              reason: els.renameTaskReason.value
+            })
+          });
+          applyCloudState(data.state);
+          render();
+          return true;
+        } catch (error) {
+          setMessage(els.renameTaskMessage, error.message || "No se pudo actualizar la tarea.", "err");
+          return false;
+        } finally {
+          els.saveTaskEdit.disabled = false;
+        }
       }
 
       function renameTask(taskId, nextTitle, reason) {
@@ -6641,7 +6749,7 @@
         const button = document.createElement("button");
         button.className = "small";
         button.type = "button";
-        button.textContent = "Corregir nombre";
+        button.textContent = canEditMasterTask(task) ? "Editar tarea" : "Corregir nombre";
         button.addEventListener("click", () => openRenameTaskDialog(task.id));
         container.appendChild(button);
       }
@@ -6947,7 +7055,12 @@
       }
 
       async function openEvidenceModuleForTask(task) {
-        if (!task || task.ownerId !== state.activeUserId || isCoordinator() || evidenceOpenInFlight) return;
+        if (
+          !task ||
+          task.ownerId !== state.activeUserId ||
+          (isCoordinator() && !isSelfManagedMasterTask(task)) ||
+          evidenceOpenInFlight
+        ) return;
         evidenceOpenInFlight = true;
         rememberEvidenceSelection(task.id, task.dueDate);
         els.evidenceTaskDate.value = task.dueDate;
@@ -6969,6 +7082,19 @@
         }
       }
 
+      function renderMasterEvidenceControl(container, task) {
+        if (!isSelfManagedMasterTask(task)) return;
+        const evidenceButton = document.createElement("button");
+        evidenceButton.className = "primary";
+        evidenceButton.type = "button";
+        evidenceButton.textContent = (task.evidence || []).length ? "Agregar otro sustento" : "Agregar sustento";
+        evidenceButton.addEventListener("click", () => {
+          if (els.taskPreviewDialog.open) els.taskPreviewDialog.close();
+          openEvidenceModuleForTask(task);
+        });
+        container.appendChild(evidenceButton);
+      }
+
       function renderTrainerTaskActions(container, task) {
         if (task.status === "Cumplida") {
           const check = document.createElement("span");
@@ -6976,6 +7102,7 @@
           check.setAttribute("aria-label", "Tarea aprobada");
           check.innerHTML = "&#10003;";
           container.appendChild(check);
+          renderMasterEvidenceControl(container, task);
           renderRenameControl(container, task);
           return;
         }
@@ -7094,7 +7221,7 @@
         els.pendingCount.textContent = pending;
         els.reviewCount.textContent = review;
         els.doneCount.textContent = done;
-        els.trainerMetricLabel.textContent = canViewAll() ? "Trainers" : "Avance hoy";
+        els.trainerMetricLabel.textContent = canViewAll() ? "Integrantes" : "Avance hoy";
         els.trainerCount.textContent = canViewAll() ? organizationScopeUsers().length : `${todayPercent}%`;
         els.trainerCount.title = canViewAll() ? "Equipo activo" : `${todayDone} de ${todayTasks.length} tareas aprobadas hoy`;
       }
@@ -7396,8 +7523,8 @@
       }
 
       function renderEvidence() {
-        els.evidenceUploadPanel.classList.toggle("hidden", isCoordinator() || isObserver());
-        if (!canViewAll()) renderEvidenceTaskPicker(els.evidenceTask.value);
+        els.evidenceUploadPanel.classList.toggle("hidden", isObserver() || (isCoordinator() && !isMaster()));
+        if (!canViewAll() || isMaster()) renderEvidenceTaskPicker(els.evidenceTask.value);
         let allEvidence = relevantTasks()
           .flatMap((task) => (task.evidence || []).map((evidence) => ({ ...evidence, task })))
           .sort((a, b) => b.submittedAt - a.submittedAt);
@@ -8411,9 +8538,10 @@
           });
         });
 
-        els.organizationScope.addEventListener("change", () => {
-          if (!isObserver()) return;
-          selectedOrganizationScope = els.organizationScope.value;
+        els.organizationScopeTabs.addEventListener("click", (event) => {
+          const button = event.target.closest("[data-organization-scope]");
+          if (!isObserver() || !button) return;
+          selectedOrganizationScope = button.dataset.organizationScope;
           localStorage.setItem(ORGANIZATION_SCOPE_KEY, selectedOrganizationScope);
           els.taskTrainerFilter.value = "all";
           els.evidenceTrainerFilter.value = "all";
@@ -8545,13 +8673,12 @@
         });
 
         els.cancelRenameTask.addEventListener("click", () => els.renameTaskDialog.close());
-        els.renameTaskForm.addEventListener("submit", (event) => {
+        els.renameTaskForm.addEventListener("submit", async (event) => {
           event.preventDefault();
-          const success = renameTask(
-            els.renameTaskForm.dataset.taskId,
-            els.renameTaskTitle.value,
-            els.renameTaskReason.value
-          );
+          const taskId = els.renameTaskForm.dataset.taskId;
+          const success = els.renameTaskForm.dataset.masterEdit === "true"
+            ? await updateMasterTask(taskId)
+            : renameTask(taskId, els.renameTaskTitle.value, els.renameTaskReason.value);
           if (success) els.renameTaskDialog.close();
         });
         els.closeTaskPreview.addEventListener("click", () => els.taskPreviewDialog.close());
@@ -8867,7 +8994,16 @@
           els.taskForm.reset();
           els.taskDueDate.value = nearestWorkingDay(todayIso);
           render();
-          setMessage(els.taskMessage, isCoordinator() ? "Tarea asignada y confirmada en la nube." : "Tu tarea se agrego y confirmo en la semana.", "ok");
+          const createdTask = state.tasks.find((item) => item.id === task.id);
+          setMessage(
+            els.taskMessage,
+            createdTask?.autoApproved
+              ? "Tarea Master registrada y aprobada automaticamente. Puedes editarla o agregar sustentos posteriormente."
+              : isCoordinator()
+                ? "Tarea asignada y confirmada en la nube."
+                : "Tu tarea se agrego y confirmo en la semana.",
+            "ok"
+          );
         });
 
         els.taskStatusFilter.addEventListener("change", renderTasks);
@@ -9116,7 +9252,8 @@
           els.evidenceSubmitButton.disabled = false;
           els.evidenceSubmitButton.textContent = "Enviar sustento";
           evidenceSubmitInFlight = false;
-          const successMessage = `${recoveredAfterSyncError ? "Sustento confirmado en la nube" : "Sustento guardado"} con ${uploadedFiles.length} archivo${uploadedFiles.length === 1 ? "" : "s"}. El coordinador del area debe aprobarlo para completar la tarea.`;
+          const savedTask = state.tasks.find((item) => item.id === task.id);
+          const successMessage = `${recoveredAfterSyncError ? "Sustento confirmado en la nube" : "Sustento guardado"} con ${uploadedFiles.length} archivo${uploadedFiles.length === 1 ? "" : "s"}. ${isSelfManagedMasterTask(savedTask) ? "Quedo aprobado automaticamente por tu perfil Master." : "El coordinador del area debe aprobarlo para completar la tarea."}`;
           setEvidenceUploadProgress("Sustento guardado correctamente en la nube.", 100, "ok");
           setMessage(els.evidenceMessage, "", "");
           activateView("tasksView", { updateUrl: true, historyMode: "replace" });

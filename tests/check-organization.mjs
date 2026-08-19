@@ -21,35 +21,44 @@ for (const email of expectedEmails) {
 }
 
 for (const marker of [
-  'const SCHEMA_VERSION = "24-org-teams-1"',
+  'const SCHEMA_VERSION = "25-master-autonomy-1"',
   '["team", "TEXT NOT NULL DEFAULT',
   '["job_title", "TEXT NOT NULL DEFAULT',
   '["member_type", "TEXT NOT NULL DEFAULT',
   'userTeam(actor) === userTeam(target)',
   'La cuenta observadora es de solo lectura',
   'Solo puedes asignar tareas dentro de tu equipo',
-  'No puedes revisar tareas de otro equipo'
+  'No puedes revisar tareas de otro equipo',
+  'function coordinatorCanManageTaskUser',
+  'function isSelfManagedMasterTask',
+  'type: "AutoaprobacionMaster"',
+  'type: "EdicionMaster"',
+  'review: selfManagedMaster ? "Aprobada" : "Pendiente"',
+  'route === "tasks/master-update"'
 ]) {
   if (!cloud.includes(marker)) throw new Error(`Falta la proteccion: ${marker}`);
 }
 
 for (const marker of [
-  'id="organizationScope"',
-  '<option value="training">Training</option>',
-  '<option value="masters">Masters</option>',
-  '<option value="audiovisual">Audiovisuales</option>',
+  'id="organizationScopeTabs"',
+  'data-organization-scope="training">Trainers</button>',
+  'data-organization-scope="masters">Master</button>',
+  'data-organization-scope="audiovisual">Audiovisual</button>',
   'function organizationScopeUsers()',
   'function renderOrganizationScope()',
-  'const APP_VERSION = "24-org-teams1"'
+  'function isSelfManagedMasterTask(task)',
+  'function updateMasterTask(taskId)',
+  'const APP_VERSION = "25-master-autonomy1"'
 ]) {
   if (!html.includes(marker)) throw new Error(`Falta la interfaz organizacional: ${marker}`);
 }
 
 if (cloud !== api) throw new Error("Las rutas /cloud y /api no son identicas");
 if (html !== operative) throw new Error("index.html y operativo.html no son identicos");
-if (!sw.includes('lgtask-shell-v24-org-teams1')) throw new Error("El cache del Service Worker no fue actualizado");
+if (!sw.includes('lgtask-shell-v25-master-autonomy1')) throw new Error("El cache del Service Worker no fue actualizado");
 
 console.log("OrganizationProfiles=7");
 console.log("TeamIsolation=OK");
 console.log("ObserverReadOnly=OK");
-console.log("FrontendScopes=Training,Masters,Audiovisuales");
+console.log("FrontendScopes=Trainers,Master,Audiovisual");
+console.log("MasterAutonomy=OK");
