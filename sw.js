@@ -1,4 +1,4 @@
-const CACHE_NAME = "lgtask-shell-v25-master-autonomy1";
+const CACHE_NAME = "lgtask-shell-v26-coordinator-week-premium1";
 const APP_SHELL = [
   "/",
   "/index.html",

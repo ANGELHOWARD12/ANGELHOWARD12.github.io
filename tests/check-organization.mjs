@@ -41,24 +41,27 @@ for (const marker of [
 
 for (const marker of [
   'id="organizationScopeTabs"',
-  'data-organization-scope="training">Trainers</button>',
-  'data-organization-scope="masters">Master</button>',
-  'data-organization-scope="audiovisual">Audiovisual</button>',
+  'data-organization-scope="training"',
+  'data-organization-scope="masters"',
+  'data-organization-scope="audiovisual"',
+  'class="scope-tab-copy"',
   'function organizationScopeUsers()',
   'function renderOrganizationScope()',
   'function isSelfManagedMasterTask(task)',
+  'function hasCoordinatorPersonalWeek()',
   'function updateMasterTask(taskId)',
-  'const APP_VERSION = "25-master-autonomy1"'
+  'const APP_VERSION = "26-coordinator-week-premium1"'
 ]) {
   if (!html.includes(marker)) throw new Error(`Falta la interfaz organizacional: ${marker}`);
 }
 
 if (cloud !== api) throw new Error("Las rutas /cloud y /api no son identicas");
 if (html !== operative) throw new Error("index.html y operativo.html no son identicos");
-if (!sw.includes('lgtask-shell-v25-master-autonomy1')) throw new Error("El cache del Service Worker no fue actualizado");
+if (!sw.includes('lgtask-shell-v26-coordinator-week-premium1')) throw new Error("El cache del Service Worker no fue actualizado");
 
 console.log("OrganizationProfiles=7");
 console.log("TeamIsolation=OK");
 console.log("ObserverReadOnly=OK");
 console.log("FrontendScopes=Trainers,Master,Audiovisual");
 console.log("MasterAutonomy=OK");
+console.log("CoordinatorPersonalWeek=OK");

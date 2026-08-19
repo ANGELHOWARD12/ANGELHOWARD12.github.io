@@ -299,7 +299,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "25-master-autonomy1",
+    version: "26-coordinator-week-premium1",
     schema: SCHEMA_VERSION,
     r2: r2StorageEnabled(env),
     migration: {

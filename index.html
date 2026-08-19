@@ -628,13 +628,14 @@
         align-items: center;
         background: #fff;
         border: 1px solid var(--line);
-        border-left: 4px solid var(--blue);
+        border-top: 4px solid var(--red);
         border-radius: 8px;
+        box-shadow: 0 12px 30px rgba(23, 32, 51, 0.08);
         display: grid;
-        gap: 14px;
-        grid-template-columns: minmax(0, 1fr) minmax(210px, 280px);
+        gap: 18px;
+        grid-template-columns: minmax(220px, 0.7fr) minmax(420px, 1.3fr);
         margin-bottom: 16px;
-        padding: 14px 16px;
+        padding: 18px;
       }
 
       .organization-scope h2 {
@@ -647,26 +648,93 @@
       }
 
       .organization-scope-tabs {
-        background: #eef3fb;
-        border: 1px solid var(--line);
+        background: #f6f8fc;
+        border: 1px solid #dce4f0;
         border-radius: 8px;
         display: grid;
-        gap: 4px;
+        gap: 8px;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        padding: 4px;
+        padding: 7px;
       }
 
       .organization-scope-tab {
-        background: transparent;
-        border-color: transparent;
-        min-height: 42px;
-        padding: 8px 12px;
+        align-items: center;
+        background: #fff;
+        border: 1px solid #dce4f0;
+        display: flex;
+        gap: 9px;
+        justify-content: flex-start;
+        min-height: 58px;
+        padding: 9px 10px;
+        text-align: left;
+        transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+      }
+
+      .organization-scope-tab:hover {
+        border-color: #9cb8e8;
+        box-shadow: 0 8px 18px rgba(33, 86, 180, 0.12);
+        transform: translateY(-1px);
+      }
+
+      .organization-scope-tab:active {
+        transform: translateY(1px);
+      }
+
+      .scope-tab-icon {
+        align-items: center;
+        background: #eaf1ff;
+        border-radius: 7px;
+        color: #1e55b3;
+        display: inline-flex;
+        flex: 0 0 34px;
+        font-size: 12px;
+        font-weight: 950;
+        height: 34px;
+        justify-content: center;
+      }
+
+      .organization-scope-tab[data-organization-scope="masters"] .scope-tab-icon {
+        background: #fff2d7;
+        color: #8a5b00;
+      }
+
+      .organization-scope-tab[data-organization-scope="audiovisual"] .scope-tab-icon {
+        background: #e5f7f1;
+        color: #087258;
+      }
+
+      .scope-tab-copy {
+        display: grid;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .scope-tab-copy strong {
+        font-size: 13px;
+        line-height: 1.1;
+      }
+
+      .scope-tab-copy small {
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1.2;
       }
 
       .organization-scope-tab.active {
-        background: var(--blue);
-        border-color: var(--blue);
+        background: #173f83;
+        border-color: #173f83;
+        box-shadow: 0 9px 20px rgba(23, 63, 131, 0.2);
         color: #fff;
+      }
+
+      .organization-scope-tab.active .scope-tab-icon {
+        background: rgba(255, 255, 255, 0.16);
+        color: #fff;
+      }
+
+      .organization-scope-tab.active .scope-tab-copy small {
+        color: #dce8ff;
       }
 
       .view {
@@ -2393,9 +2461,9 @@
           <p id="organizationScopeDescription" class="muted">Tareas y equipo del area seleccionada.</p>
         </div>
         <nav id="organizationScopeTabs" class="organization-scope-tabs" role="tablist" aria-label="Areas supervisadas por Giuliana">
-          <button class="organization-scope-tab" type="button" role="tab" data-organization-scope="training">Trainers</button>
-          <button class="organization-scope-tab" type="button" role="tab" data-organization-scope="masters">Master</button>
-          <button class="organization-scope-tab" type="button" role="tab" data-organization-scope="audiovisual">Audiovisual</button>
+          <button class="organization-scope-tab" type="button" role="tab" data-organization-scope="training"><span class="scope-tab-icon" aria-hidden="true">TR</span><span class="scope-tab-copy"><strong>Trainers</strong><small>Equipo Training</small></span></button>
+          <button class="organization-scope-tab" type="button" role="tab" data-organization-scope="masters"><span class="scope-tab-icon" aria-hidden="true">MA</span><span class="scope-tab-copy"><strong>Master</strong><small>Gestion propia</small></span></button>
+          <button class="organization-scope-tab" type="button" role="tab" data-organization-scope="audiovisual"><span class="scope-tab-icon" aria-hidden="true">AV</span><span class="scope-tab-copy"><strong>Audiovisual</strong><small>Contenido y produccion</small></span></button>
         </nav>
       </section>
 
@@ -3243,7 +3311,7 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = "25-master-autonomy1";
+      const APP_VERSION = "26-coordinator-week-premium1";
       const TEAM_TRAINING = "Training";
       const TEAM_AUDIOVISUAL = "Audiovisuales";
       const MAX_EVIDENCE_FILES = 8;
@@ -4418,6 +4486,10 @@
 
       function isMaster() {
         return clean(activeUser()?.memberType).toLowerCase() === "master";
+      }
+
+      function hasCoordinatorPersonalWeek() {
+        return isCoordinator() && isMaster();
       }
 
       function isSelfManagedMasterTask(task) {
@@ -6200,7 +6272,7 @@
         els.personalBreakPanel.classList.remove("hidden");
         els.overtimePanel.classList.remove("hidden");
         els.coordinatorDayPanel.classList.toggle("hidden", !canViewAll());
-        els.trainerWeekPanel.classList.toggle("hidden", canViewAll());
+        els.trainerWeekPanel.classList.toggle("hidden", canViewAll() && !hasCoordinatorPersonalWeek());
         els.trainerFilterWrap.classList.toggle("hidden", !canViewAll());
         els.coordinatorTeamPanel.classList.toggle("hidden", !canViewAll());
         els.backupTools.classList.toggle("hidden", !(isPrimaryCoordinator() || isObserver()));
@@ -7152,7 +7224,7 @@
       }
 
       function renderTrainerWeek() {
-        if (canViewAll()) return;
+        if (canViewAll() && !hasCoordinatorPersonalWeek()) return;
         const days = selectedWeekDates();
         els.weekLabel.textContent = `Week ${isoWeekNumber(days[0])} | ${formatShortDate(days[0])} - ${formatShortDate(days[5])}`;
         els.weeklySummary.innerHTML = "";
