@@ -299,7 +299,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "27-uppercase-users1",
+    version: "28-task-retry1",
     schema: SCHEMA_VERSION,
     r2: r2StorageEnabled(env),
     migration: {

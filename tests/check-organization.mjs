@@ -51,14 +51,14 @@ for (const marker of [
   'function isSelfManagedMasterTask(task)',
   'function hasCoordinatorPersonalWeek()',
   'function updateMasterTask(taskId)',
-  'const APP_VERSION = "27-uppercase-users1"'
+  'const APP_VERSION = "28-task-retry1"'
 ]) {
   if (!html.includes(marker)) throw new Error(`Falta la interfaz organizacional: ${marker}`);
 }
 
 if (cloud !== api) throw new Error("Las rutas /cloud y /api no son identicas");
 if (html !== operative) throw new Error("index.html y operativo.html no son identicos");
-if (!sw.includes('lgtask-shell-v27-uppercase-users1')) throw new Error("El cache del Service Worker no fue actualizado");
+if (!sw.includes('lgtask-shell-v28-task-retry1')) throw new Error("El cache del Service Worker no fue actualizado");
 
 console.log("OrganizationProfiles=7");
 console.log("TeamIsolation=OK");

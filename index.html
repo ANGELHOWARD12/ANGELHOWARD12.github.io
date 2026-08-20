@@ -3311,7 +3311,7 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = "27-uppercase-users1";
+      const APP_VERSION = "28-task-retry1";
       const TEAM_TRAINING = "Training";
       const TEAM_AUDIOVISUAL = "Audiovisuales";
       const MAX_EVIDENCE_FILES = 8;
@@ -9051,10 +9051,12 @@
           els.taskSubmitButton.disabled = true;
           setMessage(els.taskMessage, "Guardando tarea en la nube...", "");
           try {
-            const data = await apiRequest("/tasks/create", {
+            const data = await apiRequestWithRetry("/tasks/create", {
               method: "POST",
-              body: JSON.stringify({ task })
-            });
+              body: JSON.stringify({ task }),
+              allowFallback: true,
+              timeoutMs: 90_000
+            }, 3);
             applyCloudState(data.state);
           } catch (error) {
             const refreshed = await refreshStateFromServer({ quiet: true });
