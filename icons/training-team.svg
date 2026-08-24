@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Training Team">
+  <rect width="512" height="512" rx="104" fill="#0f766e"/>
+  <path d="M84 390h344" fill="none" stroke="#d9f0eb" stroke-linecap="round" stroke-width="24" opacity=".7"/>
+  <path d="M118 330h92v-92h92v-92h92" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" stroke-width="34"/>
+  <path d="M321 102h97v97" fill="none" stroke="#e76f51" stroke-linecap="round" stroke-linejoin="round" stroke-width="34"/>
+  <path d="M410 110 294 226" fill="none" stroke="#e76f51" stroke-linecap="round" stroke-width="34"/>
+  <circle cx="118" cy="330" r="22" fill="#f4c95d"/>
+</svg>

@@ -299,7 +299,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "29-offline-outbox1",
+    version: "30-training-team-ui1",
     schema: SCHEMA_VERSION,
     r2: r2StorageEnabled(env),
     migration: {
