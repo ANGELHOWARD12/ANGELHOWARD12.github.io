@@ -11,6 +11,14 @@
     <link rel="icon" href="/icons/task-hub-192.png" />
     <link rel="apple-touch-icon" href="/icons/task-hub-192.png" />
     <title>Task Hub</title>
+    <script>
+      (() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("source") === "app" || window.matchMedia("(display-mode: standalone)").matches) {
+          document.documentElement.classList.add("app-mode");
+        }
+      })();
+    </script>
     <style>
       :root {
         --bg: #f7f4f5;
@@ -44,6 +52,29 @@
         color: var(--ink);
         font-family: Inter, "Segoe UI", Arial, sans-serif;
         font-size: 15px;
+      }
+
+      html.app-mode {
+        background: #a50034;
+        overscroll-behavior: none;
+      }
+
+      html.app-mode body {
+        min-height: 100dvh;
+        overscroll-behavior-y: none;
+        -webkit-tap-highlight-color: rgba(165, 0, 52, 0.12);
+      }
+
+      html.app-mode button,
+      html.app-mode a,
+      html.app-mode input,
+      html.app-mode select,
+      html.app-mode textarea {
+        touch-action: manipulation;
+      }
+
+      html.app-mode dialog {
+        overscroll-behavior: contain;
       }
 
       button,
@@ -2183,6 +2214,22 @@
           position: static;
         }
 
+        html.app-mode .topbar {
+          padding-top: max(8px, env(safe-area-inset-top));
+          position: sticky;
+          top: 0;
+        }
+
+        html.app-mode .shell {
+          padding-bottom: calc(76px + env(safe-area-inset-bottom));
+        }
+
+        html.app-mode .panel,
+        html.app-mode .date-card,
+        html.app-mode .metric {
+          box-shadow: 0 5px 16px rgba(75, 20, 38, 0.07);
+        }
+
         .topbar .brand-mark {
           height: 34px;
           width: 34px;
@@ -3488,7 +3535,8 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = "32-task-hub-lg1";
+      const APP_VERSION = "33-task-hub-native1";
+      const APP_MODE = document.documentElement.classList.contains("app-mode");
       const TEAM_TRAINING = "Training";
       const TEAM_AUDIOVISUAL = "Audiovisuales";
       const MAX_EVIDENCE_FILES = 8;
@@ -8853,6 +8901,16 @@
       }
 
       function addEventListeners() {
+        if (APP_MODE && "vibrate" in navigator) {
+          document.addEventListener(
+            "click",
+            (event) => {
+              const control = event.target.closest?.("button, a.tab, summary");
+              if (control && !control.disabled) navigator.vibrate(8);
+            },
+            { passive: true }
+          );
+        }
         els.loginEmail.value = "";
         els.loginPassword.value = "";
         window.setTimeout(() => {

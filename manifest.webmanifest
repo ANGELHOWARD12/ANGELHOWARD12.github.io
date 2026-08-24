@@ -7,6 +7,10 @@
   "start_url": "/?source=app",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone"],
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
   "background_color": "#f7f4f5",
   "theme_color": "#a50034",
   "orientation": "portrait-primary",
@@ -28,7 +32,7 @@
     {
       "name": "Mis tareas",
       "short_name": "Tareas",
-      "url": "/?view=tasksView",
+      "url": "/?source=app&view=tasksView",
       "icons": [
         {
           "src": "/icons/task-hub-192.png",
@@ -39,7 +43,7 @@
     {
       "name": "Sustentos",
       "short_name": "Sustentos",
-      "url": "/?view=evidenceView",
+      "url": "/?source=app&view=evidenceView",
       "icons": [
         {
           "src": "/icons/task-hub-192.png",
