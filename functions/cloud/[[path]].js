@@ -299,7 +299,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "28-task-retry1",
+    version: "29-offline-outbox1",
     schema: SCHEMA_VERSION,
     r2: r2StorageEnabled(env),
     migration: {
@@ -1677,6 +1677,17 @@ function userCanUploadTaskEvidence(user, task, allowPreviousDays = false) {
   return isSelfManagedMasterTask(user, task) || taskAllowsEvidenceUpload(task, dateIsoInLima(Date.now()), allowPreviousDays);
 }
 
+function validOfflineEvidenceQueue(task, value, now = Date.now()) {
+  const queuedAt = Number(value || 0);
+  return Boolean(
+    Number.isFinite(queuedAt) &&
+      queuedAt > 0 &&
+      queuedAt <= now + 5 * 60 * 1000 &&
+      now - queuedAt <= 7 * 24 * 60 * 60 * 1000 &&
+      clean(task?.dueDate) === dateIsoInLima(queuedAt)
+  );
+}
+
 function evidenceUploadWindowError(task, today = dateIsoInLima(Date.now()), allowPreviousDays = false) {
   if (clean(task?.dueDate) < today) {
     if (allowPreviousDays) return "La carga de sustentos anteriores esta habilitada por Pablo.";
@@ -1962,6 +1973,7 @@ async function uploadEvidenceDirectToR2(request, db, user, env) {
 
   const url = new URL(request.url);
   const taskId = clean(url.searchParams.get("taskId"));
+  const offlineQueuedAt = Number(url.searchParams.get("offlineQueuedAt") || 0);
   const data = await loadData(db);
   const task = data.tasks.find((item) => clean(item.id) === taskId);
   if (!task) return json({ ok: false, message: "La tarea ya no existe." }, 404);
@@ -1969,7 +1981,7 @@ async function uploadEvidenceDirectToR2(request, db, user, env) {
     return json({ ok: false, message: "No puedes subir sustentos para esa tarea." }, 403);
   }
   const today = dateIsoInLima(Date.now());
-  if (!userCanUploadTaskEvidence(user, task, data.lateEvidenceUploadsEnabled)) {
+  if (!userCanUploadTaskEvidence(user, task, data.lateEvidenceUploadsEnabled) && !validOfflineEvidenceQueue(task, offlineQueuedAt)) {
     return json({ ok: false, message: evidenceUploadWindowError(task, today, data.lateEvidenceUploadsEnabled) }, 409);
   }
 
@@ -2044,6 +2056,7 @@ async function initR2MultipartUpload(request, db, user, env) {
   }
   const body = await readJson(request, 20_000);
   const taskId = clean(body.taskId);
+  const offlineQueuedAt = Number(body.offlineQueuedAt || 0);
   const data = await loadData(db);
   const task = data.tasks.find((item) => clean(item.id) === taskId);
   if (!task) return json({ ok: false, message: "La tarea ya no existe." }, 404);
@@ -2051,7 +2064,7 @@ async function initR2MultipartUpload(request, db, user, env) {
     return json({ ok: false, message: "No puedes subir sustentos para esa tarea." }, 403);
   }
   const today = dateIsoInLima(Date.now());
-  if (!userCanUploadTaskEvidence(user, task, data.lateEvidenceUploadsEnabled)) {
+  if (!userCanUploadTaskEvidence(user, task, data.lateEvidenceUploadsEnabled) && !validOfflineEvidenceQueue(task, offlineQueuedAt)) {
     return json({ ok: false, message: evidenceUploadWindowError(task, today, data.lateEvidenceUploadsEnabled) }, 409);
   }
 
@@ -2779,6 +2792,7 @@ async function submitTaskEvidence(request, db, user, context) {
   const body = await readJson(request, 1_000_000);
   const taskId = clean(body.taskId);
   const submittedEvidence = body.evidence || {};
+  const offlineQueuedAt = Number(body.offlineQueuedAt || submittedEvidence.offlineQueuedAt || 0);
   const data = await loadData(db);
   const task = data.tasks.find((item) => clean(item.id) === taskId);
   if (!task) return json({ ok: false, message: "La tarea ya no existe." }, 404);
@@ -2789,7 +2803,8 @@ async function submitTaskEvidence(request, db, user, context) {
   if (task.status === "Cumplida" && !selfManagedMaster) {
     return json({ ok: false, message: "La tarea ya fue aprobada y completada." }, 409);
   }
-  if (!userCanUploadTaskEvidence(user, task, data.lateEvidenceUploadsEnabled)) {
+  const validOfflineQueue = validOfflineEvidenceQueue(task, offlineQueuedAt);
+  if (!userCanUploadTaskEvidence(user, task, data.lateEvidenceUploadsEnabled) && !validOfflineQueue) {
     return json({ ok: false, message: evidenceUploadWindowError(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled) }, 409);
   }
 
@@ -2847,7 +2862,8 @@ async function submitTaskEvidence(request, db, user, context) {
   if (task.evidence.some((item) => clean(item.id) === evidenceId)) {
     return stateResponse(db, user, data);
   }
-  const submittedAt = Date.now();
+  const syncedAt = Date.now();
+  const submittedAt = validOfflineQueue ? offlineQueuedAt : syncedAt;
   const submittedDate = dateIsoInLima(submittedAt);
   const isLateSubmission = clean(task.dueDate) < submittedDate;
   const individualLateAuthorization = isLateSubmission && lateEvidenceAuthorizationActive(task)
@@ -2882,6 +2898,10 @@ async function submitTaskEvidence(request, db, user, context) {
     reviewedById: selfManagedMaster ? user.id : "",
     reviewNote: selfManagedMaster ? "Autoaprobado por perfil Master." : ""
   };
+  if (validOfflineQueue) {
+    evidence.offlineQueuedAt = offlineQueuedAt;
+    evidence.syncedAt = syncedAt;
+  }
   if (lateAuthorization) evidence.lateAuthorization = lateAuthorization;
   task.evidence.push(evidence);
   task.history = Array.isArray(task.history) ? task.history : [];
@@ -2906,6 +2926,14 @@ async function submitTaskEvidence(request, db, user, context) {
       byId: user.id,
       reason: lateAuthorization.reason,
       at: submittedAt
+    });
+  }
+  if (validOfflineQueue) {
+    task.history.push({
+      type: "SustentoOffline",
+      byId: user.id,
+      reason: "Guardado en el dispositivo durante una interrupcion de Cloudflare y sincronizado posteriormente",
+      at: syncedAt
     });
   }
   task.history.push({

@@ -1,4 +1,4 @@
-const CACHE_NAME = "lgtask-shell-v28-task-retry1";
+const CACHE_NAME = "lgtask-shell-v29-offline-outbox1";
 const APP_SHELL = [
   "/",
   "/index.html",

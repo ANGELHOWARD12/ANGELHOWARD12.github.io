@@ -32,6 +32,8 @@ for (const marker of [
   'No puedes revisar tareas de otro equipo',
   'function coordinatorCanManageTaskUser',
   'function isSelfManagedMasterTask',
+  'function validOfflineEvidenceQueue',
+  'type: "SustentoOffline"',
   'type: "AutoaprobacionMaster"',
   'type: "EdicionMaster"',
   'review: selfManagedMaster ? "Aprobada" : "Pendiente"',
@@ -51,14 +53,16 @@ for (const marker of [
   'function isSelfManagedMasterTask(task)',
   'function hasCoordinatorPersonalWeek()',
   'function updateMasterTask(taskId)',
-  'const APP_VERSION = "28-task-retry1"'
+  'const APP_VERSION = "29-offline-outbox1"',
+  'const EVIDENCE_OUTBOX_DB = "lgtask-evidence-outbox-v1"',
+  'function syncOfflineOutboxes()'
 ]) {
   if (!html.includes(marker)) throw new Error(`Falta la interfaz organizacional: ${marker}`);
 }
 
 if (cloud !== api) throw new Error("Las rutas /cloud y /api no son identicas");
 if (html !== operative) throw new Error("index.html y operativo.html no son identicos");
-if (!sw.includes('lgtask-shell-v28-task-retry1')) throw new Error("El cache del Service Worker no fue actualizado");
+if (!sw.includes('lgtask-shell-v29-offline-outbox1')) throw new Error("El cache del Service Worker no fue actualizado");
 
 console.log("OrganizationProfiles=7");
 console.log("TeamIsolation=OK");
