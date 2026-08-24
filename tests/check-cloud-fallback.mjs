@@ -53,6 +53,22 @@ if (!statusChanges.some(([status]) => status === "online")) {
   throw new Error("La conexion recuperada no vuelve a estado online");
 }
 
+calls.length = 0;
+globalThis.fetch = async (url) => {
+  calls.push(url);
+  if (url.startsWith("/cloud")) throw new DOMException("route timeout", "AbortError");
+  return Response.json({ ok: true, source: "fallback-after-timeout" });
+};
+
+const recoveredHealth = await apiRequest("/health", { timeoutMs: 100 });
+if (!recoveredHealth.ok || recoveredHealth.source !== "fallback-after-timeout") {
+  throw new Error("El timeout de la ruta principal no activo la ruta de respaldo");
+}
+if (calls.join(",") !== "/cloud/health,/api/health") {
+  throw new Error(`Secuencia de recuperacion por timeout inesperada: ${calls.join(",")}`);
+}
+
 console.log("CloudFallback=OK");
 console.log("LoginFailover=cloud->api");
 console.log("ReadFailover=cloud->api");
+console.log("TimeoutFailover=cloud->api");

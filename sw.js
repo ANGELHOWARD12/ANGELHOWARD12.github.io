@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-hub-shell-v33-task-hub-native1";
+const CACHE_NAME = "task-hub-shell-v34-task-hub-watchdog1";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -25,6 +25,23 @@ function notificationOptions(notification = {}) {
     actions: [{ action: "open", title: "Abrir Task Hub" }],
     data: { url: notification.url || "/?view=tasksView" }
   };
+}
+
+async function fetchCloudWithFallback(path) {
+  let lastError;
+  for (const base of ["/cloud", "/api"]) {
+    try {
+      const response = await fetch(`${base}${path}`, {
+        credentials: "include",
+        cache: "no-store"
+      });
+      if (response.ok) return response;
+      lastError = new Error(`Cloud route failed with HTTP ${response.status}`);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("Cloud unavailable");
 }
 
 self.addEventListener("install", (event) => {
@@ -75,11 +92,7 @@ self.addEventListener("fetch", (event) => {
 
 async function showPendingNotifications() {
   try {
-    const response = await fetch("/cloud/notifications/pending", {
-      credentials: "include",
-      cache: "no-store"
-    });
-    if (!response.ok) throw new Error("No active session");
+    const response = await fetchCloudWithFallback("/notifications/pending");
     const data = await response.json();
     for (const notification of data.notifications || []) {
       await self.registration.showNotification(notification.title || "Task Hub", notificationOptions(notification));
@@ -103,7 +116,7 @@ self.addEventListener("push", (event) => {
 self.addEventListener("periodicsync", (event) => {
   if (event.tag !== "lgtask-reminders") return;
   event.waitUntil(
-    fetch("/cloud/state", { credentials: "include", cache: "no-store" })
+    fetchCloudWithFallback("/state")
       .then(() => new Promise((resolve) => setTimeout(resolve, 1200)))
       .then(showPendingNotifications)
       .catch(() => {})
@@ -113,7 +126,7 @@ self.addEventListener("periodicsync", (event) => {
 self.addEventListener("sync", (event) => {
   if (event.tag !== "lgtask-cloud-sync") return;
   event.waitUntil(
-    fetch("/cloud/state", { credentials: "include", cache: "no-store" })
+    fetchCloudWithFallback("/state")
       .then(() => self.clients.matchAll({ type: "window", includeUncontrolled: true }))
       .then((clients) => clients.forEach((client) => client.postMessage({ type: "CLOUD_ONLINE" })))
       .catch(() => {})

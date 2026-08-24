@@ -3535,7 +3535,9 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = "33-task-hub-native1";
+      const APP_VERSION = "34-task-hub-watchdog1";
+      const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
+      const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
       const APP_MODE = document.documentElement.classList.contains("app-mode");
       const TEAM_TRAINING = "Training";
       const TEAM_AUDIOVISUAL = "Audiovisuales";
@@ -3718,6 +3720,8 @@
       let syncQueued = false;
       let stateRevision = 0;
       let serviceWorkerRegistration = null;
+      let hourlyCloudMaintenanceInFlight = null;
+      let pendingAppReload = false;
       let evidenceSubmitInFlight = false;
       let evidenceOutboxDbPromise = null;
       let offlineOutboxSyncInFlight = null;
@@ -4519,29 +4523,101 @@
         return offlineOutboxSyncInFlight;
       }
 
+      function protectedWorkInProgress() {
+        return Boolean(
+          syncInFlight ||
+          offlineOutboxSyncInFlight ||
+          evidenceSubmitInFlight ||
+          taskCreateInFlight ||
+          evidenceOpenInFlight ||
+          (activeViewId === "evidenceView" && evidenceDraftActive())
+        );
+      }
+
+      function hourlyCloudMaintenanceDue() {
+        const lastRun = Number(localStorage.getItem(HOURLY_CLOUD_MAINTENANCE_KEY) || 0);
+        return !lastRun || Date.now() - lastRun >= HOURLY_CLOUD_MAINTENANCE_MS;
+      }
+
+      function recordHourlyCloudMaintenance() {
+        localStorage.setItem(HOURLY_CLOUD_MAINTENANCE_KEY, String(Date.now()));
+      }
+
+      function maybeApplyPendingAppReload() {
+        if (!pendingAppReload || protectedWorkInProgress()) return false;
+        pendingAppReload = false;
+        window.location.reload();
+        return true;
+      }
+
+      async function runHourlyCloudMaintenance({ force = false } = {}) {
+        if (!state.activeUserId || !navigator.onLine || (!force && !hourlyCloudMaintenanceDue())) return false;
+        if (hourlyCloudMaintenanceInFlight) return hourlyCloudMaintenanceInFlight;
+        hourlyCloudMaintenanceInFlight = (async () => {
+          setCloudStatus("syncing", "Comprobando la nube y recuperando cambios pendientes.");
+          const registration = serviceWorkerRegistration || (await registerServiceWorker());
+          await registration?.update().catch(() => {});
+          const health = await apiRequestWithRetry(
+            "/health",
+            { timeoutMs: 20_000, allowFallback: true, quietTransient: true },
+            3
+          );
+          if (!health?.ok) throw new Error("La nube no confirmo su disponibilidad.");
+
+          if (!protectedWorkInProgress()) {
+            await syncOfflineOutboxes();
+            await refreshStateFromServer({ quiet: true });
+            await refreshStorageStatus().catch(() => {});
+            await syncNotificationSubscription().catch(() => {});
+            render();
+          }
+
+          recordHourlyCloudMaintenance();
+          const checkedAt = new Intl.DateTimeFormat("es-PE", { hour: "2-digit", minute: "2-digit" }).format(new Date());
+          setCloudStatus("online", `Nube verificada automaticamente a las ${checkedAt}.`);
+          maybeApplyPendingAppReload();
+          return true;
+        })()
+          .catch((error) => {
+            setCloudStatus(
+              navigator.onLine ? "error" : "offline",
+              `Revision automatica pendiente: ${error.message}`
+            );
+            return false;
+          })
+          .finally(() => {
+            hourlyCloudMaintenanceInFlight = null;
+          });
+        return hourlyCloudMaintenanceInFlight;
+      }
+
       async function apiRequest(path, options = {}) {
         const { timeoutMs = 45_000, allowFallback = false, quietTransient = false, ...fetchOptions } = options;
-        const controller = new AbortController();
-        const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+        let routeController = null;
+        let routeTimeout = 0;
         if (fetchOptions.method && fetchOptions.method !== "GET") setCloudStatus("syncing");
         try {
           const method = String(fetchOptions.method || "GET").toUpperCase();
           const apiBases = method === "GET" || allowFallback ? [API_BASE, API_FALLBACK_BASE] : [API_BASE];
+          const routeTimeoutMs = apiBases.length > 1 ? Math.max(5_000, Math.ceil(timeoutMs / apiBases.length)) : timeoutMs;
           let response;
           let networkError;
           for (const [index, apiBase] of apiBases.entries()) {
             try {
+              routeController = new AbortController();
+              window.clearTimeout(routeTimeout);
+              routeTimeout = window.setTimeout(() => routeController.abort(), routeTimeoutMs);
               response = await fetch(`${apiBase}${path}`, {
                 credentials: "same-origin",
                 headers: { "Content-Type": "application/json", ...(fetchOptions.headers || {}) },
                 ...fetchOptions,
-                signal: fetchOptions.signal || controller.signal
+                signal: fetchOptions.signal || routeController.signal
               });
               const temporaryGatewayFailure = [502, 503, 504].includes(response.status);
               if (!temporaryGatewayFailure || index === apiBases.length - 1) break;
             } catch (error) {
               networkError = error;
-              if (error.name === "AbortError" || index === apiBases.length - 1) throw error;
+              if (fetchOptions.signal?.aborted || index === apiBases.length - 1) throw error;
             }
           }
           if (!response) throw networkError || new Error("La nube no respondio.");
@@ -4573,7 +4649,7 @@
           }
           throw error;
         } finally {
-          window.clearTimeout(timeout);
+          window.clearTimeout(routeTimeout);
         }
       }
 
@@ -9958,17 +10034,16 @@
         });
         window.addEventListener("online", () => {
           setCloudStatus("syncing", "La conexion regreso. Sincronizando cambios pendientes.");
-          syncOfflineOutboxes()
-            .then(() => refreshStateFromServer({ quiet: true }))
+          runHourlyCloudMaintenance({ force: true })
             .then(() => {
-              render();
               if (pendingEvidenceSubmission) showToast("Hay un sustento cargado pendiente de confirmar.", "success");
             })
             .catch((error) => setCloudStatus("error", error.message));
         });
         document.addEventListener("visibilitychange", () => {
           if (!document.hidden && state.activeUserId && navigator.onLine) {
-            syncOfflineOutboxes().then(() => refreshStateFromServer({ quiet: true })).then(() => render()).catch(() => {});
+            maybeApplyPendingAppReload();
+            runHourlyCloudMaintenance().catch(() => {});
           }
         });
 
@@ -10008,11 +10083,12 @@
           const reloadKey = `lgtask-controller-${APP_VERSION}`;
           navigator.serviceWorker.addEventListener("controllerchange", () => {
             if (sessionStorage.getItem(reloadKey)) return;
-            sessionStorage.setItem(reloadKey, "1");
-            if (activeViewId === "evidenceView" && evidenceDraftActive()) {
-              showToast("Actualizacion lista. Tu seleccion y el sustento en preparacion se mantendran sin recargar la pantalla.", "success");
+            if (protectedWorkInProgress()) {
+              pendingAppReload = true;
+              showToast("Actualizacion lista. Se aplicara al terminar la operacion actual sin perder datos.", "success");
               return;
             }
+            sessionStorage.setItem(reloadKey, "1");
             window.location.reload();
           });
           navigator.serviceWorker.addEventListener("message", (event) => {
@@ -10025,7 +10101,10 @@
         await syncOfflineOutboxes().catch((error) => setCloudStatus(navigator.onLine ? "error" : "offline", error.message));
         await refreshStorageStatus().catch(() => {});
         await syncNotificationSubscription().catch(() => {});
+        recordHourlyCloudMaintenance();
+        window.setInterval(() => runHourlyCloudMaintenance({ force: true }).catch(() => {}), HOURLY_CLOUD_MAINTENANCE_MS);
         window.setInterval(() => {
+          if (maybeApplyPendingAppReload()) return;
           if (
             state.activeUserId &&
             !document.hidden &&
