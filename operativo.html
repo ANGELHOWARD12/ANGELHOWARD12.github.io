@@ -26,10 +26,10 @@
         --red-soft: #ffe7ea;
         --yellow: #9a6500;
         --yellow-soft: #fff3d6;
-        --cyan: #177875;
-        --cyan-soft: #e6f3f1;
-        --accent: #177875;
-        --accent-soft: #e6f3f1;
+        --cyan: #8a0030;
+        --cyan-soft: #f8e9ee;
+        --accent: #a50034;
+        --accent-soft: #f8e9ee;
         --soft: #f8e9ee;
         --shadow: 0 10px 26px rgba(75, 20, 38, 0.09);
       }
@@ -120,7 +120,7 @@
       }
 
       .brand-mark::after {
-        background: #d7a928;
+        background: #f0b7c9;
         bottom: 0;
         content: "";
         height: 7px;
@@ -703,8 +703,8 @@
       }
 
       .organization-scope-tabs {
-        background: #f6f8fc;
-        border: 1px solid #dce4f0;
+        background: #faf6f7;
+        border: 1px solid #e4d8dc;
         border-radius: 8px;
         display: grid;
         gap: 8px;
@@ -715,7 +715,7 @@
       .organization-scope-tab {
         align-items: center;
         background: #fff;
-        border: 1px solid #dce4f0;
+        border: 1px solid #e4d8dc;
         display: flex;
         gap: 9px;
         justify-content: flex-start;
@@ -726,8 +726,8 @@
       }
 
       .organization-scope-tab:hover {
-        border-color: #9cb8e8;
-        box-shadow: 0 8px 18px rgba(33, 86, 180, 0.12);
+        border-color: #d894aa;
+        box-shadow: 0 8px 18px rgba(165, 0, 52, 0.12);
         transform: translateY(-1px);
       }
 
@@ -737,9 +737,9 @@
 
       .scope-tab-icon {
         align-items: center;
-        background: #eaf1ff;
+        background: #f8e9ee;
         border-radius: 7px;
-        color: #1e55b3;
+        color: #7d0027;
         display: inline-flex;
         flex: 0 0 34px;
         font-size: 12px;
@@ -777,9 +777,9 @@
       }
 
       .organization-scope-tab.active {
-        background: #173f83;
-        border-color: #173f83;
-        box-shadow: 0 9px 20px rgba(23, 63, 131, 0.2);
+        background: #a50034;
+        border-color: #a50034;
+        box-shadow: 0 9px 20px rgba(165, 0, 52, 0.2);
         color: #fff;
       }
 
@@ -789,7 +789,7 @@
       }
 
       .organization-scope-tab.active .scope-tab-copy small {
-        color: #dce8ff;
+        color: #fbe9ef;
       }
 
       .view {
@@ -884,7 +884,7 @@
 
       .break-settings {
         align-items: end;
-        background: #f8fbff;
+        background: #fbf7f8;
         border: 1px solid var(--line);
         border-radius: 8px;
         display: grid;
@@ -900,10 +900,10 @@
       }
 
       .availability-note {
-        background: #eef7ff;
-        border: 1px solid #b8d8f5;
+        background: #fbf0f3;
+        border: 1px solid #e1b3c2;
         border-radius: 8px;
-        color: #23415f;
+        color: #542132;
         font-size: 13px;
         line-height: 1.45;
         margin: 0;
@@ -918,8 +918,8 @@
 
       .planning-reminder {
         align-items: center;
-        background: #eef8ff;
-        border: 2px solid #78bdea;
+        background: #fbf0f3;
+        border: 2px solid #dda4b6;
         border-left: 7px solid var(--blue);
         border-radius: 8px;
         display: flex;
@@ -1038,8 +1038,8 @@
       }
 
       .schedule-track {
-        background-color: #fbfdff;
-        background-image: linear-gradient(to right, transparent calc(100% - 1px), #e3e9f2 calc(100% - 1px));
+        background-color: #fdfafb;
+        background-image: linear-gradient(to right, transparent calc(100% - 1px), #eadde1 calc(100% - 1px));
         background-size: calc(100% / var(--schedule-slots, 19)) 100%;
         border: 1px solid var(--line);
         border-radius: 8px;
@@ -1073,7 +1073,7 @@
       .schedule-task {
         align-content: center;
         background: var(--soft);
-        border: 1px solid #9ab7f8;
+        border: 1px solid #dca0b4;
         border-left: 4px solid var(--blue);
         border-radius: 6px;
         color: var(--ink);
@@ -1249,7 +1249,7 @@
       }
 
       .task-filter-grid {
-        background: #f8fbff;
+        background: #fbf7f8;
         border: 1px solid var(--line);
         border-radius: 8px;
         padding: 12px;
@@ -1603,8 +1603,8 @@
 
       .confirmation-check {
         align-items: flex-start;
-        background: #eef7ff;
-        border: 1px solid #b8d8f5;
+        background: #fbf0f3;
+        border: 1px solid #e1b3c2;
         border-radius: 8px;
         display: flex;
         gap: 9px;
@@ -1620,10 +1620,10 @@
 
       .reminder-summary {
         align-items: center;
-        background: #eef6ff;
-        border: 1px solid #bfd7ff;
+        background: #f8e9ee;
+        border: 1px solid #e0afbf;
         border-radius: 6px;
-        color: #174ea6;
+        color: #7d0027;
         display: inline-flex;
         font-size: 12px;
         font-weight: 800;
@@ -1646,7 +1646,7 @@
       }
 
       .day-column {
-        background: #f8fbff;
+        background: #fbf7f8;
         border: 1px solid var(--line);
         border-radius: 8px;
         min-height: 260px;
@@ -1655,7 +1655,7 @@
 
       .day-column.today {
         border-color: var(--blue);
-        box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.18);
+        box-shadow: inset 0 0 0 1px rgba(165, 0, 52, 0.18);
       }
 
       .day-head {
