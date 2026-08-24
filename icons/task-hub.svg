@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Task Hub</title>
+  <desc id="desc">Icono de tareas conectadas con una marca de verificacion.</desc>
+  <rect width="512" height="512" rx="112" fill="#A50034"/>
+  <path d="M155 132h202c22 0 40 18 40 40v169c0 22-18 40-40 40H155c-22 0-40-18-40-40V172c0-22 18-40 40-40Z" fill="#fff"/>
+  <rect x="163" y="183" width="34" height="34" rx="9" fill="#F3D57A"/>
+  <rect x="163" y="249" width="34" height="34" rx="9" fill="#A50034"/>
+  <rect x="163" y="315" width="34" height="34" rx="9" fill="#177875"/>
+  <path d="M222 200h121M222 266h95M222 332h121" fill="none" stroke="#28151D" stroke-linecap="round" stroke-width="20"/>
+  <path d="m286 137 25 25 54-58" fill="none" stroke="#F3D57A" stroke-linecap="round" stroke-linejoin="round" stroke-width="24"/>
+</svg>

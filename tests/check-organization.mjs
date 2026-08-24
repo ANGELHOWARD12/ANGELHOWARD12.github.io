@@ -53,9 +53,11 @@ for (const marker of [
   'function isSelfManagedMasterTask(task)',
   'function hasCoordinatorPersonalWeek()',
   'function updateMasterTask(taskId)',
-  'const APP_VERSION = "30-training-team-ui1"',
-  '<title>Training Team</title>',
-  '<span class="brand-mark" aria-label="Training Team">TT</span>',
+  'const APP_VERSION = "31-task-hub-ui1"',
+  '<title>Task Hub</title>',
+  '<span class="brand-mark" aria-label="Task Hub">TH</span>',
+  'id="quickAddTask"',
+  'class="panel stack task-composer hidden"',
   'flex: 1 1 calc(50% - 5px);',
   'const EVIDENCE_OUTBOX_DB = "lgtask-evidence-outbox-v1"',
   'function syncOfflineOutboxes()'
@@ -65,7 +67,7 @@ for (const marker of [
 
 if (cloud !== api) throw new Error("Las rutas /cloud y /api no son identicas");
 if (html !== operative) throw new Error("index.html y operativo.html no son identicos");
-if (!sw.includes('training-team-shell-v30-training-team-ui1')) throw new Error("El cache del Service Worker no fue actualizado");
+if (!sw.includes('task-hub-shell-v31-task-hub-ui1')) throw new Error("El cache del Service Worker no fue actualizado");
 
 console.log("OrganizationProfiles=7");
 console.log("TeamIsolation=OK");

@@ -3,35 +3,35 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#0f766e" />
+    <meta name="theme-color" content="#a50034" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" href="/icons/training-team-192.png" />
-    <link rel="apple-touch-icon" href="/icons/training-team-192.png" />
-    <title>Training Team</title>
+    <link rel="icon" href="/icons/task-hub-192.png" />
+    <link rel="apple-touch-icon" href="/icons/task-hub-192.png" />
+    <title>Task Hub</title>
     <style>
       :root {
-        --bg: #f4f7f6;
+        --bg: #f7f4f5;
         --card: #ffffff;
-        --ink: #17312e;
-        --muted: #64736f;
-        --line: #d9e4e1;
-        --blue: #0f766e;
-        --blue-dark: #0b5f59;
+        --ink: #28151d;
+        --muted: #715f66;
+        --line: #e4d8dc;
+        --blue: #a50034;
+        --blue-dark: #7d0027;
         --green: #16835f;
         --green-soft: #e0f5eb;
         --red: #c43d4b;
         --red-soft: #ffe7ea;
         --yellow: #9a6500;
         --yellow-soft: #fff3d6;
-        --cyan: #356b8c;
-        --cyan-soft: #e9f3f7;
-        --accent: #e76f51;
-        --accent-soft: #fff0eb;
-        --soft: #e9f4f1;
-        --shadow: 0 10px 26px rgba(23, 49, 46, 0.08);
+        --cyan: #177875;
+        --cyan-soft: #e6f3f1;
+        --accent: #177875;
+        --accent-soft: #e6f3f1;
+        --soft: #f8e9ee;
+        --shadow: 0 10px 26px rgba(75, 20, 38, 0.09);
       }
 
       * {
@@ -105,9 +105,9 @@
 
       .brand-mark {
         align-items: center;
-        background: var(--blue);
+        background: #a50034;
         border-radius: 11px;
-        box-shadow: 0 8px 18px rgba(15, 118, 110, 0.22);
+        box-shadow: 0 8px 18px rgba(165, 0, 52, 0.22);
         color: #fff;
         display: inline-flex;
         font-weight: 900;
@@ -120,7 +120,7 @@
       }
 
       .brand-mark::after {
-        background: var(--accent);
+        background: #d7a928;
         bottom: 0;
         content: "";
         height: 7px;
@@ -367,7 +367,7 @@
       select:focus,
       textarea:focus,
       button:focus-visible {
-        outline: 3px solid rgba(15, 118, 110, 0.2);
+        outline: 3px solid rgba(165, 0, 52, 0.18);
         outline-offset: 2px;
       }
 
@@ -389,7 +389,7 @@
 
       .primary:hover {
         background: var(--blue-dark);
-        box-shadow: 0 8px 16px rgba(15, 118, 110, 0.2);
+        box-shadow: 0 8px 16px rgba(165, 0, 52, 0.2);
       }
 
       .ghost,
@@ -535,6 +535,44 @@
         margin: 0 auto;
         max-width: 1440px;
         padding: 22px clamp(12px, 4vw, 38px) 42px;
+      }
+
+      .quick-task-bar {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 10px;
+      }
+
+      .quick-add-task {
+        min-width: 170px;
+      }
+
+      .task-workspace.composer-closed {
+        grid-template-columns: 1fr;
+      }
+
+      .task-composer {
+        border-top: 4px solid var(--blue);
+      }
+
+      .task-composer-head {
+        align-items: flex-start;
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+      }
+
+      .task-composer .form-grid {
+        grid-template-columns: repeat(4, minmax(130px, 1fr));
+      }
+
+      .task-composer textarea {
+        min-height: 76px;
+      }
+
+      .task-composer .availability-note {
+        font-size: 12px;
+        padding: 7px 9px;
       }
 
       .motivation-strip {
@@ -2107,6 +2145,38 @@
           padding: 10px 8px 20px;
         }
 
+        .quick-task-bar {
+          margin-bottom: 8px;
+          position: sticky;
+          top: 6px;
+          z-index: 9;
+        }
+
+        .quick-add-task {
+          min-height: 40px;
+          min-width: 0;
+          width: 100%;
+        }
+
+        .task-composer .form-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .task-composer .form-grid .wide {
+          grid-column: 1 / -1;
+        }
+
+        .task-composer input,
+        .task-composer select,
+        .task-composer textarea {
+          min-height: 42px;
+          padding: 8px 9px;
+        }
+
+        .task-composer textarea {
+          min-height: 66px;
+        }
+
         .topbar {
           gap: 7px;
           padding: 8px 10px;
@@ -2410,10 +2480,10 @@
     <section id="loginScreen" class="login-screen">
       <div class="login-card">
         <div class="brand login-brand">
-          <span class="brand-mark" aria-label="Training Team">TT</span>
+          <span class="brand-mark" aria-label="Task Hub">TH</span>
           <div>
-            <h1>Training Team</h1>
-            <p class="muted">Agenda, seguimiento y evidencias del equipo</p>
+            <h1>Task Hub</h1>
+            <p class="muted">Agenda, seguimiento y evidencias</p>
           </div>
         </div>
 
@@ -2486,10 +2556,10 @@
 
     <header id="appHeader" class="topbar hidden">
       <div class="brand">
-        <span class="brand-mark" aria-label="Training Team">TT</span>
+        <span class="brand-mark" aria-label="Task Hub">TH</span>
         <div>
-          <h1>Training Team</h1>
-          <p class="muted">Agenda y seguimiento del equipo</p>
+          <h1>Task Hub</h1>
+          <p class="muted">Agenda y seguimiento</p>
         </div>
       </div>
       <div class="session">
@@ -2505,6 +2575,9 @@
     </header>
 
     <main id="appShell" class="shell hidden">
+      <section class="quick-task-bar">
+        <button id="quickAddTask" class="primary quick-add-task" type="button" aria-expanded="false" aria-controls="coordinatorTaskPanel">+ Agregar tarea</button>
+      </section>
       <section id="motivationStrip" class="motivation-strip">
         <div class="motivation-copy">
           <span class="motivation-kicker">Impulso del dia</span>
@@ -2686,23 +2759,26 @@
           </div>
         </section>
 
-        <div class="two-col">
-          <section id="coordinatorTaskPanel" class="panel stack">
-            <div>
+        <div id="taskWorkspace" class="two-col task-workspace composer-closed">
+          <section id="coordinatorTaskPanel" class="panel stack task-composer hidden">
+            <div class="task-composer-head">
+              <div>
               <h2 id="taskFormTitle">Asignar tarea</h2>
-              <p id="taskFormHelp" class="muted">El coordinador asigna actividades a su equipo. Cada integrante organiza sus propias tareas.</p>
+              <p id="taskFormHelp" class="muted">Elige persona, fecha y horario.</p>
+              </div>
+              <button id="closeTaskComposer" class="small" type="button">Cerrar</button>
             </div>
             <form id="taskForm" class="form-grid">
               <label>
-                Titulo de tarea
+                Tarea
                 <input id="taskTitle" type="text" placeholder="Ej. Validar exhibicion OLED" required />
               </label>
               <label>
-                Responsable
+                Persona
                 <select id="taskOwner" required></select>
               </label>
               <label>
-                Categoria
+                Tipo
                 <select id="taskCategory">
                   <option>PDP</option>
                   <option>Entrenamiento</option>
@@ -2720,15 +2796,15 @@
                 </select>
               </label>
               <label>
-                Fecha de tarea
+                Fecha
                 <input id="taskDueDate" type="date" required />
               </label>
               <label>
-                Hora de inicio disponible (24 h)
+                Inicio (24 h)
                 <select id="taskStartTime" required></select>
               </label>
               <label>
-                Hora de finalizacion disponible (24 h)
+                Fin (24 h)
                 <select id="taskEndTime" required></select>
               </label>
               <label>
@@ -2741,12 +2817,12 @@
                 </select>
               </label>
               <label class="wide">
-                Instrucciones
-                <textarea id="taskDescription" placeholder="Detalle de lo que debe revisar o ejecutar el trainer"></textarea>
+                Detalle (opcional)
+                <textarea id="taskDescription" placeholder="Indicaciones breves"></textarea>
               </label>
               <p id="taskDurationSummary" class="availability-note wide"></p>
               <p id="taskAvailabilityHint" class="availability-note wide"></p>
-              <button id="taskSubmitButton" class="primary wide" type="submit">Asignar tarea</button>
+              <button id="taskSubmitButton" class="primary wide" type="submit">Guardar tarea</button>
             </form>
             <p id="taskMessage" class="message" aria-live="polite"></p>
           </section>
@@ -2908,9 +2984,9 @@
             </summary>
             <div class="collapsible-panel-body stack">
             <div id="cloudPlanPanel" class="note">
-              <strong>Nube Training Team</strong>
+              <strong>Nube Task Hub</strong>
               <p class="muted">Las fotos y archivos nuevos quedan protegidos en Cloudflare R2 y el coordinador del area puede revisarlos.</p>
-              <div class="cloud-path">Training Team / Sustentos / persona / fecha / tarea</div>
+              <div class="cloud-path">Task Hub / Sustentos / persona / fecha / tarea</div>
               <p class="muted">Cada archivo se registra por nombre de trainer, fecha y tarea.</p>
               <button id="openCloudHistory" class="small" type="button">Actualizar historial</button>
             </div>
@@ -3138,7 +3214,7 @@
       <div class="assistant-shell">
         <header class="assistant-header">
           <div>
-            <h2>Guia Training Team</h2>
+            <h2>Guia Task Hub</h2>
             <p class="muted">Respuestas rapidas sobre la plataforma.</p>
           </div>
           <button id="closeAssistant" class="small" type="button" aria-label="Cerrar asistente">Cerrar</button>
@@ -3404,7 +3480,7 @@
       const ORGANIZATION_SCOPE_KEY = "lgtask-organization-scope-v1";
       const API_BASE = "/cloud";
       const API_FALLBACK_BASE = "/api";
-      const PUBLIC_APP_ORIGIN = "https://lgtask.pages.dev";
+      const PUBLIC_APP_ORIGIN = window.location.origin;
       const WORKDAY_START = "08:30";
       const WEEKDAY_END = "19:00";
       const SATURDAY_END = "14:00";
@@ -3412,7 +3488,7 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = "30-training-team-ui1";
+      const APP_VERSION = "31-task-hub-ui1";
       const TEAM_TRAINING = "Training";
       const TEAM_AUDIOVISUAL = "Audiovisuales";
       const MAX_EVIDENCE_FILES = 8;
@@ -3611,6 +3687,7 @@
       let selectedEvidenceTaskId = sessionStorage.getItem(EVIDENCE_SELECTION_TASK_KEY) || "";
       let selectedEvidenceDate = sessionStorage.getItem(EVIDENCE_SELECTION_DATE_KEY) || "";
       let taskCreateInFlight = false;
+      let taskComposerOpen = false;
       let notificationCheckInFlight = null;
       let toastTimer = 0;
       let activePreviewObjectUrl = "";
@@ -3725,7 +3802,10 @@
         nextWeek: document.querySelector("#nextWeek"),
         weekLabel: document.querySelector("#weekLabel"),
         weeklySummary: document.querySelector("#weeklySummary"),
+        quickAddTask: document.querySelector("#quickAddTask"),
+        taskWorkspace: document.querySelector("#taskWorkspace"),
         coordinatorTaskPanel: document.querySelector("#coordinatorTaskPanel"),
+        closeTaskComposer: document.querySelector("#closeTaskComposer"),
         taskFormTitle: document.querySelector("#taskFormTitle"),
         taskFormHelp: document.querySelector("#taskFormHelp"),
         taskForm: document.querySelector("#taskForm"),
@@ -4420,7 +4500,7 @@
           const data = await response.json().catch(() => ({}));
           if (!response.ok) {
             const temporaryMessage = [502, 503, 504].includes(response.status)
-              ? "La nube esta tardando. Training Team seguira reintentando."
+              ? "La nube esta tardando. Task Hub seguira reintentando."
               : `No se pudo conectar con la nube (HTTP ${response.status}).`;
             const error = new Error(data.message || temporaryMessage);
             error.status = response.status;
@@ -4439,7 +4519,7 @@
                 : "offline";
           setCloudStatus(status, quietTransient && transient ? "Reconectando automaticamente con la nube" : error.message);
           if (error.name === "AbortError") {
-            const timeoutError = new Error("La nube demoro demasiado. Training Team volvera a intentarlo automaticamente.");
+            const timeoutError = new Error("La nube demoro demasiado. Task Hub volvera a intentarlo automaticamente.");
             timeoutError.status = 0;
             throw timeoutError;
           }
@@ -4496,7 +4576,7 @@
             );
             lastError = error;
             if (error.name === "AbortError") {
-              lastError = new Error("La carga demoro demasiado. Training Team volvera a intentarlo automaticamente.");
+              lastError = new Error("La carga demoro demasiado. Task Hub volvera a intentarlo automaticamente.");
               lastError.status = 0;
             }
             if (attempt >= attempts || (lastError.status && lastError.status < 500)) throw lastError;
@@ -4583,8 +4663,8 @@
       function notificationDisplayOptions(notification = {}) {
         return {
           body: notification.body || "Tienes una actualizacion pendiente.",
-          icon: "/icons/training-team-192.png",
-          badge: "/icons/training-team-96.png",
+          icon: "/icons/task-hub-192.png",
+          badge: "/icons/task-hub-96.png",
           tag: notification.id || `lgtask-${Date.now()}`,
           renotify: true,
           requireInteraction: true,
@@ -4631,7 +4711,7 @@
         await updateNotificationButton();
         await playNotificationTone();
         await registration.showNotification(
-          "Training Team conectado",
+          "Task Hub conectado",
           notificationDisplayOptions({
             id: "lgtask-ready",
             body: "Recibiras avisos visibles de tareas asignadas y recordatorios.",
@@ -4682,7 +4762,7 @@
             showToast(`${notifications.length} ${notifications.length === 1 ? "notificacion nueva" : "notificaciones nuevas"}.`, "success");
           }
           for (const notification of notifications) {
-            await registration.showNotification(notification.title || "Training Team", notificationDisplayOptions(notification));
+            await registration.showNotification(notification.title || "Task Hub", notificationDisplayOptions(notification));
           }
         })()
           .catch((error) => console.error("No se pudieron consultar los avisos", error))
@@ -5382,7 +5462,7 @@
         if (entry.type === "Sustento") return `${userName(entry.byId)} envio un sustento para revision.`;
         if (entry.type === "AutoaprobacionMaster") return `${userName(entry.byId)} registro su tarea Master y quedo aprobada automaticamente.`;
         if (entry.type === "SustentoMaster") return `${userName(entry.byId)} agrego un sustento, aprobado automaticamente por su perfil Master.`;
-        if (entry.type === "SustentoOffline") return `${userName(entry.byId)} guardo el sustento durante una interrupcion y Training Team lo sincronizo al volver la nube.`;
+        if (entry.type === "SustentoOffline") return `${userName(entry.byId)} guardo el sustento durante una interrupcion y Task Hub lo sincronizo al volver la nube.`;
         if (entry.type === "EdicionMaster") return `${userName(entry.byId)} actualizo la informacion de su tarea Master. Motivo: ${entry.reason || "Sin detalle"}`;
         if (entry.type === "AutorizacionSustentoTardio") {
           return `${userName(entry.byId)} habilito una carga tardia. Motivo: ${entry.reason || "Sin detalle"}`;
@@ -5714,7 +5794,7 @@
 
       function cloudFolderForEvidence(evidence, task) {
         const date = dateIsoInLima(evidence.submittedAt || Date.now());
-        return `Training Team / Sustentos / ${folderSafe(userName(evidence.submittedById || task.ownerId))} / ${date} / ${folderSafe(task.title)}`;
+        return `Task Hub / Sustentos / ${folderSafe(userName(evidence.submittedById || task.ownerId))} / ${date} / ${folderSafe(task.title)}`;
       }
 
       function evidenceFilesForEntry(evidence) {
@@ -5789,7 +5869,7 @@
         const requestId = ++previewRequestId;
         clearPreviewObjectUrl();
         els.filePreviewTitle.textContent = file.name || "Archivo de sustento";
-        els.filePreviewMeta.textContent = `${file.mimeType || "Archivo"} | Original protegido en la nube Training Team`;
+        els.filePreviewMeta.textContent = `${file.mimeType || "Archivo"} | Original protegido en la nube Task Hub`;
         els.filePreviewStatus.textContent = "Cargando archivo original...";
         els.filePreviewStatus.classList.remove("hidden");
         els.filePreviewImage.classList.add("hidden");
@@ -5913,7 +5993,7 @@
               activityDate,
               folder: evidence
                 ? cloudFolderForEvidence(evidence, task)
-                : `Training Team / Sustentos / ${folderSafe(userName(trainerId))} / ${activityDate} / ${folderSafe(task.title)}`,
+                : `Task Hub / Sustentos / ${folderSafe(userName(trainerId))} / ${activityDate} / ${folderSafe(task.title)}`,
               taskDate: task.dueDate,
               schedule: taskTimeLabel(task),
               task: task.title,
@@ -6130,10 +6210,10 @@
             ? {
                 text: row.fileType.startsWith("image/") ? "Ver imagen original" : "Abrir archivo original",
                 hyperlink: row.fileUrl,
-                tooltip: `Abrir ${row.fileName || "archivo"} exacto en Training Team`
+                tooltip: `Abrir ${row.fileName || "archivo"} exacto en Task Hub`
               }
             : "Sin archivo",
-          { text: "Ver en historial", hyperlink: row.historyUrl, tooltip: "Abrir este sustento exacto en Training Team" }
+          { text: "Ver en historial", hyperlink: row.historyUrl, tooltip: "Abrir este sustento exacto en Task Hub" }
         ];
       }
 
@@ -6246,8 +6326,8 @@
           from: { row: 3, column: 1 },
           to: { row: 3, column: lastColumn }
         };
-        worksheet.headerFooter.oddHeader = "&L&BTRAINING TEAM&CReporte de tareas y sustentos&R&P de &N";
-        worksheet.headerFooter.oddFooter = "&LEquipo de entrenamiento&CGenerado por Training Team&R&D &T";
+        worksheet.headerFooter.oddHeader = "&L&BTASK HUB&CReporte de tareas y sustentos&R&P de &N";
+        worksheet.headerFooter.oddFooter = "&LEquipo de entrenamiento&CGenerado por Task Hub&R&D &T";
         return worksheet;
       }
 
@@ -6267,7 +6347,7 @@
           { width: 12 },
           { width: 110 }
         ];
-        worksheet.addRow(["ARCHIVOS ORIGINALES TRAINING TEAM - No modificar esta hoja."]);
+        worksheet.addRow(["ARCHIVOS ORIGINALES TASK HUB - No modificar esta hoja."]);
         worksheet.mergeCells("A1:G1");
         const header = worksheet.addRow(["ID interno", "Nombre", "Tipo", "Bytes", "Parte", "Total", "Contenido Base64"]);
         header.eachCell((cell) => {
@@ -6293,10 +6373,10 @@
 
       function buildEvidenceWorkbook(rows, attachments) {
         const workbook = new ExcelJS.Workbook();
-        workbook.creator = "Training Team";
-        workbook.lastModifiedBy = "Training Team";
-        workbook.company = `Training Team - ${organizationScopeLabel()}`;
-        workbook.title = "Training Team - Tareas cumplidas y sustentos";
+        workbook.creator = "Task Hub";
+        workbook.lastModifiedBy = "Task Hub";
+        workbook.company = `Task Hub - ${organizationScopeLabel()}`;
+        workbook.title = "Task Hub - Tareas cumplidas y sustentos";
         workbook.subject = `Reporte de actividades del equipo ${organizationScopeLabel()}`;
         workbook.created = new Date();
         workbook.modified = new Date();
@@ -6398,13 +6478,13 @@
         zip.file(
           "LEEME.txt",
           [
-            "PAQUETE COMPLETO TRAINING TEAM",
+            "PAQUETE COMPLETO TASK HUB",
             "",
             `Generado: ${new Date().toLocaleString("es-PE", { timeZone: "America/Lima" })}`,
             `Registros: ${rows.length}`,
             `Archivos originales: ${attachments.size}`,
             "",
-            "El archivo XLSX contiene el reporte con la identidad Training Team y las fotografias visibles.",
+            "El archivo XLSX contiene el reporte con la identidad Task Hub y las fotografias visibles.",
             "La carpeta Sustentos contiene todos los archivos originales organizados por trainer, fecha y tarea."
           ].join("\r\n")
         );
@@ -6481,9 +6561,9 @@
       }
 
       function recoveryMailLink(user, tempPassword) {
-        const subject = encodeURIComponent("Recuperacion de clave - Training Team");
+        const subject = encodeURIComponent("Recuperacion de clave - Task Hub");
         const body = encodeURIComponent(
-          `Hola ${user.name},\n\nSe genero una clave temporal para ingresar a Training Team.\n\nCorreo: ${user.email}\nClave temporal: ${tempPassword}\n\nIngresa a https://lgtask.pages.dev/ con estos datos.\n\nMensaje enviado por coordinacion.`
+          `Hola ${user.name},\n\nSe genero una clave temporal para ingresar a Task Hub.\n\nCorreo: ${user.email}\nClave temporal: ${tempPassword}\n\nIngresa a ${PUBLIC_APP_ORIGIN}/ con estos datos.\n\nMensaje enviado por coordinacion.`
         );
         return `mailto:${encodeURIComponent(user.email)}?subject=${subject}&body=${body}`;
       }
@@ -6576,7 +6656,8 @@
           month: "long"
         }).format(new Date());
 
-        els.coordinatorTaskPanel.classList.remove("hidden");
+        els.quickAddTask.classList.toggle("hidden", isObserver());
+        setTaskComposerOpen(taskComposerOpen && !isObserver());
         els.personalBreakPanel.classList.remove("hidden");
         els.overtimePanel.classList.remove("hidden");
         els.coordinatorDayPanel.classList.toggle("hidden", !canViewAll());
@@ -6595,12 +6676,12 @@
         els.taskFormTitle.textContent = canViewAll() ? "Asignar tarea" : "Agregar mi tarea";
         els.taskFormHelp.textContent = canViewAll()
           ? isObserver()
-            ? `Consulta de tareas de ${organizationScopeLabel()} sin permisos de modificacion.`
-            : `${activeUser().name} puede asignar tareas a integrantes de ${organizationScopeLabel()} o a si mismo.${isMaster() ? " Las tareas propias se aprueban automaticamente." : ""}`
+            ? "Solo lectura."
+            : "Elige persona, fecha y horario."
           : isMaster()
-            ? "Administra tus tareas propias. Se aprobaran automaticamente y podras editarlas o agregar sustentos despues."
-            : "Organiza tus propias tareas de la semana. Solo puedes asignarlas a tu usuario.";
-        els.taskSubmitButton.textContent = canViewAll() ? "Asignar tarea" : isMaster() ? "Registrar tarea Master" : "Agregar a mi semana";
+            ? "Registro propio con aprobacion automatica."
+            : "Agrega una tarea a tu semana.";
+        els.taskSubmitButton.textContent = "Guardar tarea";
         els.taskOwner.disabled = !isCoordinator();
         if ((isPrimaryCoordinator() || isObserver()) && !lastStorageStatusAt) {
           try {
@@ -7294,7 +7375,21 @@
         }
       }
 
+      function setTaskComposerOpen(open, options = {}) {
+        taskComposerOpen = Boolean(open) && !isObserver();
+        els.coordinatorTaskPanel.classList.toggle("hidden", !taskComposerOpen);
+        els.taskWorkspace.classList.toggle("composer-closed", !taskComposerOpen);
+        els.quickAddTask.setAttribute("aria-expanded", String(taskComposerOpen));
+        if (taskComposerOpen && options.scroll) {
+          requestAnimationFrame(() => {
+            els.coordinatorTaskPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+            els.taskTitle.focus();
+          });
+        }
+      }
+
       function focusTaskFormForDate(dateValue, ownerId = state.activeUserId) {
+        setTaskComposerOpen(true);
         els.taskDueDate.value = dateValue;
         const person = state.users.find((user) => user.id === (ownerId || state.activeUserId)) || activeUser();
         const personStarts = person ? availableStartTimes([person], dateValue) : [];
@@ -7304,7 +7399,6 @@
         renderTaskAvailability(suggestedStart, suggestedEnd);
         if (ownerId && Array.from(els.taskOwner.options).some((option) => option.value === ownerId)) els.taskOwner.value = ownerId;
         if (!isCoordinator()) els.taskOwner.value = state.activeUserId;
-        els.taskTitle.focus();
         setMessage(
           els.taskMessage,
           isCoordinator()
@@ -7313,6 +7407,7 @@
           "ok"
         );
         els.coordinatorTaskPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+        els.taskTitle.focus();
       }
 
       function scheduleAxisMarkup(dateValue) {
@@ -8799,7 +8894,7 @@
 
         els.loginForm.addEventListener("submit", async (event) => {
           event.preventDefault();
-          setMessage(els.loginMessage, "Conectando con Training Team...", "");
+          setMessage(els.loginMessage, "Conectando con Task Hub...", "");
           try {
             const data = await apiRequestWithRetry("/auth/login", {
               method: "POST",
@@ -9317,6 +9412,9 @@
           }
         });
 
+        els.quickAddTask.addEventListener("click", () => setTaskComposerOpen(true, { scroll: true }));
+        els.closeTaskComposer.addEventListener("click", () => setTaskComposerOpen(false));
+
         els.taskForm.addEventListener("submit", async (event) => {
           event.preventDefault();
           if (taskCreateInFlight) return;
@@ -9408,6 +9506,8 @@
                 : "Tu tarea se agrego y confirmo en la semana.",
             "ok"
           );
+          showToast(queuedForLater ? "Tarea guardada para sincronizar." : "Tarea guardada.", "success");
+          setTaskComposerOpen(false);
         });
 
         els.taskStatusFilter.addEventListener("change", renderTasks);
@@ -9796,7 +9896,7 @@
 
         window.addEventListener("offline", () => {
           setCloudStatus("offline", "Los cambios del trainer se conservaran para sincronizarlos al volver la conexion.");
-          showToast("Sin conexion. Training Team conservara los cambios pendientes.", "error");
+          showToast("Sin conexion. Task Hub conservara los cambios pendientes.", "error");
         });
         window.addEventListener("online", () => {
           setCloudStatus("syncing", "La conexion regreso. Sincronizando cambios pendientes.");
@@ -9819,7 +9919,7 @@
           const url = URL.createObjectURL(blob);
           const link = document.createElement("a");
           link.href = url;
-          link.download = `lg-task-hub-respaldo-${todayIso}.json`;
+          link.download = `task-hub-respaldo-${todayIso}.json`;
           link.click();
           URL.revokeObjectURL(url);
         });

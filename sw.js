@@ -1,4 +1,4 @@
-const CACHE_NAME = "training-team-shell-v30-training-team-ui1";
+const CACHE_NAME = "task-hub-shell-v31-task-hub-ui1";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -6,23 +6,23 @@ const APP_SHELL = [
   "/manifest.webmanifest",
   "/vendor/exceljs-4.4.0.min.js",
   "/vendor/jszip-3.10.1.min.js",
-  "/icons/training-team-96.png",
-  "/icons/training-team-192.png",
-  "/icons/training-team-512.png"
+  "/icons/task-hub-96.png",
+  "/icons/task-hub-192.png",
+  "/icons/task-hub-512.png"
 ];
 
 function notificationOptions(notification = {}) {
   return {
     body: notification.body || "Tienes una actualizacion pendiente.",
-    icon: "/icons/training-team-192.png",
-    badge: "/icons/training-team-96.png",
+    icon: "/icons/task-hub-192.png",
+    badge: "/icons/task-hub-96.png",
     tag: notification.id || `lgtask-${Date.now()}`,
     renotify: true,
     requireInteraction: true,
     vibrate: [180, 90, 180, 90, 360],
     silent: false,
     timestamp: Date.now(),
-    actions: [{ action: "open", title: "Abrir Training Team" }],
+    actions: [{ action: "open", title: "Abrir Task Hub" }],
     data: { url: notification.url || "/?view=tasksView" }
   };
 }
@@ -82,14 +82,14 @@ async function showPendingNotifications() {
     if (!response.ok) throw new Error("No active session");
     const data = await response.json();
     for (const notification of data.notifications || []) {
-      await self.registration.showNotification(notification.title || "Training Team", notificationOptions(notification));
+      await self.registration.showNotification(notification.title || "Task Hub", notificationOptions(notification));
     }
   } catch {
     await self.registration.showNotification(
-      "Nueva actividad en Training Team",
+      "Nueva actividad en Task Hub",
       notificationOptions({
         id: "lgtask-generic",
-        body: "Abre Training Team para revisar tus tareas y recordatorios.",
+        body: "Abre Task Hub para revisar tus tareas y recordatorios.",
         url: "/?view=tasksView"
       })
     );
@@ -124,7 +124,7 @@ self.addEventListener("message", (event) => {
   if (event.data?.type !== "SHOW_NOTIFICATION") return;
   event.waitUntil(
     self.registration.showNotification(
-      event.data.title || "Training Team",
+      event.data.title || "Task Hub",
       notificationOptions({
         id: event.data.tag,
         body: event.data.body,

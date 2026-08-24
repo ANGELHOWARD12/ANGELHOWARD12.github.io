@@ -299,7 +299,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "30-training-team-ui1",
+    version: "31-task-hub-ui1",
     schema: SCHEMA_VERSION,
     r2: r2StorageEnabled(env),
     migration: {
@@ -593,7 +593,7 @@ async function migrateStructuredTasks(db) {
 function scheduleMaintenance(db, env, context) {
   context.waitUntil(
     runMaintenance(db, env).catch((error) => {
-      console.error("LGTASK maintenance", error);
+      console.error("Task Hub maintenance", error);
     })
   );
 }
@@ -1156,7 +1156,7 @@ async function ensureWeeklyBackup(db, env, { force = false } = {}) {
   ]);
   const objectKey = `backups/${weekId.slice(0, 4)}/${weekId}/lgtask-${dateValue}-${generatedAt}.json`;
   const backup = {
-    product: "LGTASK",
+    product: "Task Hub",
     schemaVersion: SCHEMA_VERSION,
     weekId,
     generatedAt,
@@ -1844,7 +1844,7 @@ async function r2EvidenceDescriptor(db, task, file) {
   const dueDate = oneDriveSafeName(task.dueDate, dateIsoInLima(Date.now()), 20);
   const taskName = oneDriveSafeName(task.title, "Tarea");
   const storedName = oneDriveSafeName(`${clean(file.id).slice(0, 8)} - ${file.fileName}`, "sustento", 120);
-  const parentPath = `LGTASK Sustentos / ${trainerName} / ${dueDate} / ${taskName}`;
+  const parentPath = `Task Hub / Sustentos / ${trainerName} / ${dueDate} / ${taskName}`;
   const objectKey = `sustentos/${trainerName}/${dueDate}/${taskName}/${storedName}`;
   return { objectKey, parentPath };
 }
@@ -2359,7 +2359,7 @@ async function uploadEvidenceToOneDrive(env, db, task, file, fileBase64) {
   });
   if (!response.ok) throw await graphResponseError(response, "OneDrive file upload");
   const item = await response.json();
-  const parentPath = `LGTASK Sustentos / ${trainerName} / ${dueDate} / ${taskName}`;
+  const parentPath = `Task Hub / Sustentos / ${trainerName} / ${dueDate} / ${taskName}`;
   await db
     .prepare(
       `INSERT OR REPLACE INTO evidence_storage
@@ -3927,7 +3927,7 @@ async function queueNotifications(db, notifications) {
       .bind(
         crypto.randomUUID(),
         clean(item.userId),
-        clean(item.title).slice(0, 100) || "LGTASK",
+        clean(item.title).slice(0, 100) || "Task Hub",
         clean(item.body).slice(0, 280),
         clean(item.url).slice(0, 500) || "/",
         clean(item.sourceKey).slice(0, 500),
@@ -4006,7 +4006,7 @@ async function pushNotificationsForUsers(db, userIds) {
           await db.prepare("DELETE FROM notification_subscriptions WHERE id = ?").bind(subscription.id).run();
         }
       } catch (error) {
-        console.error("LGTASK push", error);
+        console.error("Task Hub push", error);
       }
     }
   }
