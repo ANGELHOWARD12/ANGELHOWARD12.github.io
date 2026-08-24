@@ -20,8 +20,8 @@
         --line: #e4d8dc;
         --blue: #a50034;
         --blue-dark: #7d0027;
-        --green: #16835f;
-        --green-soft: #e0f5eb;
+        --green: #a50034;
+        --green-soft: #f8e9ee;
         --red: #c43d4b;
         --red-soft: #ffe7ea;
         --yellow: #9a6500;
@@ -414,7 +414,7 @@
       .small:hover,
       .ghost:hover {
         background: var(--soft);
-        border-color: #86bdb7;
+        border-color: #d69aae;
       }
 
       .danger {
@@ -458,7 +458,7 @@
       }
 
       .notification-button.is-active {
-        background: var(--green-soft);
+        background: #e0f5eb;
         border-color: #83d3b3;
         color: #07583e;
       }
@@ -493,9 +493,9 @@
       }
 
       .cloud-status[data-state="online"] {
-        background: var(--green-soft);
+        background: #e0f5eb;
         border-color: #83d3b3;
-        color: #087653;
+        color: #07583e;
       }
 
       .cloud-status[data-state="syncing"] {
@@ -754,8 +754,8 @@
       }
 
       .organization-scope-tab[data-organization-scope="audiovisual"] .scope-tab-icon {
-        background: #e5f7f1;
-        color: #087258;
+        background: #f8e9ee;
+        color: #7d0027;
       }
 
       .scope-tab-copy {
@@ -825,8 +825,8 @@
       }
 
       .toast.success {
-        background: #07583e;
-        border-color: #0f8a5f;
+        background: #a50034;
+        border-color: #ca5579;
       }
 
       .toast.error {
@@ -1088,7 +1088,7 @@
 
       .schedule-task.approved {
         background: var(--green-soft);
-        border-color: #78c5a7;
+        border-color: #d69aae;
         border-left-color: var(--green);
       }
 
@@ -1427,7 +1427,7 @@
 
       .deadline-alert.is-authorized {
         background: var(--green-soft);
-        border-color: #9fd8ba;
+        border-color: #dca8b9;
         color: var(--green);
       }
 
@@ -1635,7 +1635,7 @@
       .evidence-cloud-badge {
         align-items: center;
         background: var(--green-soft);
-        border: 1px solid #9dd8c2;
+        border: 1px solid #dca8b9;
         border-radius: 8px;
         color: var(--green);
         display: flex;
@@ -3488,7 +3488,7 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = "31-task-hub-ui1";
+      const APP_VERSION = "32-task-hub-lg1";
       const TEAM_TRAINING = "Training";
       const TEAM_AUDIOVISUAL = "Audiovisuales";
       const MAX_EVIDENCE_FILES = 8;
@@ -6218,7 +6218,7 @@
       }
 
       function statusCellStyle(status) {
-        if (status === "Cumplida" || status === "Aprobado") return { fill: "FFE7F6EC", font: "FF166534" };
+        if (status === "Cumplida" || status === "Aprobado") return { fill: "FFF8E9EE", font: "FFA50034" };
         if (status === "En revision" || status === "Pendiente") return { fill: "FFFFF4CC", font: "FF7A4B00" };
         if (status === "Observada" || status === "Rechazada" || status === "No disponible") return { fill: "FFFFE3E8", font: "FFA50034" };
         return { fill: "FFEAF2FF", font: "FF174EA6" };
@@ -6302,7 +6302,7 @@
             name: "Aptos",
             size: 10,
             bold: true,
-            color: { argb: reportRow.review === "Aprobado" ? "FF166534" : "FFA50034" }
+            color: { argb: "FFA50034" }
           };
           [20, 21].forEach((columnNumber) => {
             const cell = dataRow.getCell(columnNumber);

@@ -53,7 +53,7 @@ for (const marker of [
   'function isSelfManagedMasterTask(task)',
   'function hasCoordinatorPersonalWeek()',
   'function updateMasterTask(taskId)',
-  'const APP_VERSION = "31-task-hub-ui1"',
+  'const APP_VERSION = "32-task-hub-lg1"',
   '<title>Task Hub</title>',
   '<span class="brand-mark" aria-label="Task Hub">TH</span>',
   'id="quickAddTask"',
@@ -67,7 +67,7 @@ for (const marker of [
 
 if (cloud !== api) throw new Error("Las rutas /cloud y /api no son identicas");
 if (html !== operative) throw new Error("index.html y operativo.html no son identicos");
-if (!sw.includes('task-hub-shell-v31-task-hub-ui1')) throw new Error("El cache del Service Worker no fue actualizado");
+if (!sw.includes('task-hub-shell-v32-task-hub-lg1')) throw new Error("El cache del Service Worker no fue actualizado");
 
 console.log("OrganizationProfiles=7");
 console.log("TeamIsolation=OK");

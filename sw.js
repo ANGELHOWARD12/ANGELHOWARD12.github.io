@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-hub-shell-v31-task-hub-ui1";
+const CACHE_NAME = "task-hub-shell-v32-task-hub-lg1";
 const APP_SHELL = [
   "/",
   "/index.html",
