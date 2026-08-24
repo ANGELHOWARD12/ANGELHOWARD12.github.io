@@ -39,6 +39,14 @@
         --accent: #a50034;
         --accent-soft: #f8e9ee;
         --soft: #f8e9ee;
+        --task-assigned: #2563eb;
+        --task-assigned-soft: #eaf2ff;
+        --task-review: #9a6500;
+        --task-review-soft: #fff3d6;
+        --task-approved: #1f7a52;
+        --task-approved-soft: #e8f7ef;
+        --task-rejected: #c6283d;
+        --task-rejected-soft: #fdebed;
         --shadow: 0 10px 26px rgba(75, 20, 38, 0.09);
       }
 
@@ -1103,9 +1111,9 @@
 
       .schedule-task {
         align-content: center;
-        background: var(--soft);
-        border: 1px solid #dca0b4;
-        border-left: 4px solid var(--blue);
+        background: var(--task-assigned-soft);
+        border: 1px solid #a9c5fb;
+        border-left: 4px solid var(--task-assigned);
         border-radius: 6px;
         color: var(--ink);
         display: grid;
@@ -1118,21 +1126,21 @@
       }
 
       .schedule-task.approved {
-        background: var(--green-soft);
-        border-color: #d69aae;
-        border-left-color: var(--green);
+        background: var(--task-approved-soft);
+        border-color: #9ed8bb;
+        border-left-color: var(--task-approved);
       }
 
       .schedule-task.review {
-        background: var(--yellow-soft);
+        background: var(--task-review-soft);
         border-color: #e5c875;
-        border-left-color: var(--yellow);
+        border-left-color: var(--task-review);
       }
 
       .schedule-task.observed {
-        background: var(--red-soft);
+        background: var(--task-rejected-soft);
         border-color: #eea2aa;
-        border-left-color: var(--red);
+        border-left-color: var(--task-rejected);
       }
 
       .schedule-task strong,
@@ -1204,9 +1212,9 @@
       }
 
       .trainer-task-card {
-        background: #fff;
-        border: 1px solid var(--line);
-        border-left: 4px solid var(--blue);
+        background: var(--task-assigned-soft);
+        border: 1px solid #a9c5fb;
+        border-left: 4px solid var(--task-assigned);
         border-radius: 7px;
         display: grid;
         gap: 7px;
@@ -1225,14 +1233,40 @@
         max-width: 100%;
       }
 
+      .trainer-task-card.review {
+        background: var(--task-review-soft);
+        border-color: #e5c875;
+        border-left-color: var(--task-review);
+      }
+
       .trainer-task-card.approved {
-        border-left-color: var(--green);
+        background: var(--task-approved-soft);
+        border-color: #9ed8bb;
+        border-left-color: var(--task-approved);
+      }
+
+      .trainer-task-card.observed {
+        background: var(--task-rejected-soft);
+        border-color: #eea2aa;
+        border-left-color: var(--task-rejected);
       }
 
       .trainer-task-time {
-        color: var(--blue);
+        color: var(--task-assigned);
         font-size: 11px;
         font-weight: 900;
+      }
+
+      .trainer-task-card.review .trainer-task-time {
+        color: var(--task-review);
+      }
+
+      .trainer-task-card.approved .trainer-task-time {
+        color: var(--task-approved);
+      }
+
+      .trainer-task-card.observed .trainer-task-time {
+        color: var(--task-rejected);
       }
 
       .workday-note {
@@ -1247,7 +1281,7 @@
 
       .approval-check {
         align-items: center;
-        background: var(--green);
+        background: var(--task-approved);
         border-radius: 50%;
         color: #fff;
         display: inline-flex;
@@ -1259,17 +1293,33 @@
       }
 
       .review-note {
-        color: var(--yellow);
+        color: var(--task-review);
         font-size: 12px;
         font-weight: 900;
       }
 
       .task-item {
-        border-left: 5px solid var(--blue);
+        border-left: 5px solid var(--task-assigned);
       }
 
-      .task-item.is-approved {
-        border-left-color: var(--green);
+      .task-item.pending,
+      .task-item.process {
+        background: var(--task-assigned-soft);
+      }
+
+      .task-item.review {
+        background: var(--task-review-soft);
+        border-left-color: var(--task-review);
+      }
+
+      .task-item.approved {
+        background: var(--task-approved-soft);
+        border-left-color: var(--task-approved);
+      }
+
+      .task-item.observed {
+        background: var(--task-rejected-soft);
+        border-left-color: var(--task-rejected);
       }
 
       .task-history summary {
@@ -1801,23 +1851,27 @@
       }
 
       .pill.pending,
-      .pill.process,
+      .pill.process {
+        background: var(--task-assigned-soft);
+        color: var(--task-assigned);
+      }
+
       .pill.review,
       .pill.medium {
-        background: var(--yellow-soft);
-        color: var(--yellow);
+        background: var(--task-review-soft);
+        color: var(--task-review);
       }
 
       .pill.done,
       .pill.approved {
-        background: var(--green-soft);
-        color: var(--green);
+        background: var(--task-approved-soft);
+        color: var(--task-approved);
       }
 
       .pill.high,
       .pill.observed {
-        background: var(--red-soft);
-        color: var(--red);
+        background: var(--task-rejected-soft);
+        color: var(--task-rejected);
       }
 
       .empty {
@@ -3531,7 +3585,7 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = "35-task-hub-no-evidence-links1";
+      const APP_VERSION = "36-task-status-colors1";
       const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
       const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
       const APP_MODE = document.documentElement.classList.contains("app-mode");
@@ -6319,9 +6373,10 @@
       }
 
       function statusCellStyle(status) {
-        if (status === "Cumplida" || status === "Aprobado") return { fill: "FFF8E9EE", font: "FFA50034" };
-        if (status === "En revision" || status === "Pendiente") return { fill: "FFFFF4CC", font: "FF7A4B00" };
-        if (status === "Observada" || status === "Rechazada" || status === "No disponible") return { fill: "FFFFE3E8", font: "FFA50034" };
+        if (status === "Cumplida" || status === "Aprobado") return { fill: "FFE8F7EF", font: "FF1F7A52" };
+        if (status === "En revision") return { fill: "FFFFF3D6", font: "FF7A4B00" };
+        if (status === "Pendiente" || status === "En proceso") return { fill: "FFEAF2FF", font: "FF1D4ED8" };
+        if (status === "Observada" || status === "Rechazada" || status === "No disponible") return { fill: "FFFDEBED", font: "FFB42336" };
         return { fill: "FFEAF2FF", font: "FF174EA6" };
       }
 
@@ -7771,7 +7826,7 @@
           } else {
             tasks.forEach((task) => {
               const card = document.createElement("div");
-              card.className = `trainer-task-card ${task.status === "Cumplida" ? "approved" : ""}`;
+              card.className = `trainer-task-card ${taskStatusClass(task.status)}`;
               card.innerHTML = `
                 <span class="trainer-task-time">${escapeHtml(taskTimeLabel(task))}</span>
                 <div class="title-row"><strong>${escapeHtml(task.title)}</strong><span class="pill ${taskStatusClass(task.status)}">${escapeHtml(taskStatusLabel(task.status))}</span></div>
@@ -7956,7 +8011,7 @@
         const archived = task.status === "Cumplida" && task.dueDate < addDaysIso(todayIso, -30);
         const evidenceCount = (task.evidence || []).length;
         const card = document.createElement("article");
-        card.className = `item task-item ${task.status === "Cumplida" ? "is-approved" : ""} ${archived ? "is-archived" : ""}`;
+        card.className = `item task-item ${taskStatusClass(task.status)} ${archived ? "is-archived" : ""}`;
         card.dataset.taskId = task.id;
         card.innerHTML = `
           <div class="stack">
