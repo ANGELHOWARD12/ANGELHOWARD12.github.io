@@ -299,7 +299,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "34-task-hub-watchdog1",
+    version: "35-task-hub-no-evidence-links1",
     schema: SCHEMA_VERSION,
     r2: r2StorageEnabled(env),
     migration: {

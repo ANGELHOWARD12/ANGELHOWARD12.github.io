@@ -3000,10 +3000,6 @@
               </label>
               <p class="muted wide">Debes adjuntar al menos un sustento. Puedes cargar hasta 8 fotos, videos o documentos de 15 MB cada uno y los originales conservan su calidad.</p>
               <label class="wide">
-                Enlaces relacionados (opcional)
-                <textarea id="evidenceLinks" placeholder="Un enlace https:// por linea"></textarea>
-              </label>
-              <label class="wide">
                 Observaciones
                 <textarea id="evidenceNotes" placeholder="Describe que se realizo, hallazgos, incidencias o acuerdos"></textarea>
               </label>
@@ -3535,7 +3531,7 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = "34-task-hub-watchdog1";
+      const APP_VERSION = "35-task-hub-no-evidence-links1";
       const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
       const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
       const APP_MODE = document.documentElement.classList.contains("app-mode");
@@ -3904,7 +3900,6 @@
         evidenceResult: document.querySelector("#evidenceResult"),
         evidenceFiles: document.querySelector("#evidenceFiles"),
         evidenceSelectedFiles: document.querySelector("#evidenceSelectedFiles"),
-        evidenceLinks: document.querySelector("#evidenceLinks"),
         evidenceNotes: document.querySelector("#evidenceNotes"),
         evidenceDeadlineMessage: document.querySelector("#evidenceDeadlineMessage"),
         evidenceUploadProgress: document.querySelector("#evidenceUploadProgress"),
@@ -5653,24 +5648,6 @@
           return `El sustento podra cargarse el ${formatDate(task.dueDate)}, fecha programada para la tarea.`;
         }
         return "Carga disponible hoy. La fecha y hora se registraran automaticamente con la hora oficial de la plataforma.";
-      }
-
-      function parseEvidenceLinks(value) {
-        const links = String(value || "")
-          .split(/\r?\n/)
-          .map((item) => item.trim())
-          .filter(Boolean);
-        if (links.length > 10) throw new Error("Puedes registrar un maximo de 10 enlaces por sustento.");
-        for (const link of links) {
-          let parsed;
-          try {
-            parsed = new URL(link);
-          } catch {
-            throw new Error(`El enlace no es valido: ${link}`);
-          }
-          if (!["http:", "https:"].includes(parsed.protocol)) throw new Error(`El enlace debe comenzar con http:// o https://: ${link}`);
-        }
-        return links;
       }
 
       function taskAuditPreviewMarkup(task) {
@@ -7635,7 +7612,6 @@
         els.evidenceDeadlineMessage.classList.toggle("hidden", !task);
         els.evidenceDeadlineMessage.classList.toggle("is-authorized", Boolean(task && allowed));
         els.evidenceFiles.disabled = Boolean(task && !allowed);
-        els.evidenceLinks.disabled = Boolean(task && !allowed);
         els.evidenceSubmitButton.disabled = !task || !allowed;
         if (!evidenceSubmitInFlight) {
           els.evidenceSubmitButton.textContent = hasPendingConfirmation ? "Confirmar sustento guardado" : "Enviar sustento";
@@ -8857,7 +8833,6 @@
           clean(els.evidenceStore.value) ||
           clean(els.evidenceProduct.value) ||
           clean(els.evidenceTrainingTopic.value) ||
-          clean(els.evidenceLinks.value) ||
           clean(els.evidenceNotes.value)
         );
       }
@@ -9753,15 +9728,7 @@
             return;
           }
           const notes = clean(els.evidenceNotes.value);
-          let links = [];
-          try {
-            links = parseEvidenceLinks(els.evidenceLinks.value);
-          } catch (error) {
-            setMessage(els.evidenceMessage, error.message, "err");
-            setEvidenceUploadProgress("Revisa los enlaces ingresados.", 0, "err");
-            els.evidenceLinks.focus();
-            return;
-          }
+          const links = [];
           const trainingTopic = clean(els.evidenceTrainingTopic.value);
           if (clean(task.category).toLowerCase() === "entrenamiento" && !trainingTopic) {
             els.evidenceTrainingTopic.setCustomValidity("Indica el tema de la capacitacion.");
