@@ -3585,7 +3585,7 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = "36-task-status-colors1";
+      const APP_VERSION = "37-offline-continuity1";
       const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
       const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
       const APP_MODE = document.documentElement.classList.contains("app-mode");
@@ -3602,6 +3602,9 @@
       const TASK_OUTBOX_KEY = "lgtask-task-outbox-v1";
       const EVIDENCE_OUTBOX_DB = "lgtask-evidence-outbox-v1";
       const EVIDENCE_OUTBOX_STORE = "pending-evidence";
+      const OFFLINE_SESSION_DB = "taskhub-offline-session-v1";
+      const OFFLINE_SESSION_STORE = "encrypted-sessions";
+      const OFFLINE_SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
       const NOTIFICATION_TASKS_KEY = "lgtask-notified-tasks-v1";
       const ALLOWED_VIEW_IDS = ["tasksView", "evidenceView", "teamView", "announcementsView", "infoView"];
       const EVIDENCE_FILE_EXTENSIONS = new Set([
@@ -3774,6 +3777,12 @@
       let pendingAppReload = false;
       let evidenceSubmitInFlight = false;
       let evidenceOutboxDbPromise = null;
+      let offlineSessionDbPromise = null;
+      let offlineSnapshotTimer = 0;
+      let offlineUnlockContext = null;
+      let offlineReauthCredentials = null;
+      let offlineSessionMode = false;
+      let offlineReauthInFlight = null;
       let offlineOutboxSyncInFlight = null;
       let evidenceOpenInFlight = false;
       let pendingEvidenceSubmission = (() => {
@@ -4130,6 +4139,156 @@
         }
       }
 
+      function openOfflineSessionDb() {
+        if (offlineSessionDbPromise) return offlineSessionDbPromise;
+        offlineSessionDbPromise = new Promise((resolve, reject) => {
+          const request = indexedDB.open(OFFLINE_SESSION_DB, 1);
+          request.onupgradeneeded = () => {
+            if (!request.result.objectStoreNames.contains(OFFLINE_SESSION_STORE)) {
+              request.result.createObjectStore(OFFLINE_SESSION_STORE, { keyPath: "email" });
+            }
+          };
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error || new Error("No se pudo abrir el acceso protegido del dispositivo."));
+        });
+        return offlineSessionDbPromise;
+      }
+
+      async function readOfflineSession(email) {
+        const db = await openOfflineSessionDb();
+        return new Promise((resolve, reject) => {
+          const request = db
+            .transaction(OFFLINE_SESSION_STORE, "readonly")
+            .objectStore(OFFLINE_SESSION_STORE)
+            .get(clean(email).toLowerCase());
+          request.onsuccess = () => resolve(request.result || null);
+          request.onerror = () => reject(request.error || new Error("No se pudo leer el acceso protegido."));
+        });
+      }
+
+      async function writeOfflineSession(record) {
+        const db = await openOfflineSessionDb();
+        await new Promise((resolve, reject) => {
+          const transaction = db.transaction(OFFLINE_SESSION_STORE, "readwrite");
+          transaction.objectStore(OFFLINE_SESSION_STORE).put(record);
+          transaction.oncomplete = resolve;
+          transaction.onerror = () => reject(transaction.error || new Error("No se pudo proteger la sesion en este dispositivo."));
+          transaction.onabort = () => reject(transaction.error || new Error("El dispositivo rechazo el almacenamiento protegido."));
+        });
+      }
+
+      async function deriveOfflineSessionKey(password, salt) {
+        if (!window.crypto?.subtle || !window.indexedDB) throw new Error("Este dispositivo no admite el acceso seguro sin conexion.");
+        const sourceKey = await crypto.subtle.importKey(
+          "raw",
+          new TextEncoder().encode(String(password || "")),
+          "PBKDF2",
+          false,
+          ["deriveKey"]
+        );
+        return crypto.subtle.deriveKey(
+          { name: "PBKDF2", salt, iterations: 180_000, hash: "SHA-256" },
+          sourceKey,
+          { name: "AES-GCM", length: 256 },
+          false,
+          ["encrypt", "decrypt"]
+        );
+      }
+
+      async function cacheCurrentOfflineState() {
+        const context = offlineUnlockContext;
+        const user = activeUser();
+        if (!context?.key || !user || clean(user.email).toLowerCase() !== context.email) return false;
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const payload = new TextEncoder().encode(JSON.stringify(state));
+        const encryptedState = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, context.key, payload);
+        await writeOfflineSession({
+          email: context.email,
+          salt: context.salt,
+          iv,
+          encryptedState,
+          updatedAt: Date.now()
+        });
+        return true;
+      }
+
+      function scheduleOfflineSnapshot() {
+        if (!offlineUnlockContext?.key || !state.activeUserId) return;
+        window.clearTimeout(offlineSnapshotTimer);
+        offlineSnapshotTimer = window.setTimeout(() => {
+          cacheCurrentOfflineState().catch((error) => console.error("No se pudo actualizar la copia protegida", error));
+        }, 250);
+      }
+
+      async function enableOfflineContinuity(email, password) {
+        const normalizedEmail = clean(email).toLowerCase();
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const key = await deriveOfflineSessionKey(password, salt);
+        offlineUnlockContext = { email: normalizedEmail, salt, key };
+        offlineReauthCredentials = { email: normalizedEmail, password: String(password || "") };
+        offlineSessionMode = false;
+        await cacheCurrentOfflineState();
+        await navigator.storage?.persist?.().catch(() => false);
+      }
+
+      async function unlockOfflineSession(email, password) {
+        const normalizedEmail = clean(email).toLowerCase();
+        const record = await readOfflineSession(normalizedEmail);
+        if (!record || Date.now() - Number(record.updatedAt || 0) > OFFLINE_SESSION_MAX_AGE_MS) return false;
+        try {
+          const salt = new Uint8Array(record.salt);
+          const iv = new Uint8Array(record.iv);
+          const key = await deriveOfflineSessionKey(password, salt);
+          const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, record.encryptedState);
+          const snapshot = JSON.parse(new TextDecoder().decode(decrypted));
+          const user = (snapshot.users || []).find((item) => clean(item.email).toLowerCase() === normalizedEmail);
+          if (!user || user.status !== "Activo") return false;
+          state = normalizeState({
+            ...structuredClone(initialState),
+            ...snapshot,
+            activeUserId: user.id,
+            selectedProduct: state.selectedProduct,
+            selectedWeekStart: state.selectedWeekStart || snapshot.selectedWeekStart,
+            selectedCoordinatorDate: state.selectedCoordinatorDate || snapshot.selectedCoordinatorDate
+          });
+          offlineUnlockContext = { email: normalizedEmail, salt, key };
+          offlineReauthCredentials = { email: normalizedEmail, password: String(password || "") };
+          offlineSessionMode = true;
+          setCloudStatus("offline", "Modo sin conexion. Los cambios y sustentos quedaran protegidos en este dispositivo.");
+          return true;
+        } catch {
+          return false;
+        }
+      }
+
+      function isTransientCloudError(error) {
+        return !error?.status || Number(error.status) >= 500;
+      }
+
+      async function restoreCloudSessionIfNeeded() {
+        if (!offlineSessionMode) return true;
+        if (!offlineReauthCredentials?.email || !offlineReauthCredentials.password) return false;
+        if (offlineReauthInFlight) return offlineReauthInFlight;
+        offlineReauthInFlight = (async () => {
+          const credentials = offlineReauthCredentials;
+          const data = await apiRequestWithRetry("/auth/login", {
+            method: "POST",
+            body: JSON.stringify(credentials),
+            timeoutMs: 20_000,
+            allowFallback: true
+          }, 2);
+          applyCloudState(data.state);
+          await enableOfflineContinuity(credentials.email, credentials.password);
+          showToast("La nube regreso. Task Hub esta sincronizando el trabajo pendiente.", "success");
+          return true;
+        })()
+          .catch(() => false)
+          .finally(() => {
+            offlineReauthInFlight = null;
+          });
+        return offlineReauthInFlight;
+      }
+
       function normalizeWorkSettings(settings = {}) {
         const breakStart = clean(settings.breakStart) || DEFAULT_BREAK_START;
         const breakEnd = clean(settings.breakEnd) || DEFAULT_BREAK_END;
@@ -4273,6 +4432,11 @@
         stateRevision += 1;
         saveUiState();
         if (!state.activeUserId) return;
+        scheduleOfflineSnapshot();
+        if (offlineSessionMode || !navigator.onLine) {
+          persistOfflineState(JSON.parse(JSON.stringify(state)));
+          return;
+        }
         window.clearTimeout(syncTimer);
         syncTimer = window.setTimeout(() => {
           syncState().catch((error) => console.error("No se pudo sincronizar", error));
@@ -4502,7 +4666,7 @@
       }
 
       async function syncEvidenceOutbox() {
-        if (!navigator.onLine || !state.activeUserId) return 0;
+        if (!navigator.onLine || !state.activeUserId || evidenceSubmitInFlight) return 0;
         const entries = (await listEvidenceOutbox()).filter((entry) => entry.userId === state.activeUserId);
         let synced = 0;
         for (const entry of entries) {
@@ -4557,6 +4721,9 @@
       async function syncOfflineOutboxes() {
         if (offlineOutboxSyncInFlight) return offlineOutboxSyncInFlight;
         offlineOutboxSyncInFlight = (async () => {
+          if (offlineSessionMode && !(await restoreCloudSessionIfNeeded())) {
+            throw new Error("La nube sigue sin responder. El trabajo permanece protegido en este dispositivo.");
+          }
           await replayOfflineState();
           const tasks = await syncTaskOutbox();
           const evidence = await syncEvidenceOutbox();
@@ -4612,6 +4779,9 @@
             3
           );
           if (!health?.ok) throw new Error("La nube no confirmo su disponibilidad.");
+          if (offlineSessionMode && !(await restoreCloudSessionIfNeeded())) {
+            throw new Error("La nube respondio, pero la sesion aun no pudo recuperarse.");
+          }
 
           if (!protectedWorkInProgress()) {
             await syncOfflineOutboxes();
@@ -4956,6 +5126,7 @@
           selectedWeekStart: selectedWeekStart || nextState.selectedWeekStart,
           selectedCoordinatorDate: selectedCoordinatorDate || nextState.selectedCoordinatorDate
         });
+        scheduleOfflineSnapshot();
       }
 
       async function refreshStateFromServer({ quiet = false } = {}) {
@@ -4967,6 +5138,10 @@
           return true;
         } catch (error) {
           if (error.status === 401) {
+            if (offlineSessionMode) {
+              setCloudStatus("offline", "La sesion local sigue activa mientras vuelve la nube.");
+              return false;
+            }
             state.activeUserId = "";
             state.users = [];
             state.tasks = [];
@@ -9058,15 +9233,20 @@
 
         els.loginForm.addEventListener("submit", async (event) => {
           event.preventDefault();
+          const email = clean(els.loginEmail.value).toLowerCase();
+          const password = els.loginPassword.value;
           setMessage(els.loginMessage, "Conectando con Task Hub...", "");
           try {
             const data = await apiRequestWithRetry("/auth/login", {
               method: "POST",
-              body: JSON.stringify({ email: els.loginEmail.value, password: els.loginPassword.value }),
-              timeoutMs: 30_000,
+              body: JSON.stringify({ email, password }),
+              timeoutMs: 16_000,
               allowFallback: true
-            }, 7);
+            }, 2);
             applyCloudState(data.state);
+            await enableOfflineContinuity(email, password).catch((cacheError) => {
+              console.error("No se pudo activar la continuidad sin conexion", cacheError);
+            });
             els.loginPassword.value = "";
             setMessage(els.loginMessage, "", "");
             setMessage(els.overtimeMessage, "", "");
@@ -9075,6 +9255,22 @@
             refreshStorageStatus().catch(() => {});
             syncNotificationSubscription().catch(() => {});
           } catch (error) {
+            if (isTransientCloudError(error)) {
+              const unlocked = await unlockOfflineSession(email, password).catch(() => false);
+              if (unlocked) {
+                els.loginPassword.value = "";
+                setMessage(els.loginMessage, "", "");
+                render();
+                showToast("Modo sin conexion activo. Puedes trabajar y guardar sustentos con seguridad.", "success");
+                return;
+              }
+              setMessage(
+                els.loginMessage,
+                "Cloudflare no responde y este dispositivo aun no tiene un acceso protegido. Ingresa una vez cuando vuelva la nube para habilitarlo.",
+                "err"
+              );
+              return;
+            }
             setMessage(els.loginMessage, error.message, "err");
           }
         });
@@ -9105,11 +9301,18 @@
         });
 
         els.logoutButton.addEventListener("click", async () => {
+          await cacheCurrentOfflineState().catch(() => {});
           try {
-            await apiRequest("/auth/logout", { method: "POST", body: "{}" });
+            if (!offlineSessionMode && navigator.onLine) {
+              await apiRequest("/auth/logout", { method: "POST", body: "{}" });
+            }
           } catch {
             // The local session is still cleared when the network is unavailable.
           }
+          offlineSessionMode = false;
+          offlineUnlockContext = null;
+          offlineReauthCredentials = null;
+          window.clearTimeout(offlineSnapshotTimer);
           state.activeUserId = "";
           state.users = [];
           state.tasks = [];
@@ -9634,6 +9837,11 @@
           setMessage(els.taskMessage, "Guardando tarea en la nube...", "");
           let queuedForLater = false;
           try {
+            if (offlineSessionMode || !navigator.onLine || cloudStatus === "error") {
+              const offlineError = new Error("La nube no esta disponible en este momento.");
+              offlineError.status = 0;
+              throw offlineError;
+            }
             const data = await apiRequestWithRetry("/tasks/create", {
               method: "POST",
               body: JSON.stringify({ task }),
@@ -9817,13 +10025,40 @@
           }
           let uploadedFiles = pendingForTask?.evidence?.files || [];
           let evidence = pendingForTask?.evidence || null;
+          let locallyProtectedEvidence = null;
           if (!pendingForTask) {
             setMessage(els.evidenceMessage, "Validando archivos...", "");
             setEvidenceUploadProgress("Validando archivos...", 5);
             uploadedFiles = [];
+            const preparedFiles = [];
             try {
+              for (const file of selectedFiles) preparedFiles.push(await prepareEvidenceFile(file));
+              locallyProtectedEvidence = await queueEvidenceForLater(task, selectedFiles, {
+                store:
+                  clean(els.evidenceStore.value) ||
+                  (["PDP", "PDV"].includes(clean(task.category).toUpperCase()) ? "No especificada" : "No aplica"),
+                product: clean(els.evidenceProduct.value),
+                trainingTopic,
+                notes,
+                links
+              });
+              setEvidenceUploadProgress("Archivos protegidos en el dispositivo. Iniciando sincronizacion...", 8);
+            } catch (protectionError) {
+              setMessage(els.evidenceMessage, `No se pudo proteger el sustento: ${protectionError.message}`, "err");
+              setEvidenceUploadProgress("La carga no inicio. Libera espacio en el dispositivo y vuelve a intentar.", 0, "err");
+              els.evidenceSubmitButton.disabled = false;
+              els.evidenceSubmitButton.textContent = "Reintentar carga";
+              evidenceSubmitInFlight = false;
+              return;
+            }
+            try {
+              if (offlineSessionMode || !navigator.onLine || cloudStatus === "error") {
+                const offlineError = new Error("La nube no esta disponible en este momento.");
+                offlineError.status = 0;
+                throw offlineError;
+              }
               for (let index = 0; index < selectedFiles.length; index += 1) {
-                const prepared = await prepareEvidenceFile(selectedFiles[index]);
+                const prepared = preparedFiles[index];
                 setMessage(els.evidenceMessage, `Subiendo archivo ${index + 1} de ${selectedFiles.length}...`, "");
                 els.evidenceSubmitButton.textContent = `Subiendo ${index + 1} de ${selectedFiles.length}...`;
                 setEvidenceUploadProgress(
@@ -9849,35 +10084,23 @@
                 });
               }
             } catch (error) {
-              if ((!error.status || error.status >= 500) && selectedFiles.length) {
-                try {
-                  await queueEvidenceForLater(task, selectedFiles, {
-                    store:
-                      clean(els.evidenceStore.value) ||
-                      (["PDP", "PDV"].includes(clean(task.category).toUpperCase()) ? "No especificada" : "No aplica"),
-                    product: clean(els.evidenceProduct.value),
-                    trainingTopic,
-                    notes,
-                    links
-                  });
-                  rememberPendingEvidenceSubmission(null);
-                  els.evidenceForm.reset();
-                  els.evidenceResult.value = "Realizado";
-                  renderSelectedEvidenceFiles();
-                  clearEvidenceSelection();
-                  renderEvidenceTaskPicker();
-                  renderEvidenceTrainingTopic();
-                  setEvidenceUploadProgress("Sustento protegido en este dispositivo. Se enviara automaticamente al volver Cloudflare.", 100, "ok");
-                  setMessage(els.evidenceMessage, "Puedes continuar trabajando. No vuelvas a seleccionar estos archivos.", "ok");
-                  els.evidenceSubmitButton.disabled = false;
-                  els.evidenceSubmitButton.textContent = "Enviar sustento";
-                  evidenceSubmitInFlight = false;
-                  showToast("Sustento guardado localmente y pendiente de sincronizacion.", "success");
-                  return;
-                } catch (queueError) {
-                  error = new Error(`${error.message} Tampoco se pudo guardar en el dispositivo: ${queueError.message}`);
-                }
+              if (isTransientCloudError(error) && locallyProtectedEvidence) {
+                rememberPendingEvidenceSubmission(null);
+                els.evidenceForm.reset();
+                els.evidenceResult.value = "Realizado";
+                renderSelectedEvidenceFiles();
+                clearEvidenceSelection();
+                renderEvidenceTaskPicker();
+                renderEvidenceTrainingTopic();
+                setEvidenceUploadProgress("Sustento protegido en este dispositivo. Se enviara automaticamente al volver Cloudflare.", 100, "ok");
+                setMessage(els.evidenceMessage, "Puedes continuar trabajando. No vuelvas a seleccionar estos archivos.", "ok");
+                els.evidenceSubmitButton.disabled = false;
+                els.evidenceSubmitButton.textContent = "Enviar sustento";
+                evidenceSubmitInFlight = false;
+                showToast("Sustento guardado localmente y pendiente de sincronizacion.", "success");
+                return;
               }
+              if (locallyProtectedEvidence?.id) await deleteEvidenceOutbox(locallyProtectedEvidence.id).catch(() => {});
               setMessage(els.evidenceMessage, `No se pudieron subir todos los archivos: ${error.message}`, "err");
               setEvidenceUploadProgress(
                 `Carga interrumpida: ${error.message}. La tarea continuara marcada para volver a intentar.`,
@@ -9890,7 +10113,8 @@
               return;
             }
             evidence = {
-              id: id(),
+              ...locallyProtectedEvidence,
+              id: locallyProtectedEvidence?.id || id(),
               submittedById: state.activeUserId,
               submittedAt: Date.now(),
               store:
@@ -9931,6 +10155,7 @@
             }
             recoveredAfterSyncError = true;
           }
+          await deleteEvidenceOutbox(evidence.id).catch(() => {});
           rememberPendingEvidenceSubmission(null);
           els.evidenceForm.reset();
           els.evidenceResult.value = "Realizado";

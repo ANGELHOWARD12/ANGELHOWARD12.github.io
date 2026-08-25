@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-hub-shell-v36-task-status-colors1";
+const CACHE_NAME = "task-hub-shell-v37-offline-continuity1";
 const APP_SHELL = [
   "/",
   "/index.html",
