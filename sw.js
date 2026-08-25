@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-hub-shell-v41-original-evidence-links1";
+const CACHE_NAME = "task-hub-shell-v42-weekly-photo-report1";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -6,6 +6,9 @@ const APP_SHELL = [
   "/manifest.webmanifest",
   "/vendor/exceljs-4.4.0.min.js",
   "/vendor/jszip-3.10.1.min.js",
+  "/vendor/pptxgen-4.0.1.min.js",
+  "/report-assets/photo-report-cover.png",
+  "/report-assets/photo-report-evidence.png",
   "/icons/task-hub-96.png",
   "/icons/task-hub-192.png",
   "/icons/task-hub-512.png"

@@ -1006,6 +1006,16 @@
         min-width: min(100%, 360px);
       }
 
+      .weekly-report-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .weekly-report-actions button {
+        min-width: min(100%, 310px);
+      }
+
       .week-grid {
         display: grid;
         gap: 10px;
@@ -3001,7 +3011,7 @@
           <div class="week-toolbar">
             <div>
               <h2>Sustentos por Week</h2>
-              <p class="muted">Descarga el Excel y todos los archivos originales del equipo visible.</p>
+              <p class="muted">Descarga el paquete completo o el reporte fotografico PowerPoint del equipo visible.</p>
             </div>
             <div class="actions">
               <button id="previousEvidenceWeek" class="small" type="button">Week anterior</button>
@@ -3011,7 +3021,10 @@
           </div>
           <div class="weekly-evidence-download-action">
             <strong id="weeklyEvidenceDownloadLabel"></strong>
-            <button id="downloadWeeklyEvidence" class="primary" type="button">Descargar sustentos de la semana completa</button>
+            <div class="weekly-report-actions">
+              <button id="downloadWeeklyEvidence" class="primary" type="button">Descargar sustentos de la semana completa</button>
+              <button id="downloadWeeklyPhotoReport" class="ghost" type="button">Descargar reporte fotografico PowerPoint</button>
+            </div>
           </div>
           <p id="weeklyEvidenceDownloadMessage" class="message" aria-live="polite"></p>
         </section>
@@ -3632,6 +3645,7 @@
 
     <script src="./vendor/exceljs-4.4.0.min.js"></script>
     <script src="./vendor/jszip-3.10.1.min.js"></script>
+    <script src="./vendor/pptxgen-4.0.1.min.js"></script>
     <script>
       const STORAGE_KEY = "lg-task-hub-ui-v1";
       const ORGANIZATION_SCOPE_KEY = "lgtask-organization-scope-v1";
@@ -3646,7 +3660,7 @@
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
       const EARLIEST_OVERTIME_START = "05:00";
-      const APP_VERSION = "41-original-evidence-links1";
+      const APP_VERSION = "42-weekly-photo-report1";
       const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
       const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
       const APP_MODE = document.documentElement.classList.contains("app-mode");
@@ -3846,6 +3860,7 @@
       let offlineReauthInFlight = null;
       let offlineOutboxSyncInFlight = null;
       let evidenceOpenInFlight = false;
+      let photoReportAssetsPromise = null;
       let pendingEvidenceSubmission = (() => {
         try {
           return JSON.parse(localStorage.getItem(EVIDENCE_PENDING_SUBMISSION_KEY) || "null");
@@ -4018,6 +4033,7 @@
         nextEvidenceWeek: document.querySelector("#nextEvidenceWeek"),
         weeklyEvidenceDownloadLabel: document.querySelector("#weeklyEvidenceDownloadLabel"),
         downloadWeeklyEvidence: document.querySelector("#downloadWeeklyEvidence"),
+        downloadWeeklyPhotoReport: document.querySelector("#downloadWeeklyPhotoReport"),
         weeklyEvidenceDownloadMessage: document.querySelector("#weeklyEvidenceDownloadMessage"),
         evidenceUploadPanel: document.querySelector("#evidenceUploadPanel"),
         evidenceFormHome: document.querySelector("#evidenceFormHome"),
@@ -6401,6 +6417,8 @@
               evidenceId: evidence?.id || ""
             });
             return {
+              taskId: task.id,
+              evidenceId: evidence?.id || "",
               trainerId,
               trainer: userName(trainerId),
               activityDate,
@@ -6513,7 +6531,9 @@
             const scale = Math.min(maxWidth / image.naturalWidth, maxHeight / image.naturalHeight, 1);
             resolve({
               width: Math.max(48, Math.round(image.naturalWidth * scale)),
-              height: Math.max(36, Math.round(image.naturalHeight * scale))
+              height: Math.max(36, Math.round(image.naturalHeight * scale)),
+              naturalWidth: image.naturalWidth,
+              naturalHeight: image.naturalHeight
             });
           };
           image.onerror = () => resolve({ width: 150, height: 95 });
@@ -6933,6 +6953,7 @@
         els.exportEvidenceExcel.disabled = true;
         els.exportEvidencePackage.disabled = true;
         els.downloadWeeklyEvidence.disabled = true;
+        els.downloadWeeklyPhotoReport.disabled = true;
         setMessage(
           messageElement,
           options.rangeByTaskDate ? "Actualizando datos y preparando la descarga semanal..." : "Actualizando datos y preparando el Excel...",
@@ -6976,6 +6997,7 @@
           els.exportEvidenceExcel.disabled = false;
           els.exportEvidencePackage.disabled = false;
           els.downloadWeeklyEvidence.disabled = false;
+          els.downloadWeeklyPhotoReport.disabled = false;
         }
       }
 
@@ -7004,6 +7026,282 @@
           messageElement: els.weeklyEvidenceDownloadMessage,
           rangeByTaskDate: true
         });
+      }
+
+      function photoReportDayLabel(dateValue) {
+        const date = new Date(`${dateValue}T12:00:00-05:00`);
+        const weekday = new Intl.DateTimeFormat("es-PE", {
+          timeZone: "America/Lima",
+          weekday: "short"
+        })
+          .format(date)
+          .replace(/\./g, "")
+          .toUpperCase();
+        const dayMonth = new Intl.DateTimeFormat("es-PE", {
+          timeZone: "America/Lima",
+          day: "2-digit",
+          month: "short"
+        })
+          .format(date)
+          .replace(/\./g, "")
+          .replace(/\s+/g, "-")
+          .toUpperCase();
+        return `${weekday} ${dayMonth} | W${isoWeekNumber(dateValue)}`;
+      }
+
+      async function loadPhotoReportAssets() {
+        if (!photoReportAssetsPromise) {
+          photoReportAssetsPromise = Promise.all(
+            ["/report-assets/photo-report-cover.png", "/report-assets/photo-report-evidence.png"].map(async (path) => {
+              const response = await fetch(`${path}?v=${APP_VERSION}`, { cache: "force-cache" });
+              if (!response.ok) throw new Error("No se pudo cargar la plantilla del reporte fotografico.");
+              return readFileAsDataUrl(await response.blob(), path);
+            })
+          )
+            .then(([cover, evidence]) => ({ cover, evidence }))
+            .catch((error) => {
+              photoReportAssetsPromise = null;
+              throw error;
+            });
+        }
+        return photoReportAssetsPromise;
+      }
+
+      function groupPhotoReportRows(rows) {
+        const trainerGroups = new Map();
+        rows.forEach((row) => {
+          if (!trainerGroups.has(row.trainerId)) {
+            trainerGroups.set(row.trainerId, {
+              trainerId: row.trainerId,
+              trainer: row.trainer,
+              entries: new Map()
+            });
+          }
+          const trainerGroup = trainerGroups.get(row.trainerId);
+          const entryKey = `${row.taskId}:${row.evidenceId || row.evidenceDate}:${row.schedule}`;
+          if (!trainerGroup.entries.has(entryKey)) {
+            trainerGroup.entries.set(entryKey, {
+              taskDate: row.taskDate,
+              schedule: row.schedule,
+              task: row.task,
+              line: row.line || "GENERAL",
+              store: row.store || "No aplica",
+              topic: row.trainingTopic || row.reviewedProduct || row.category || "No aplica",
+              rows: []
+            });
+          }
+          trainerGroup.entries.get(entryKey).rows.push(row);
+        });
+        return Array.from(trainerGroups.values())
+          .map((group) => ({
+            ...group,
+            entries: Array.from(group.entries.values()).sort(
+              (a, b) => a.taskDate.localeCompare(b.taskDate) || a.schedule.localeCompare(b.schedule) || a.task.localeCompare(b.task, "es")
+            )
+          }))
+          .sort((a, b) => a.trainer.localeCompare(b.trainer, "es"));
+      }
+
+      function addPhotoReportValue(slide, text, frame, fontSize = 15) {
+        slide.addShape("rect", {
+          x: frame.x,
+          y: frame.y,
+          w: frame.w,
+          h: frame.h,
+          fill: { color: "FFFFFF" },
+          line: { color: "FFFFFF", transparency: 100 }
+        });
+        slide.addText(clean(text) || "No aplica", {
+          x: frame.x + 0.06,
+          y: frame.y + 0.01,
+          w: frame.w - 0.12,
+          h: frame.h - 0.02,
+          fontFace: "Helvetica Neue",
+          fontSize,
+          color: "222222",
+          margin: 0,
+          valign: "mid",
+          breakLine: false,
+          fit: "shrink"
+        });
+      }
+
+      function addPhotoReportImage(slide, row, attachment, frame) {
+        slide.addShape("rect", {
+          x: frame.x,
+          y: frame.y,
+          w: frame.w,
+          h: frame.h,
+          fill: { color: "FFFFFF" },
+          line: { color: "E1E1E1", width: 0.8 }
+        });
+        if (!attachment?.workbookDataUrl) {
+          slide.addText("Sin fotografia", {
+            x: frame.x,
+            y: frame.y,
+            w: frame.w,
+            h: frame.h,
+            align: "center",
+            valign: "mid",
+            fontFace: "Helvetica Neue",
+            fontSize: 18,
+            bold: true,
+            color: "777777",
+            margin: 0
+          });
+          return;
+        }
+        const sourceWidth = attachment.displaySize?.naturalWidth || attachment.displaySize?.width || frame.w;
+        const sourceHeight = attachment.displaySize?.naturalHeight || attachment.displaySize?.height || frame.h;
+        const scale = Math.min(frame.w / sourceWidth, frame.h / sourceHeight);
+        const width = sourceWidth * scale;
+        const height = sourceHeight * scale;
+        const options = {
+          data: attachment.workbookDataUrl,
+          x: frame.x + (frame.w - width) / 2,
+          y: frame.y + (frame.h - height) / 2,
+          w: width,
+          h: height
+        };
+        if (row?.fileUrl) {
+          options.hyperlink = {
+            url: row.fileUrl,
+            tooltip: `Abrir ${row.fileName || "fotografia"} original en Task Hub`
+          };
+        }
+        slide.addImage(options);
+      }
+
+      function buildWeeklyPhotoPresentation(groups, attachments, assets, start, end) {
+        const pptx = new window.PptxGenJS();
+        pptx.layout = "LAYOUT_WIDE";
+        pptx.author = "Task Hub";
+        pptx.company = "Training Team";
+        pptx.subject = `Reporte fotografico Week ${isoWeekNumber(start)}`;
+        pptx.title = `Training Team - Reporte fotografico ${formatShortDate(start)} al ${formatShortDate(end)}`;
+        pptx.lang = "es-PE";
+        pptx.theme = {
+          headFontFace: "Helvetica Neue",
+          bodyFontFace: "Helvetica Neue",
+          lang: "es-PE"
+        };
+
+        groups.forEach((trainerGroup) => {
+          const cover = pptx.addSlide();
+          cover.background = { color: "FFFFFF" };
+          cover.addImage({ data: assets.cover, x: 0, y: 0, w: 13.333, h: 7.5 });
+          cover.addShape("rect", {
+            x: 0.42,
+            y: 4.16,
+            w: 7.45,
+            h: 0.62,
+            fill: { color: "A51B37" },
+            line: { color: "A51B37", transparency: 100 }
+          });
+          cover.addText(trainerGroup.trainer, {
+            x: 0.5,
+            y: 4.2,
+            w: 7.25,
+            h: 0.48,
+            fontFace: "Helvetica Neue",
+            fontSize: 24,
+            color: "FFFFFF",
+            margin: 0,
+            fit: "shrink"
+          });
+
+          trainerGroup.entries.forEach((entry) => {
+            for (let index = 0; index < entry.rows.length; index += 2) {
+              const pageRows = entry.rows.slice(index, index + 2);
+              const detail = pptx.addSlide();
+              detail.background = { color: "FFFFFF" };
+              detail.addImage({ data: assets.evidence, x: 0, y: 0, w: 13.333, h: 7.5 });
+              detail.addShape("rect", {
+                x: 0,
+                y: 0.12,
+                w: 2.28,
+                h: 0.5,
+                fill: { color: "A51B37" },
+                line: { color: "A51B37", transparency: 100 }
+              });
+              detail.addText(photoReportDayLabel(entry.taskDate), {
+                x: 0.03,
+                y: 0.16,
+                w: 2.18,
+                h: 0.36,
+                fontFace: "Helvetica Neue",
+                fontSize: 15,
+                color: "FFFFFF",
+                margin: 0,
+                fit: "shrink"
+              });
+              addPhotoReportValue(detail, entry.task, { x: 3.21, y: 0.965, w: 3.26, h: 0.39 }, 15);
+              addPhotoReportValue(detail, entry.line, { x: 3.21, y: 1.365, w: 3.26, h: 0.39 }, 15);
+              addPhotoReportValue(detail, entry.store, { x: 8.99, y: 0.965, w: 2.77, h: 0.39 }, 14);
+              addPhotoReportValue(detail, entry.topic, { x: 8.99, y: 1.365, w: 2.77, h: 0.39 }, 14);
+              addPhotoReportImage(
+                detail,
+                pageRows[0],
+                attachments.get(reportFileKey(pageRows[0])),
+                { x: 1.175, y: 2.528, w: 5.365, h: 4.014 }
+              );
+              addPhotoReportImage(
+                detail,
+                pageRows[1],
+                pageRows[1] ? attachments.get(reportFileKey(pageRows[1])) : null,
+                { x: 6.793, y: 2.528, w: 5.365, h: 4.014 }
+              );
+            }
+          });
+        });
+        return pptx;
+      }
+
+      async function downloadWeeklyPhotoReport() {
+        if (!canViewAll()) {
+          setMessage(els.weeklyEvidenceDownloadMessage, "Solo Coordinacion o Admin pueden generar este reporte.", "err");
+          return;
+        }
+        if (!window.PptxGenJS) {
+          setMessage(els.weeklyEvidenceDownloadMessage, "El modulo de PowerPoint no termino de cargar. Recarga la pagina.", "err");
+          return;
+        }
+        const start = selectedEvidenceReportWeekStart || weekStartIso(todayIso);
+        const end = addDaysIso(start, 5);
+        els.evidenceTrainerFilter.value = "all";
+        els.evidenceDateFrom.value = start;
+        els.evidenceDateTo.value = end;
+        els.downloadWeeklyPhotoReport.disabled = true;
+        els.downloadWeeklyEvidence.disabled = true;
+        setMessage(els.weeklyEvidenceDownloadMessage, "Actualizando datos y preparando el reporte fotografico...", "");
+        try {
+          if (syncInFlight) await syncInFlight;
+          const refreshed = await refreshStateFromServer({ quiet: true });
+          if (!refreshed || !canViewAll()) throw new Error("No se pudo actualizar la informacion de la nube.");
+          const rows = evidenceReportRows({ rangeByTaskDate: true }).filter((row) =>
+            /^image\/(?:jpeg|jpg|png|gif|webp)$/i.test(row.fileType)
+          );
+          if (!rows.length) throw new Error("No hay fotografias compatibles para la Week seleccionada.");
+          const attachments = await loadEvidenceReportAttachments(rows, (current, total) => {
+            setMessage(els.weeklyEvidenceDownloadMessage, `Preparando fotografia ${current} de ${total}...`, "");
+          });
+          const groups = groupPhotoReportRows(rows);
+          const assets = await loadPhotoReportAssets();
+          const pptx = buildWeeklyPhotoPresentation(groups, attachments, assets, start, end);
+          const fileName = `Training-Team-reporte-fotografico-Week-${isoWeekNumber(start)}-${start}-a-${end}.pptx`;
+          setMessage(els.weeklyEvidenceDownloadMessage, "Generando el PowerPoint con las fotografias originales...", "");
+          await pptx.writeFile({ fileName, compression: true });
+          setMessage(
+            els.weeklyEvidenceDownloadMessage,
+            `PowerPoint generado para ${groups.length} trainer${groups.length === 1 ? "" : "s"} con ${rows.length} fotografia${rows.length === 1 ? "" : "s"}.`,
+            "ok"
+          );
+        } catch (error) {
+          setMessage(els.weeklyEvidenceDownloadMessage, error.message || "No se pudo generar el reporte fotografico.", "err");
+        } finally {
+          els.downloadWeeklyPhotoReport.disabled = false;
+          els.downloadWeeklyEvidence.disabled = false;
+        }
       }
 
       function recoveryMailLink(user, tempPassword) {
@@ -10105,6 +10403,7 @@
           renderWeeklyEvidenceDownload();
         });
         els.downloadWeeklyEvidence.addEventListener("click", downloadWeeklyEvidencePackage);
+        els.downloadWeeklyPhotoReport.addEventListener("click", downloadWeeklyPhotoReport);
 
         els.evidenceFiles.addEventListener("change", () => {
           els.evidenceFiles.setCustomValidity("");
