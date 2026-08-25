@@ -2752,12 +2752,16 @@
           <button id="openNextWeekPlanning" class="primary" type="button">Abrir siguiente Week</button>
         </section>
 
-        <section id="personalBreakPanel" class="panel stack">
-          <div>
-            <h2>Mi break por dia</h2>
-            <p class="muted">El cambio se guarda solamente para la fecha elegida y nunca modifica los demas dias.</p>
-          </div>
-          <form id="breakSettingsForm" class="break-settings">
+        <details id="personalBreakPanel" class="panel collapsible-panel">
+          <summary>
+            <div>
+              <h2>Mi break por dia</h2>
+              <p class="muted">Configura una fecha sin alterar los demas dias.</p>
+            </div>
+            <span class="collapsible-symbol" aria-hidden="true">+</span>
+          </summary>
+          <div class="collapsible-panel-body">
+            <form id="breakSettingsForm" class="break-settings">
             <label>
               Fecha del break
               <input id="breakDate" type="date" required />
@@ -2782,15 +2786,20 @@
             <button id="saveBreakButton" class="primary" type="submit">Guardar este dia</button>
             <p id="breakAvailabilityHint" class="availability-note"></p>
             <p id="breakSettingsMessage" class="message" aria-live="polite"></p>
-          </form>
-        </section>
-
-        <section id="overtimePanel" class="panel stack">
-          <div>
-            <h2>Ampliar jornada por dia</h2>
-            <p id="overtimeHelp" class="muted">Habilita ingreso anticipado o salida extendida para la persona y fecha seleccionadas.</p>
+            </form>
           </div>
-          <form id="overtimeForm" class="break-settings">
+        </details>
+
+        <details id="overtimePanel" class="panel collapsible-panel">
+          <summary>
+            <div>
+              <h2>Ampliar jornada por dia</h2>
+              <p id="overtimeHelp" class="muted">Solicita ingreso anticipado, salida extendida o ambos.</p>
+            </div>
+            <span class="collapsible-symbol" aria-hidden="true">+</span>
+          </summary>
+          <div class="collapsible-panel-body stack">
+            <form id="overtimeForm" class="break-settings">
             <label id="overtimeUserWrap">
               Trainer
               <select id="overtimeUser" required></select>
@@ -2814,18 +2823,19 @@
             <button id="saveOvertimeButton" class="primary" type="submit">Guardar jornada</button>
             <p id="overtimeCurrent" class="availability-note wide"></p>
             <p id="overtimeMessage" class="message wide" aria-live="polite"></p>
-          </form>
-          <div id="overtimeRequestsWrap" class="stack hidden">
-            <div class="panel-header">
-              <div>
-                <h3>Solicitudes de horas extra</h3>
-                <p class="muted">La jornada del trainer cambia solamente despues de la aprobacion.</p>
+            </form>
+            <div id="overtimeRequestsWrap" class="stack hidden">
+              <div class="panel-header">
+                <div>
+                  <h3>Solicitudes de horas extra</h3>
+                  <p class="muted">La jornada del trainer cambia solamente despues de la aprobacion.</p>
+                </div>
+                <span id="overtimeRequestCount" class="pill review">0 pendientes</span>
               </div>
-              <span id="overtimeRequestCount" class="pill review">0 pendientes</span>
+              <div id="overtimeRequests" class="list"></div>
             </div>
-            <div id="overtimeRequests" class="list"></div>
           </div>
-        </section>
+        </details>
 
         <section id="coordinatorDayPanel" class="panel stack">
           <div class="week-toolbar">
@@ -2864,7 +2874,7 @@
           </div>
         </section>
 
-        <div id="taskWorkspace" class="two-col task-workspace composer-closed">
+        <div id="taskWorkspace" class="task-workspace composer-closed">
           <section id="coordinatorTaskPanel" class="panel stack task-composer hidden">
             <div class="task-composer-head">
               <div>
@@ -2932,56 +2942,6 @@
             <p id="taskMessage" class="message" aria-live="polite"></p>
           </section>
 
-          <aside class="panel stack">
-            <div>
-              <h2>Mis tareas / Seguimiento</h2>
-              <p class="muted">El coordinador ve todas; cada trainer ve solo las suyas.</p>
-            </div>
-            <div class="form-grid task-filter-grid">
-              <label>
-                Estado
-                <select id="taskStatusFilter">
-                  <option value="all">Todas</option>
-                  <option value="missing_evidence">Sin sustento</option>
-                  <option value="Pendiente">Pendientes</option>
-                  <option value="En proceso">En proceso</option>
-                  <option value="En revision">En revision</option>
-                  <option value="Cumplida">Cumplidas</option>
-                  <option value="Observada">Rechazadas</option>
-                  <option value="No disponible">No disponibles</option>
-                </select>
-              </label>
-              <label id="trainerFilterWrap">
-                Trainer
-                <select id="taskTrainerFilter"></select>
-              </label>
-              <label>
-                Categoria
-                <select id="taskCategoryFilter">
-                  <option value="all">Todas</option>
-                  <option value="PDP">PDP</option>
-                  <option value="Entrenamiento">Entrenamiento</option>
-                  <option value="ULG">ULG</option>
-                  <option value="Reporte">Reporte</option>
-                  <option value="Coordinacion">Coordinacion</option>
-                </select>
-              </label>
-              <label>
-                Buscar tarea
-                <input id="taskNameFilter" type="search" placeholder="Nombre de la tarea" />
-              </label>
-              <label>
-                Desde
-                <input id="taskDateFrom" type="date" />
-              </label>
-              <label>
-                Hasta
-                <input id="taskDateTo" type="date" />
-              </label>
-              <button id="clearTaskFilters" class="ghost wide" type="button">Limpiar filtros</button>
-            </div>
-            <div id="taskList" class="list"></div>
-          </aside>
         </div>
 
         <details id="deletedTasksPanel" class="panel collapsible-panel">
@@ -3071,6 +3031,57 @@
             </div>
             <p id="evidenceMessage" class="message" aria-live="polite"></p>
           </section>
+
+          <aside id="taskTrackingPanel" class="panel stack">
+            <div>
+              <h2>Mis tareas / Seguimiento</h2>
+              <p class="muted">Consulta el estado de tus tareas y abre sus detalles.</p>
+            </div>
+            <div class="form-grid task-filter-grid">
+              <label>
+                Estado
+                <select id="taskStatusFilter">
+                  <option value="all">Todas</option>
+                  <option value="missing_evidence">Sin sustento</option>
+                  <option value="Pendiente">Pendientes</option>
+                  <option value="En proceso">En proceso</option>
+                  <option value="En revision">En revision</option>
+                  <option value="Cumplida">Cumplidas</option>
+                  <option value="Observada">Rechazadas</option>
+                  <option value="No disponible">No disponibles</option>
+                </select>
+              </label>
+              <label id="trainerFilterWrap">
+                Trainer
+                <select id="taskTrainerFilter"></select>
+              </label>
+              <label>
+                Categoria
+                <select id="taskCategoryFilter">
+                  <option value="all">Todas</option>
+                  <option value="PDP">PDP</option>
+                  <option value="Entrenamiento">Entrenamiento</option>
+                  <option value="ULG">ULG</option>
+                  <option value="Reporte">Reporte</option>
+                  <option value="Coordinacion">Coordinacion</option>
+                </select>
+              </label>
+              <label>
+                Buscar tarea
+                <input id="taskNameFilter" type="search" placeholder="Nombre de la tarea" />
+              </label>
+              <label>
+                Desde
+                <input id="taskDateFrom" type="date" />
+              </label>
+              <label>
+                Hasta
+                <input id="taskDateTo" type="date" />
+              </label>
+              <button id="clearTaskFilters" class="ghost wide" type="button">Limpiar filtros</button>
+            </div>
+            <div id="taskList" class="list"></div>
+          </aside>
 
           <details id="evidenceHistoryPanel" class="panel collapsible-panel">
             <summary>
@@ -3590,7 +3601,7 @@
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
       const EARLIEST_OVERTIME_START = "05:00";
-      const APP_VERSION = "38-flexible-workday1";
+      const APP_VERSION = "39-compact-evidence-view1";
       const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
       const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
       const APP_MODE = document.documentElement.classList.contains("app-mode");
@@ -7058,10 +7069,10 @@
           renderOvertimeSettings();
           renderCoordinatorDay();
           renderTrainerWeek();
-          renderTasks();
           renderDeletedTasks();
         } else if (activeViewId === "evidenceView") {
           renderLateEvidencePolicy();
+          renderTasks();
           renderEvidence();
         } else if (activeViewId === "teamView") {
           renderTeam();
@@ -10229,7 +10240,7 @@
           const successMessage = `${recoveredAfterSyncError ? "Sustento confirmado en la nube" : "Sustento guardado"} con ${uploadedFiles.length} archivo${uploadedFiles.length === 1 ? "" : "s"}. ${isSelfManagedMasterTask(savedTask) ? "Quedo aprobado automaticamente por tu perfil Master." : "El coordinador del area debe aprobarlo para completar la tarea."}`;
           setEvidenceUploadProgress("Sustento guardado correctamente en la nube.", 100, "ok");
           setMessage(els.evidenceMessage, "", "");
-          activateView("tasksView", { updateUrl: true, historyMode: "replace" });
+          activateView("evidenceView", { updateUrl: true, historyMode: "replace" });
           render();
           showToast(successMessage, "success");
           window.requestAnimationFrame(() => {
