@@ -2788,7 +2788,7 @@
         <section id="overtimePanel" class="panel stack">
           <div>
             <h2>Ampliar jornada por dia</h2>
-            <p id="overtimeHelp" class="muted">Habilita horas extra solamente para la persona y fecha seleccionadas.</p>
+            <p id="overtimeHelp" class="muted">Habilita ingreso anticipado o salida extendida para la persona y fecha seleccionadas.</p>
           </div>
           <form id="overtimeForm" class="break-settings">
             <label id="overtimeUserWrap">
@@ -2798,6 +2798,10 @@
             <label>
               Fecha
               <input id="overtimeDate" type="date" required />
+            </label>
+            <label>
+              Nueva hora de entrada (24 h)
+              <select id="overtimeStart" required></select>
             </label>
             <label>
               Nueva hora de salida (24 h)
@@ -3585,7 +3589,8 @@
       const DANNY_SATURDAY_END = "14:30";
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
-      const APP_VERSION = "37-offline-continuity1";
+      const EARLIEST_OVERTIME_START = "05:00";
+      const APP_VERSION = "38-flexible-workday1";
       const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
       const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
       const APP_MODE = document.documentElement.classList.contains("app-mode");
@@ -3900,6 +3905,7 @@
         overtimeUserWrap: document.querySelector("#overtimeUserWrap"),
         overtimeUser: document.querySelector("#overtimeUser"),
         overtimeDate: document.querySelector("#overtimeDate"),
+        overtimeStart: document.querySelector("#overtimeStart"),
         overtimeEnd: document.querySelector("#overtimeEnd"),
         overtimeReason: document.querySelector("#overtimeReason"),
         saveOvertimeButton: document.querySelector("#saveOvertimeButton"),
@@ -4335,12 +4341,16 @@
                     ([dateValue, settings]) =>
                       /^\d{4}-\d{2}-\d{2}$/.test(dateValue) &&
                       settings &&
+                      (!clean(settings.startTime) ||
+                        (/^\d{2}:\d{2}$/.test(clean(settings.startTime)) &&
+                          timeToMinutes(settings.startTime) >= timeToMinutes(EARLIEST_OVERTIME_START))) &&
                       /^\d{2}:\d{2}$/.test(clean(settings.endTime)) &&
                       timeToMinutes(settings.endTime) <= timeToMinutes("23:45")
                   )
                   .map(([dateValue, settings]) => [
                     dateValue,
                     {
+                      startTime: clean(settings.startTime),
                       endTime: clean(settings.endTime),
                       reason: clean(settings.reason).slice(0, 300),
                       updatedById: clean(settings.updatedById),
@@ -4381,6 +4391,7 @@
         nextState.workScheduleByUserDate = normalizeWorkScheduleByUserDate(nextState.workScheduleByUserDate);
         nextState.overtimeRequests = (nextState.overtimeRequests || []).map((request) => ({
           ...request,
+          startTime: clean(request.startTime),
           status: ["Pendiente", "Aprobada", "Rechazada"].includes(request.status) ? request.status : "Pendiente"
         }));
         nextState.tasks = (nextState.tasks || []).map((task) => ({
@@ -5446,7 +5457,14 @@
         const base = baseWorkScheduleForDate(dateValue, userId);
         const settings = breakSettingsForUser(userId, dateValue);
         const override = state.workScheduleByUserDate?.[userId]?.[dateValue];
+        const requestedStart = clean(override?.startTime);
         const requestedEnd = clean(override?.endTime);
+        const extendedStart =
+          /^\d{2}:\d{2}$/.test(requestedStart) &&
+          timeToMinutes(requestedStart) >= timeToMinutes(EARLIEST_OVERTIME_START) &&
+          timeToMinutes(requestedStart) <= timeToMinutes(base.start)
+            ? requestedStart
+            : base.start;
         const extendedEnd =
           /^\d{2}:\d{2}$/.test(requestedEnd) &&
           timeToMinutes(requestedEnd) >= timeToMinutes(base.end) &&
@@ -5454,10 +5472,13 @@
             ? requestedEnd
             : base.end;
         return {
-          start: base.start,
+          start: extendedStart,
           end: extendedEnd,
+          baseStart: base.start,
           baseEnd: base.end,
-          overtime: timeToMinutes(extendedEnd) > timeToMinutes(base.end),
+          overtime:
+            timeToMinutes(extendedStart) < timeToMinutes(base.start) ||
+            timeToMinutes(extendedEnd) > timeToMinutes(base.end),
           hasBreak: base.hasBreak,
           breakStart: settings.breakStart,
           breakEnd: settings.breakEnd
@@ -7112,6 +7133,22 @@
         breakEditorKey = editorKey;
       }
 
+      function overtimeStartOptions(dateValue, userId, selectedStart = "") {
+        if (!dateValue || !userId || isSunday(dateValue)) return [];
+        const base = baseWorkScheduleForDate(dateValue, userId);
+        const values = [base.start];
+        for (let value = timeToMinutes(base.start) - 30; value >= timeToMinutes(EARLIEST_OVERTIME_START); value -= 30) {
+          values.push(minutesToTime(value));
+        }
+        if (/^\d{2}:\d{2}$/.test(selectedStart) && !values.includes(selectedStart)) values.push(selectedStart);
+        return values
+          .sort((left, right) => timeToMinutes(left) - timeToMinutes(right))
+          .map((startTime) => ({
+            value: startTime,
+            label: startTime === base.start ? `Horario normal (${startTime})` : `Ingreso anticipado desde ${startTime}`
+          }));
+      }
+
       function overtimeEndOptions(dateValue, userId, selectedEnd = "") {
         if (!dateValue || !userId || isSunday(dateValue)) return [];
         const base = baseWorkScheduleForDate(dateValue, userId);
@@ -7150,7 +7187,7 @@
                       </div>
                       <div class="meta">
                         <span>${escapeHtml(formatDate(request.date))}</span>
-                        <span>Salida solicitada: ${escapeHtml(request.endTime)}</span>
+                        <span>Jornada solicitada: ${escapeHtml(request.startTime || baseWorkScheduleForDate(request.date, request.userId).start)}-${escapeHtml(request.endTime)}</span>
                         <span>${escapeHtml(formatDateTime(request.requestedAt))}</span>
                       </div>
                       <p>${escapeHtml(request.reason || "Sin motivo")}</p>
@@ -7182,8 +7219,8 @@
         );
         els.overtimeUserWrap.classList.toggle("hidden", !canViewAll());
         els.overtimeHelp.textContent = canViewAll()
-          ? `${activeUser().name} puede ampliar directamente la jornada y revisar solicitudes de su equipo.`
-          : `Solicita horas extra para una fecha. El horario se habilitara cuando ${coordinatorNameForUser()} lo apruebe.`;
+          ? `${activeUser().name} puede autorizar ingreso anticipado, salida extendida y revisar solicitudes del equipo.`
+          : `Solicita ampliar el inicio, el final o ambos. La jornada se habilitara cuando ${coordinatorNameForUser()} la apruebe.`;
         if (!els.overtimeDate.value) els.overtimeDate.value = nearestWorkingDay(todayIso);
         const dateValue = els.overtimeDate.value;
         const userId = els.overtimeUser.value || state.activeUserId;
@@ -7195,10 +7232,14 @@
         const pendingRequest = matchingRequests.find((request) => request.status === "Pendiente") || null;
         const latestRequest = matchingRequests[0] || null;
         const base = dateValue && userId ? baseWorkScheduleForDate(dateValue, userId) : null;
+        const selectedStart = clean(!canViewAll() && pendingRequest ? pendingRequest.startTime : saved?.startTime) || base?.start || "";
         const selectedEnd = clean(!canViewAll() && pendingRequest ? pendingRequest.endTime : saved?.endTime) || base?.end || "";
-        const options = overtimeEndOptions(dateValue, userId, selectedEnd);
-        fillSelect(els.overtimeEnd, options.length ? options : [{ value: "", label: "Dia no laborable" }], selectedEnd);
-        const blocked = !userId || !dateValue || isSunday(dateValue) || !options.length;
+        const startOptions = overtimeStartOptions(dateValue, userId, selectedStart);
+        const endOptions = overtimeEndOptions(dateValue, userId, selectedEnd);
+        fillSelect(els.overtimeStart, startOptions.length ? startOptions : [{ value: "", label: "Dia no laborable" }], selectedStart);
+        fillSelect(els.overtimeEnd, endOptions.length ? endOptions : [{ value: "", label: "Dia no laborable" }], selectedEnd);
+        const blocked = !userId || !dateValue || isSunday(dateValue) || !startOptions.length || !endOptions.length;
+        els.overtimeStart.disabled = blocked;
         els.overtimeEnd.disabled = blocked;
         els.overtimeReason.disabled = blocked;
         els.saveOvertimeButton.disabled = blocked;
@@ -7217,10 +7258,14 @@
             : "Selecciona un trainer y una fecha valida.";
         } else if (!canViewAll() && pendingRequest) {
           const currentSchedule = workScheduleForDate(dateValue, userId);
-          els.overtimeCurrent.textContent = `Solicitud pendiente para salir a las ${pendingRequest.endTime}. Tu jornada continua hasta las ${currentSchedule.end} mientras ${coordinatorNameForUser()} revisa la autorizacion.`;
-        } else if (saved && timeToMinutes(saved.endTime) > timeToMinutes(base.end)) {
+          els.overtimeCurrent.textContent = `Solicitud pendiente para trabajar de ${pendingRequest.startTime || base.start} a ${pendingRequest.endTime}. Tu jornada vigente sigue siendo ${currentSchedule.start}-${currentSchedule.end} mientras ${coordinatorNameForUser()} revisa la autorizacion.`;
+        } else if (
+          saved &&
+          (timeToMinutes(saved.startTime || base.start) < timeToMinutes(base.start) ||
+            timeToMinutes(saved.endTime) > timeToMinutes(base.end))
+        ) {
           const author = saved.updatedByName || userName(saved.updatedById);
-          els.overtimeCurrent.textContent = `Jornada base ${base.start}-${base.end}. Ampliada hasta ${saved.endTime} por ${author}${saved.updatedAt ? ` el ${formatDateTime(saved.updatedAt)}` : ""}. Motivo: ${saved.reason || "Sin detalle"}.`;
+          els.overtimeCurrent.textContent = `Jornada base ${base.start}-${base.end}. Ampliada a ${saved.startTime || base.start}-${saved.endTime} por ${author}${saved.updatedAt ? ` el ${formatDateTime(saved.updatedAt)}` : ""}. Motivo: ${saved.reason || "Sin detalle"}.`;
         } else {
           els.overtimeCurrent.textContent = `Jornada normal para ${formatDate(dateValue)}: ${base.start}-${base.end}.${!canViewAll() && latestRequest?.status === "Rechazada" ? ` Ultima solicitud rechazada${latestRequest.reviewNote ? `: ${latestRequest.reviewNote}` : "."}` : ""}`;
         }
@@ -7742,7 +7787,7 @@
       }
 
       function scheduleAxisMarkup(dateValue) {
-        const start = timeToMinutes(WORKDAY_START);
+        const start = timeToMinutes(coordinatorScheduleBounds(dateValue).start);
         return Array.from({ length: scheduleSlotsForDate(dateValue) }, (_, index) => {
           const total = start + index * 15;
           const label = `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
@@ -7753,7 +7798,8 @@
       function scheduleBreakMarkup(dateValue, userId = state.activeUserId) {
         const schedule = workScheduleForDate(dateValue, userId);
         if (!schedule.hasBreak) return "";
-        const startColumn = Math.floor((timeToMinutes(schedule.breakStart) - timeToMinutes(WORKDAY_START)) / 15) + 1;
+        const axisStart = coordinatorScheduleBounds(dateValue).start;
+        const startColumn = Math.floor((timeToMinutes(schedule.breakStart) - timeToMinutes(axisStart)) / 15) + 1;
         const span = Math.ceil((timeToMinutes(schedule.breakEnd) - timeToMinutes(schedule.breakStart)) / 15);
         return `<span class="schedule-break" style="grid-column: ${startColumn} / span ${span}">BREAK<br>${schedule.breakStart}-${schedule.breakEnd}</span>`;
       }
@@ -7765,11 +7811,14 @@
         const bounds = coordinatorScheduleBounds(dateValue);
         const scheduleSlots = scheduleSlotsForDate(dateValue);
         const dannySaturday = isSaturday(dateValue) && state.users.some((user) => user.status === "Activo" && isDannyDiosUser(user.id));
-        const saturdayOvertime = dannySaturday && timeToMinutes(bounds.end) > timeToMinutes(DANNY_SATURDAY_END);
+        const saturdayOvertime =
+          dannySaturday &&
+          (timeToMinutes(bounds.start) < timeToMinutes(WORKDAY_START) ||
+            timeToMinutes(bounds.end) > timeToMinutes(DANNY_SATURDAY_END));
         state.selectedCoordinatorDate = dateValue;
         els.coordinatorDate.value = dateValue;
         els.coordinatorDayLabel.textContent = dannySaturday
-          ? `${formatShortDate(dateValue)} | Week ${isoWeekNumber(dateValue)} | Danny 09:00-14:30 | Demas 08:30-14:00 | Sin break${saturdayOvertime ? ` | Horas extra hasta ${bounds.end}` : ""}`
+          ? `${formatShortDate(dateValue)} | Week ${isoWeekNumber(dateValue)} | Danny 09:00-14:30 | Demas 08:30-14:00 | Sin break${saturdayOvertime ? ` | Vista ampliada ${bounds.start}-${bounds.end}` : ""}`
           : `${formatShortDate(dateValue)} | Week ${isoWeekNumber(dateValue)} | ${bounds.start} - ${bounds.end}${schedule.hasBreak ? " | Break personalizado por usuario" : " | Sin break"}`;
         els.coordinatorDayRoster.innerHTML = `
           <div class="roster-head">
@@ -7811,7 +7860,7 @@
             tasks.forEach((task) => {
               const start = Math.max(timeToMinutes(personSchedule.start), timeToMinutes(task.startTime || personSchedule.start));
               const end = Math.min(timeToMinutes(personSchedule.end), timeToMinutes(task.endTime || "09:30"));
-              const startColumn = Math.max(1, Math.floor((start - timeToMinutes(WORKDAY_START)) / 15) + 1);
+              const startColumn = Math.max(1, Math.floor((start - timeToMinutes(bounds.start)) / 15) + 1);
               const span = Math.max(1, Math.ceil((end - start) / 15));
               const block = document.createElement("button");
               block.className = `schedule-task ${taskStatusClass(task.status)}`;
@@ -8941,12 +8990,12 @@
             text: "En Tareas abre Mi break por dia, elige la fecha, la duracion y uno de los horarios libres. El cambio se guarda solo para ese dia y no modifica el resto de la semana."
           };
         }
-        if (/hora.*extra|ampliar.*jornada|salir.*tarde/.test(query)) {
+        if (/hora.*extra|ampliar.*jornada|salir.*tarde|entrar.*antes|ingreso.*anticipado/.test(query)) {
           return {
             view: "tasksView",
             text: isCoordinator()
-              ? "En Ampliar jornada por dia selecciona trainer, fecha, nueva hora de salida y motivo. Tambien puedes aprobar o rechazar solicitudes pendientes."
-              : "En Ampliar jornada por dia selecciona fecha, hora de salida y motivo. El horario adicional se habilitara cuando el coordinador de tu area apruebe la solicitud."
+              ? "En Ampliar jornada por dia selecciona trainer, fecha, nueva hora de entrada, nueva hora de salida y motivo. Tambien puedes aprobar o rechazar solicitudes pendientes."
+              : "En Ampliar jornada por dia selecciona fecha, entrada, salida y motivo. El horario adicional se habilitara cuando el coordinador de tu area apruebe la solicitud."
           };
         }
         if (/reasign|otro trainer|no puedo/.test(query)) {
@@ -9677,17 +9726,27 @@
           setMessage(els.overtimeMessage, "", "");
           renderOvertimeSettings(true);
         });
+        els.overtimeStart.addEventListener("change", () => setMessage(els.overtimeMessage, "", ""));
         els.overtimeEnd.addEventListener("change", () => setMessage(els.overtimeMessage, "", ""));
         els.overtimeReason.addEventListener("input", () => setMessage(els.overtimeMessage, "", ""));
         els.overtimeForm.addEventListener("submit", async (event) => {
           event.preventDefault();
           const userId = isCoordinator() ? els.overtimeUser.value : state.activeUserId;
           const dateValue = els.overtimeDate.value;
+          const startTime = els.overtimeStart.value;
           const endTime = els.overtimeEnd.value;
           const reason = clean(els.overtimeReason.value);
           const base = baseWorkScheduleForDate(dateValue, userId);
           if (!userId || !dateValue || isSunday(dateValue)) {
             setMessage(els.overtimeMessage, "Selecciona una persona y un dia laborable de lunes a sabado.", "err");
+            return;
+          }
+          if (
+            !/^\d{2}:\d{2}$/.test(startTime) ||
+            timeToMinutes(startTime) < timeToMinutes(EARLIEST_OVERTIME_START) ||
+            timeToMinutes(startTime) > timeToMinutes(base.start)
+          ) {
+            setMessage(els.overtimeMessage, `La entrada debe estar entre ${EARLIEST_OVERTIME_START} y ${base.start}.`, "err");
             return;
           }
           if (
@@ -9711,7 +9770,7 @@
             await syncState();
             const data = await apiRequest(isCoordinator() ? "/schedule/overtime" : "/schedule/overtime-request", {
               method: "POST",
-              body: JSON.stringify({ userId, date: dateValue, endTime, reason })
+              body: JSON.stringify({ userId, date: dateValue, startTime, endTime, reason })
             });
             applyCloudState(data.state);
             overtimeEditorKey = "";
@@ -9719,17 +9778,17 @@
             if (!isCoordinator()) {
               setMessage(
                 els.overtimeMessage,
-                `Solicitud enviada a ${coordinatorNameForUser()} para ${formatDate(dateValue)} hasta las ${endTime}. El horario aun no ha cambiado.`,
+                `Solicitud enviada a ${coordinatorNameForUser()} para ${formatDate(dateValue)} de ${startTime} a ${endTime}. El horario aun no ha cambiado.`,
                 "ok"
               );
               return;
             }
-            const restored = endTime === base.end;
+            const restored = startTime === base.start && endTime === base.end;
             setMessage(
               els.overtimeMessage,
               restored
                 ? `Horario normal restablecido para ${formatDate(dateValue)}.`
-                : `Horas extra habilitadas para ${userName(userId)} el ${formatDate(dateValue)} hasta las ${endTime}.`,
+                : `Jornada ampliada para ${userName(userId)} el ${formatDate(dateValue)}: ${startTime}-${endTime}.`,
               "ok"
             );
           } catch (error) {

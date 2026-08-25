@@ -130,6 +130,7 @@ const WEEKDAY_END = "19:00";
 const SATURDAY_END = "14:00";
 const DANNY_SATURDAY_START = "09:00";
 const DANNY_SATURDAY_END = "14:30";
+const EARLIEST_OVERTIME_START = "05:00";
 const BREAK_START = "12:30";
 const BREAK_END = "14:00";
 const MAX_FILE_BASE64 = 1_800_000;
@@ -299,7 +300,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "37-offline-continuity1",
+    version: "38-flexible-workday1",
     schema: SCHEMA_VERSION,
     r2: r2StorageEnabled(env),
     migration: {
@@ -2688,14 +2689,16 @@ async function createTask(request, db, user, context) {
       endTime,
       breakSettingsForUser(data, ownerId, dueDate),
       owner.name,
-      workScheduleEndForUser(data, ownerId, dueDate, owner.name)
+      workScheduleEndForUser(data, ownerId, dueDate, owner.name),
+      workScheduleStartForUser(data, ownerId, dueDate, owner.name)
     )
   ) {
+    const scheduleStart = workScheduleStartForUser(data, ownerId, dueDate, owner.name);
     const scheduleEnd = workScheduleEndForUser(data, ownerId, dueDate, owner.name);
     const schedule = breakSettingsForUser(data, ownerId, dueDate);
     return json({
       ok: false,
-      message: `El horario no esta disponible. Jornada hasta ${scheduleEnd}${new Date(`${dueDate}T12:00:00Z`).getUTCDay() === 6 ? " sin break" : ` y break ${schedule.breakStart}-${schedule.breakEnd}`}.`
+      message: `El horario no esta disponible. Jornada ${scheduleStart}-${scheduleEnd}${new Date(`${dueDate}T12:00:00Z`).getUTCDay() === 6 ? " sin break" : ` y break ${schedule.breakStart}-${schedule.breakEnd}`}.`
     }, 409);
   }
   if (hasTaskConflict(data.tasks, ownerId, dueDate, startTime, endTime)) {
@@ -3223,6 +3226,7 @@ async function saveOvertimeSchedule(request, db, user, context) {
   const body = await readJson(request, 20_000);
   const targetUserId = clean(body.userId);
   const dateValue = clean(body.date);
+  const startTime = clean(body.startTime);
   const endTime = clean(body.endTime);
   const reason = clean(body.reason).slice(0, 300);
   const target = await db
@@ -3236,7 +3240,15 @@ async function saveOvertimeSchedule(request, db, user, context) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue) || new Date(`${dateValue}T12:00:00Z`).getUTCDay() === 0) {
     return json({ ok: false, message: "Selecciona un dia laborable de lunes a sabado." }, 400);
   }
+  const baseStart = baseWorkdayStart(dateValue, target.name);
   const baseEnd = baseWorkdayEnd(dateValue, target.name);
+  if (
+    !/^\d{2}:\d{2}$/.test(startTime) ||
+    timeToMinutes(startTime) < timeToMinutes(EARLIEST_OVERTIME_START) ||
+    timeToMinutes(startTime) > timeToMinutes(baseStart)
+  ) {
+    return json({ ok: false, message: `La entrada debe estar entre ${EARLIEST_OVERTIME_START} y ${baseStart}.` }, 400);
+  }
   if (
     !/^\d{2}:\d{2}$/.test(endTime) ||
     timeToMinutes(endTime) < timeToMinutes(baseEnd) ||
@@ -3253,6 +3265,7 @@ async function saveOvertimeSchedule(request, db, user, context) {
     [target.id]: {
       ...(data.workScheduleByUserDate?.[target.id] || {}),
       [dateValue]: {
+        startTime,
         endTime,
         reason,
         updatedById: user.id,
@@ -3265,12 +3278,12 @@ async function saveOvertimeSchedule(request, db, user, context) {
     item.status === "Pendiente" && item.userId === target.id && item.date === dateValue
       ? {
           ...item,
-          status: item.endTime === endTime ? "Aprobada" : "Rechazada",
+          status: (item.startTime || baseStart) === startTime && item.endTime === endTime ? "Aprobada" : "Rechazada",
           reviewedAt: updatedAt,
           reviewedById: user.id,
           reviewedByName: user.name,
           reviewNote:
-            item.endTime === endTime
+            (item.startTime || baseStart) === startTime && item.endTime === endTime
               ? "Aprobada al configurar la jornada directamente."
               : "Resuelta al configurar un horario diferente."
         }
@@ -3278,11 +3291,11 @@ async function saveOvertimeSchedule(request, db, user, context) {
   );
   await saveData(db, data);
 
-  const restored = endTime === baseEnd;
+  const restored = startTime === baseStart && endTime === baseEnd;
   const notifications = [{
     userId: target.id,
     title: restored ? "Jornada normal restablecida" : "Jornada ampliada",
-    body: `${target.name} | ${dateValue} | salida ${endTime} | ${reason}`,
+    body: `${target.name} | ${dateValue} | jornada ${startTime}-${endTime} | ${reason}`,
     url: `/?view=tasksView`,
     sourceKey: `overtime:${target.id}:${dateValue}:${endTime}:${updatedAt}`
   }];
@@ -3295,12 +3308,21 @@ async function requestOvertimeSchedule(request, db, user, context) {
   if (user.role !== "Trainer") return json({ ok: false, message: "Solo los trainers pueden enviar esta solicitud." }, 403);
   const body = await readJson(request, 20_000);
   const dateValue = clean(body.date);
+  const startTime = clean(body.startTime);
   const endTime = clean(body.endTime);
   const reason = clean(body.reason).slice(0, 300);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue) || new Date(`${dateValue}T12:00:00Z`).getUTCDay() === 0) {
     return json({ ok: false, message: "Selecciona un dia laborable de lunes a sabado." }, 400);
   }
+  const baseStart = baseWorkdayStart(dateValue, user.name);
   const baseEnd = baseWorkdayEnd(dateValue, user.name);
+  if (
+    !/^\d{2}:\d{2}$/.test(startTime) ||
+    timeToMinutes(startTime) < timeToMinutes(EARLIEST_OVERTIME_START) ||
+    timeToMinutes(startTime) > timeToMinutes(baseStart)
+  ) {
+    return json({ ok: false, message: `La entrada debe estar entre ${EARLIEST_OVERTIME_START} y ${baseStart}.` }, 400);
+  }
   if (
     !/^\d{2}:\d{2}$/.test(endTime) ||
     timeToMinutes(endTime) < timeToMinutes(baseEnd) ||
@@ -3311,8 +3333,11 @@ async function requestOvertimeSchedule(request, db, user, context) {
   if (!reason) return json({ ok: false, message: "Escribe el motivo de la solicitud." }, 400);
 
   const data = await loadData(db);
+  const currentStart = workScheduleStartForUser(data, user.id, dateValue, user.name);
   const currentEnd = workScheduleEndForUser(data, user.id, dateValue, user.name);
-  if (endTime === currentEnd) return json({ ok: false, message: `Tu jornada ya termina a las ${endTime}.` }, 400);
+  if (startTime === currentStart && endTime === currentEnd) {
+    return json({ ok: false, message: `Tu jornada ya esta configurada de ${startTime} a ${endTime}.` }, 400);
+  }
   const requestedAt = Date.now();
   const existingIndex = (data.overtimeRequests || []).findIndex(
     (item) => item.userId === user.id && item.date === dateValue && item.status === "Pendiente"
@@ -3323,6 +3348,7 @@ async function requestOvertimeSchedule(request, db, user, context) {
     userId: user.id,
     userName: user.name,
     date: dateValue,
+    startTime,
     endTime,
     reason,
     status: "Pendiente",
@@ -3343,7 +3369,7 @@ async function requestOvertimeSchedule(request, db, user, context) {
   const notifications = (coordinators.results || []).map((coordinator) => ({
     userId: coordinator.id,
     title: "Solicitud de horas extra",
-    body: `${user.name} solicita salida ${endTime} para ${dateValue}. ${reason}`,
+    body: `${user.name} solicita jornada ${startTime}-${endTime} para ${dateValue}. ${reason}`,
     url: "/?view=tasksView",
     sourceKey: `overtime-request:${overtimeRequest.id}:${requestedAt}`
   }));
@@ -3373,10 +3399,15 @@ async function reviewOvertimeSchedule(request, db, user, context) {
   if (!coordinatorCanManageUser(user, target)) {
     return json({ ok: false, message: "No puedes revisar solicitudes de otro equipo." }, 403);
   }
+  const baseStart = baseWorkdayStart(overtimeRequest.date, target.name);
   const baseEnd = baseWorkdayEnd(overtimeRequest.date, target.name);
+  const requestedStart = clean(overtimeRequest.startTime) || baseStart;
   if (
     !/^\d{4}-\d{2}-\d{2}$/.test(overtimeRequest.date) ||
     new Date(`${overtimeRequest.date}T12:00:00Z`).getUTCDay() === 0 ||
+    !/^\d{2}:\d{2}$/.test(requestedStart) ||
+    timeToMinutes(requestedStart) < timeToMinutes(EARLIEST_OVERTIME_START) ||
+    timeToMinutes(requestedStart) > timeToMinutes(baseStart) ||
     !/^\d{2}:\d{2}$/.test(overtimeRequest.endTime) ||
     timeToMinutes(overtimeRequest.endTime) < timeToMinutes(baseEnd) ||
     timeToMinutes(overtimeRequest.endTime) > timeToMinutes("23:45")
@@ -3391,6 +3422,7 @@ async function reviewOvertimeSchedule(request, db, user, context) {
       [target.id]: {
         ...(data.workScheduleByUserDate?.[target.id] || {}),
         [overtimeRequest.date]: {
+          startTime: requestedStart,
           endTime: overtimeRequest.endTime,
           reason: overtimeRequest.reason,
           updatedById: user.id,
@@ -3415,7 +3447,7 @@ async function reviewOvertimeSchedule(request, db, user, context) {
     title: decision === "Aprobar" ? "Horas extra aprobadas" : "Solicitud de horas extra rechazada",
     body:
       decision === "Aprobar"
-        ? `${overtimeRequest.date} | jornada autorizada hasta ${overtimeRequest.endTime}${note ? ` | ${note}` : ""}`
+        ? `${overtimeRequest.date} | jornada autorizada ${requestedStart}-${overtimeRequest.endTime}${note ? ` | ${note}` : ""}`
         : `${overtimeRequest.date} | ${note}`,
     url: "/?view=tasksView",
     sourceKey: `overtime-review:${overtimeRequest.id}:${decision}:${reviewedAt}`
@@ -3647,6 +3679,12 @@ async function putState(request, db, user, context, env) {
                   normalizedTask.ownerId,
                   clean(normalizedTask.dueDate),
                   userNamesById.get(clean(normalizedTask.ownerId))
+                ),
+                workScheduleStartForUser(
+                  current,
+                  normalizedTask.ownerId,
+                  clean(normalizedTask.dueDate),
+                  userNamesById.get(clean(normalizedTask.ownerId))
                 )
               ) ||
               hasTaskConflict(
@@ -3738,7 +3776,8 @@ async function putState(request, db, user, context, env) {
           clean(task.endTime),
           breakSettingsForUser(current, requestedOwnerId, clean(task.dueDate)),
           userNamesById.get(requestedOwnerId),
-          workScheduleEndForUser(current, requestedOwnerId, clean(task.dueDate), userNamesById.get(requestedOwnerId))
+          workScheduleEndForUser(current, requestedOwnerId, clean(task.dueDate), userNamesById.get(requestedOwnerId)),
+          workScheduleStartForUser(current, requestedOwnerId, clean(task.dueDate), userNamesById.get(requestedOwnerId))
         ) &&
         !hasTaskConflict(
           current.tasks,
@@ -3775,7 +3814,8 @@ async function putState(request, db, user, context, env) {
           requestedEnd,
           breakSettingsForUser(current, user.id, requestedDate),
           user.name,
-          workScheduleEndForUser(current, user.id, requestedDate, user.name)
+          workScheduleEndForUser(current, user.id, requestedDate, user.name),
+          workScheduleStartForUser(current, user.id, requestedDate, user.name)
         ) &&
         !hasTaskConflict(current.tasks, user.id, requestedDate, requestedStart, requestedEnd, task.id);
       if (validReassignment) {
@@ -3853,7 +3893,8 @@ async function putState(request, db, user, context, env) {
           endTime,
           breakSettingsForUser(current, user.id, dueDate),
           user.name,
-          workScheduleEndForUser(current, user.id, dueDate, user.name)
+          workScheduleEndForUser(current, user.id, dueDate, user.name),
+          workScheduleStartForUser(current, user.id, dueDate, user.name)
         ) ||
         hasTaskConflict(current.tasks, user.id, dueDate, startTime, endTime)
       ) {
@@ -4204,12 +4245,16 @@ function normalizeWorkScheduleByUserDate(settingsByUserDate) {
               ([dateValue, settings]) =>
                 /^\d{4}-\d{2}-\d{2}$/.test(dateValue) &&
                 settings &&
+                (!clean(settings.startTime) ||
+                  (/^\d{2}:\d{2}$/.test(clean(settings.startTime)) &&
+                    timeToMinutes(settings.startTime) >= timeToMinutes(EARLIEST_OVERTIME_START))) &&
                 /^\d{2}:\d{2}$/.test(clean(settings.endTime)) &&
                 timeToMinutes(settings.endTime) <= timeToMinutes("23:45")
             )
             .map(([dateValue, settings]) => [
               dateValue,
               {
+                startTime: clean(settings.startTime),
                 endTime: clean(settings.endTime),
                 reason: clean(settings.reason).slice(0, 300),
                 updatedById: clean(settings.updatedById),
@@ -4238,6 +4283,7 @@ function normalizeOvertimeRequests(requests) {
       userId: clean(request.userId),
       userName: clean(request.userName),
       date: clean(request.date),
+      startTime: clean(request.startTime),
       endTime: clean(request.endTime),
       reason: clean(request.reason).slice(0, 300),
       status: ["Pendiente", "Aprobada", "Rechazada"].includes(request.status) ? request.status : "Pendiente",
@@ -4291,10 +4337,25 @@ function normalizeLgUpdates(items) {
     .slice(0, 500);
 }
 
+function baseWorkdayStart(dateValue, userName = "") {
+  const day = new Date(`${dateValue}T12:00:00Z`).getUTCDay();
+  return day === 6 && normalizedUserName(userName) === "DANNY DIOS" ? DANNY_SATURDAY_START : WORKDAY_START;
+}
+
 function baseWorkdayEnd(dateValue, userName = "") {
   const day = new Date(`${dateValue}T12:00:00Z`).getUTCDay();
   const dannySaturday = day === 6 && normalizedUserName(userName) === "DANNY DIOS";
   return day === 6 ? (dannySaturday ? DANNY_SATURDAY_END : SATURDAY_END) : WEEKDAY_END;
+}
+
+function workScheduleStartForUser(data, userId, dateValue, userName = "") {
+  const baseStart = baseWorkdayStart(dateValue, userName);
+  const requestedStart = clean(data.workScheduleByUserDate?.[clean(userId)]?.[dateValue]?.startTime);
+  return /^\d{2}:\d{2}$/.test(requestedStart) &&
+    timeToMinutes(requestedStart) >= timeToMinutes(EARLIEST_OVERTIME_START) &&
+    timeToMinutes(requestedStart) <= timeToMinutes(baseStart)
+    ? requestedStart
+    : baseStart;
 }
 
 function workScheduleEndForUser(data, userId, dateValue, userName = "") {
@@ -4307,14 +4368,26 @@ function workScheduleEndForUser(data, userId, dateValue, userName = "") {
     : baseEnd;
 }
 
-function validWorkSchedule(dateValue, startTime, endTime, workSettings = null, userName = "", workEndOverride = "") {
+function validWorkSchedule(
+  dateValue,
+  startTime,
+  endTime,
+  workSettings = null,
+  userName = "",
+  workEndOverride = "",
+  workStartOverride = ""
+) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateValue || ""))) return false;
   const day = new Date(`${dateValue}T12:00:00Z`).getUTCDay();
   if (day === 0) return false;
   const start = timeToMinutes(startTime);
   const end = timeToMinutes(endTime);
-  const dannySaturday = day === 6 && normalizedUserName(userName) === "DANNY DIOS";
-  const workStart = timeToMinutes(dannySaturday ? DANNY_SATURDAY_START : WORKDAY_START);
+  const baseStart = baseWorkdayStart(dateValue, userName);
+  const validStartOverride =
+    /^\d{2}:\d{2}$/.test(clean(workStartOverride)) &&
+    timeToMinutes(workStartOverride) >= timeToMinutes(EARLIEST_OVERTIME_START) &&
+    timeToMinutes(workStartOverride) <= timeToMinutes(baseStart);
+  const workStart = timeToMinutes(validStartOverride ? workStartOverride : baseStart);
   const baseEnd = baseWorkdayEnd(dateValue, userName);
   const validOverride =
     /^\d{2}:\d{2}$/.test(clean(workEndOverride)) &&
