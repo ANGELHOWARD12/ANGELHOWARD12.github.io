@@ -990,6 +990,22 @@
         justify-content: space-between;
       }
 
+      .weekly-evidence-download {
+        border-left: 4px solid var(--blue);
+      }
+
+      .weekly-evidence-download-action {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: space-between;
+      }
+
+      .weekly-evidence-download-action .primary {
+        min-width: min(100%, 360px);
+      }
+
       .week-grid {
         display: grid;
         gap: 10px;
@@ -2230,6 +2246,16 @@
           padding: 10px 8px 20px;
         }
 
+        .weekly-evidence-download-action {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .weekly-evidence-download-action .primary {
+          min-width: 0;
+          width: 100%;
+        }
+
         .quick-task-bar {
           margin-bottom: 8px;
           position: sticky;
@@ -2971,6 +2997,24 @@
             <span id="lateEvidencePolicyState" class="policy-switch-state">Apagado</span>
           </label>
         </section>
+        <section id="weeklyEvidenceDownloadPanel" class="panel stack weekly-evidence-download hidden">
+          <div class="week-toolbar">
+            <div>
+              <h2>Sustentos por Week</h2>
+              <p class="muted">Descarga el Excel y todos los archivos originales del equipo visible.</p>
+            </div>
+            <div class="actions">
+              <button id="previousEvidenceWeek" class="small" type="button">Week anterior</button>
+              <button id="currentEvidenceWeek" class="small" type="button">Week actual</button>
+              <button id="nextEvidenceWeek" class="small" type="button">Week siguiente</button>
+            </div>
+          </div>
+          <div class="weekly-evidence-download-action">
+            <strong id="weeklyEvidenceDownloadLabel"></strong>
+            <button id="downloadWeeklyEvidence" class="primary" type="button">Descargar sustentos de la semana completa</button>
+          </div>
+          <p id="weeklyEvidenceDownloadMessage" class="message" aria-live="polite"></p>
+        </section>
         <div class="evidence-layout">
           <section id="evidenceUploadPanel" class="panel stack">
             <div>
@@ -3601,7 +3645,7 @@
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
       const EARLIEST_OVERTIME_START = "05:00";
-      const APP_VERSION = "39-compact-evidence-view1";
+      const APP_VERSION = "40-weekly-evidence-download1";
       const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
       const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
       const APP_MODE = document.documentElement.classList.contains("app-mode");
@@ -3813,6 +3857,7 @@
       let storageStatusInFlight = null;
       let selectedEvidenceTaskId = sessionStorage.getItem(EVIDENCE_SELECTION_TASK_KEY) || "";
       let selectedEvidenceDate = sessionStorage.getItem(EVIDENCE_SELECTION_DATE_KEY) || "";
+      let selectedEvidenceReportWeekStart = weekStartIso(todayIso);
       let taskCreateInFlight = false;
       let taskComposerOpen = false;
       let notificationCheckInFlight = null;
@@ -3966,6 +4011,13 @@
         lateEvidencePolicyState: document.querySelector("#lateEvidencePolicyState"),
         lateEvidencePolicyText: document.querySelector("#lateEvidencePolicyText"),
         lateEvidencePolicyMessage: document.querySelector("#lateEvidencePolicyMessage"),
+        weeklyEvidenceDownloadPanel: document.querySelector("#weeklyEvidenceDownloadPanel"),
+        previousEvidenceWeek: document.querySelector("#previousEvidenceWeek"),
+        currentEvidenceWeek: document.querySelector("#currentEvidenceWeek"),
+        nextEvidenceWeek: document.querySelector("#nextEvidenceWeek"),
+        weeklyEvidenceDownloadLabel: document.querySelector("#weeklyEvidenceDownloadLabel"),
+        downloadWeeklyEvidence: document.querySelector("#downloadWeeklyEvidence"),
+        weeklyEvidenceDownloadMessage: document.querySelector("#weeklyEvidenceDownloadMessage"),
         evidenceUploadPanel: document.querySelector("#evidenceUploadPanel"),
         evidenceFormHome: document.querySelector("#evidenceFormHome"),
         evidenceForm: document.querySelector("#evidenceForm"),
@@ -6323,7 +6375,7 @@
         return name;
       }
 
-      function evidenceReportRows() {
+      function evidenceReportRows({ rangeByTaskDate = false } = {}) {
         const trainerFilter = els.evidenceTrainerFilter.value || "all";
         const rows = relevantTasks().flatMap((task) => {
           const evidenceItems = task.evidence || [];
@@ -6386,7 +6438,7 @@
             };
           })
           .filter((row) => trainerFilter === "all" || row.trainerId === trainerFilter)
-          .filter((row) => dateIsInEvidenceRange(row.activityDate))
+          .filter((row) => dateIsInEvidenceRange(rangeByTaskDate ? row.taskDate : row.activityDate))
           .sort(
             (a, b) =>
               a.trainer.localeCompare(b.trainer, "es") ||
@@ -6858,38 +6910,44 @@
         });
       }
 
-      async function createEvidenceDownload(includePackage = false) {
+      async function createEvidenceDownload(includePackage = false, options = {}) {
+        const messageElement = options.messageElement || els.evidenceExportMessage;
         if (!canViewAll()) {
-          setMessage(els.evidenceExportMessage, "Solo Coordinacion o Admin pueden generar este reporte.", "err");
+          setMessage(messageElement, "Solo Coordinacion o Admin pueden generar este reporte.", "err");
           return;
         }
         const rangeError = evidenceRangeError();
         if (rangeError) {
-          setMessage(els.evidenceExportMessage, rangeError, "err");
+          setMessage(messageElement, rangeError, "err");
           return;
         }
         if (!window.ExcelJS) {
-          setMessage(els.evidenceExportMessage, "El modulo de Excel no termino de cargar. Recarga la pagina e intenta nuevamente.", "err");
+          setMessage(messageElement, "El modulo de Excel no termino de cargar. Recarga la pagina e intenta nuevamente.", "err");
           return;
         }
         els.exportEvidenceExcel.disabled = true;
         els.exportEvidencePackage.disabled = true;
-        setMessage(els.evidenceExportMessage, "Actualizando datos y preparando el Excel...", "");
+        els.downloadWeeklyEvidence.disabled = true;
+        setMessage(
+          messageElement,
+          options.rangeByTaskDate ? "Actualizando datos y preparando la descarga semanal..." : "Actualizando datos y preparando el Excel...",
+          ""
+        );
         try {
           if (syncInFlight) await syncInFlight;
           const refreshed = await refreshStateFromServer({ quiet: true });
           if (!refreshed || !canViewAll()) throw new Error("No se pudo actualizar la informacion de la nube.");
-          const rows = evidenceReportRows();
+          const rows = evidenceReportRows({ rangeByTaskDate: Boolean(options.rangeByTaskDate) });
           const attachments = await loadEvidenceReportAttachments(rows, (current, total) => {
-            setMessage(els.evidenceExportMessage, `Incluyendo archivo ${current} de ${total} en el reporte...`, "");
+            setMessage(messageElement, `Incluyendo archivo ${current} de ${total} en el reporte...`, "");
           });
-          setMessage(els.evidenceExportMessage, "Preparando el reporte e incrustando las fotografias...", "");
+          setMessage(messageElement, "Preparando el reporte e incrustando las fotografias...", "");
           const workbook = buildEvidenceWorkbook(rows, attachments);
           const workbookBuffer = await workbook.xlsx.writeBuffer();
           const baseName = reportDownloadBaseName();
           const workbookName = `${baseName}.xlsx`;
           if (includePackage) {
-            setMessage(els.evidenceExportMessage, "Organizando el Excel y los archivos originales...", "");
+            setMessage(messageElement, "Organizando el Excel y los archivos originales...", "");
             const packageBlob = await buildCompleteEvidencePackage(rows, attachments, workbookBuffer, workbookName);
             downloadGeneratedBlob(packageBlob, `${baseName}-paquete-completo.zip`);
           } else {
@@ -6901,17 +6959,18 @@
             );
           }
           setMessage(
-            els.evidenceExportMessage,
+            messageElement,
             includePackage
               ? `Paquete generado con el Excel visual y ${attachments.size} archivo${attachments.size === 1 ? "" : "s"} original${attachments.size === 1 ? "" : "es"}.`
               : `Excel generado con ${rows.length} registro${rows.length === 1 ? "" : "s"} y las fotos incrustadas. Los demas archivos quedaron guardados internamente.`,
             "ok"
           );
         } catch (error) {
-          setMessage(els.evidenceExportMessage, error.message || "No se pudo generar el Excel.", "err");
+          setMessage(messageElement, error.message || "No se pudo generar el Excel.", "err");
         } finally {
           els.exportEvidenceExcel.disabled = false;
           els.exportEvidencePackage.disabled = false;
+          els.downloadWeeklyEvidence.disabled = false;
         }
       }
 
@@ -6921,6 +6980,25 @@
 
       function exportEvidencePackage() {
         return createEvidenceDownload(true);
+      }
+
+      function renderWeeklyEvidenceDownload() {
+        const start = selectedEvidenceReportWeekStart || weekStartIso(todayIso);
+        const end = addDaysIso(start, 5);
+        selectedEvidenceReportWeekStart = start;
+        els.weeklyEvidenceDownloadLabel.textContent = `Week ${isoWeekNumber(start)} | ${formatShortDate(start)} - ${formatShortDate(end)} | ${organizationScopeLabel()}`;
+      }
+
+      function downloadWeeklyEvidencePackage() {
+        const start = selectedEvidenceReportWeekStart || weekStartIso(todayIso);
+        els.evidenceTrainerFilter.value = "all";
+        els.evidenceDateFrom.value = start;
+        els.evidenceDateTo.value = addDaysIso(start, 5);
+        setMessage(els.evidenceExportMessage, "", "");
+        return createEvidenceDownload(true, {
+          messageElement: els.weeklyEvidenceDownloadMessage,
+          rangeByTaskDate: true
+        });
       }
 
       function recoveryMailLink(user, tempPassword) {
@@ -7032,6 +7110,7 @@
         els.coordinatorAnnouncementPanel.classList.toggle("hidden", !(isPrimaryCoordinator() || isObserver()));
         els.cloudPlanPanel.classList.toggle("hidden", !canViewAll());
         els.evidenceFilters.classList.toggle("hidden", !canViewAll());
+        els.weeklyEvidenceDownloadPanel.classList.toggle("hidden", !canViewAll());
         els.lateEvidencePolicyPanel.classList.toggle("hidden", !(isPrimaryCoordinator() || isObserver()));
         els.editMotivation.classList.toggle("hidden", !isPrimaryCoordinator());
         els.lgUpdateForm.classList.remove("hidden");
@@ -7072,6 +7151,7 @@
           renderDeletedTasks();
         } else if (activeViewId === "evidenceView") {
           renderLateEvidencePolicy();
+          renderWeeklyEvidenceDownload();
           renderTasks();
           renderEvidence();
         } else if (activeViewId === "teamView") {
@@ -10010,6 +10090,22 @@
         });
         els.exportEvidenceExcel.addEventListener("click", exportEvidenceWorkbook);
         els.exportEvidencePackage.addEventListener("click", exportEvidencePackage);
+        els.previousEvidenceWeek.addEventListener("click", () => {
+          selectedEvidenceReportWeekStart = addDaysIso(selectedEvidenceReportWeekStart || weekStartIso(todayIso), -7);
+          setMessage(els.weeklyEvidenceDownloadMessage, "", "");
+          renderWeeklyEvidenceDownload();
+        });
+        els.currentEvidenceWeek.addEventListener("click", () => {
+          selectedEvidenceReportWeekStart = weekStartIso(todayIso);
+          setMessage(els.weeklyEvidenceDownloadMessage, "", "");
+          renderWeeklyEvidenceDownload();
+        });
+        els.nextEvidenceWeek.addEventListener("click", () => {
+          selectedEvidenceReportWeekStart = addDaysIso(selectedEvidenceReportWeekStart || weekStartIso(todayIso), 7);
+          setMessage(els.weeklyEvidenceDownloadMessage, "", "");
+          renderWeeklyEvidenceDownload();
+        });
+        els.downloadWeeklyEvidence.addEventListener("click", downloadWeeklyEvidencePackage);
 
         els.evidenceFiles.addEventListener("change", () => {
           els.evidenceFiles.setCustomValidity("");
