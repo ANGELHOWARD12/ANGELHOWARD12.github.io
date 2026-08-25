@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-hub-shell-v40-weekly-evidence-download1";
+const CACHE_NAME = "task-hub-shell-v41-original-evidence-links1";
 const APP_SHELL = [
   "/",
   "/index.html",

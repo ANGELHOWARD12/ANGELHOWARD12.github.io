@@ -3624,6 +3624,7 @@
         </div>
         <div class="file-preview-actions">
           <span class="muted">El archivo se muestra sin reducir su calidad.</span>
+          <a id="openFilePreviewOriginal" class="ghost hidden" href="#" target="_blank" rel="noopener">Abrir en otra pestana</a>
           <a id="downloadFilePreview" class="primary hidden" href="#" download>Descargar original</a>
         </div>
       </div>
@@ -3645,7 +3646,7 @@
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
       const EARLIEST_OVERTIME_START = "05:00";
-      const APP_VERSION = "40-weekly-evidence-download1";
+      const APP_VERSION = "41-original-evidence-links1";
       const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
       const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
       const APP_MODE = document.documentElement.classList.contains("app-mode");
@@ -4168,6 +4169,7 @@
         filePreviewImage: document.querySelector("#filePreviewImage"),
         filePreviewVideo: document.querySelector("#filePreviewVideo"),
         filePreviewFrame: document.querySelector("#filePreviewFrame"),
+        openFilePreviewOriginal: document.querySelector("#openFilePreviewOriginal"),
         downloadFilePreview: document.querySelector("#downloadFilePreview"),
         closeFilePreview: document.querySelector("#closeFilePreview"),
         productTabs: document.querySelector("#productTabs"),
@@ -6011,11 +6013,11 @@
                   ${entry.notes ? `<p><strong>Comentario:</strong> ${escapeHtml(entry.notes)}</p>` : `<p class="muted">Sin comentarios.</p>`}
                   ${entry.reviewNote ? `<div class="note"><strong>Observacion del coordinador:</strong><p>${escapeHtml(entry.reviewNote)}</p><small>${entry.reviewedAt ? formatDateTime(entry.reviewedAt) : ""}</small></div>` : ""}
                   ${links.length ? `<div class="actions">${links.map((link) => `<a class="small" href="${escapeHtml(link)}" target="_blank" rel="noopener">Abrir enlace</a>`).join("")}</div>` : ""}
-                  ${files.length ? `<div class="evidence-file-list">${files.map((file, fileIndex) => `
+                  ${files.length ? `<div class="evidence-file-list">${files.map((file) => `
                     <div class="evidence-file-row">
                       <strong>${escapeHtml(file.name)}</strong>
                       <span class="muted">${escapeHtml(file.mimeType)}</span>
-                      <button class="small preview-task-file" type="button" data-evidence-index="${evidenceIndex}" data-file-index="${fileIndex}">Abrir original</button>
+                      <a class="small" href="${escapeHtml(originalEvidenceFileUrl(file, { absolute: true }))}" target="_blank" rel="noopener">Abrir original</a>
                     </div>
                   `).join("")}</div>` : `<p class="muted">Este envio no tiene archivos disponibles.</p>`}
                 </article>
@@ -6160,14 +6162,6 @@
         els.taskPreviewSubtitle.textContent = `${userName(task.ownerId)} | ${formatDate(task.dueDate)} | ${taskTimeLabel(task)}`;
         renderTaskPreviewActions(task);
         els.taskPreviewContent.innerHTML = taskPreviewMarkup(task);
-        els.taskPreviewContent.querySelectorAll(".preview-task-file").forEach((button) => {
-          button.addEventListener("click", () => {
-            const evidence = task.evidence?.[Number(button.dataset.evidenceIndex)];
-            const file = evidenceFilesForEntry(evidence)[Number(button.dataset.fileIndex)];
-            if (!file) return;
-            openEvidenceFilePreview(file, { syncUrl: false }).catch(() => {});
-          });
-        });
       }
 
       function openTaskPreviewDialog(taskId) {
@@ -6240,10 +6234,12 @@
         return files;
       }
 
-      function originalEvidenceFileUrl(file) {
-        return file?.id
+      function originalEvidenceFileUrl(file, { absolute = false } = {}) {
+        const source = file?.id
           ? `${API_BASE}/evidence/${encodeURIComponent(file.id)}/file`
           : file?.dataUrl || "";
+        if (!absolute || !source || source.startsWith("data:")) return source;
+        return new URL(source, PUBLIC_APP_ORIGIN).href;
       }
 
       function publicEvidenceHistoryUrl({ fileId = "", evidenceId = "" } = {}) {
@@ -6289,6 +6285,8 @@
         els.filePreviewImage.classList.add("hidden");
         els.filePreviewVideo.classList.add("hidden");
         els.filePreviewFrame.classList.add("hidden");
+        els.openFilePreviewOriginal.classList.add("hidden");
+        els.openFilePreviewOriginal.removeAttribute("href");
         els.downloadFilePreview.classList.add("hidden");
         els.downloadFilePreview.removeAttribute("href");
         if (!els.filePreviewDialog.open) els.filePreviewDialog.showModal();
@@ -6322,6 +6320,8 @@
           }
           if (!previewUrl || requestId !== previewRequestId) throw new Error("El archivo no esta disponible.");
 
+          els.openFilePreviewOriginal.href = originalEvidenceFileUrl(file, { absolute: true });
+          els.openFilePreviewOriginal.classList.remove("hidden");
           els.downloadFilePreview.href = previewUrl;
           els.downloadFilePreview.download = file.name || "sustento";
           els.downloadFilePreview.classList.remove("hidden");
@@ -6346,6 +6346,7 @@
           if (requestId !== previewRequestId) return;
           clearPreviewObjectUrl();
           els.filePreviewStatus.textContent = error.message || "No se pudo abrir el archivo.";
+          els.openFilePreviewOriginal.classList.add("hidden");
           els.downloadFilePreview.classList.add("hidden");
         }
       }
@@ -6394,9 +6395,7 @@
           .map(({ task, evidence, file }) => {
             const trainerId = evidence?.submittedById || task.ownerId;
             const activityDate = evidence?.submittedAt ? dateIsoInLima(evidence.submittedAt) : task.dueDate;
-            const fileUrl = file?.id
-              ? publicEvidenceHistoryUrl({ fileId: file.id })
-              : "";
+            const fileUrl = file?.id ? originalEvidenceFileUrl(file, { absolute: true }) : "";
             const historyUrl = publicEvidenceHistoryUrl({
               fileId: file?.id || "",
               evidenceId: evidence?.id || ""
@@ -6468,8 +6467,8 @@
         { header: "Archivo adjunto", width: 28 },
         { header: "Tipo de archivo", width: 25 },
         { header: "Evidencia incluida", width: 40 },
-        { header: "Respaldo", width: 20 },
-        { header: "Historial", width: 20 }
+        { header: "Direccion del original", width: 48 },
+        { header: "Ver en Task Hub", width: 20 }
       ];
 
       function reportFileKey(row) {
@@ -6622,9 +6621,9 @@
           included,
           row.fileUrl
             ? {
-                text: row.fileType.startsWith("image/") ? "Ver imagen original" : "Abrir archivo original",
+                text: row.fileUrl,
                 hyperlink: row.fileUrl,
-                tooltip: `Abrir ${row.fileName || "archivo"} exacto en Task Hub`
+                tooltip: `Abrir ${row.fileName || "archivo"} original en otra pestana`
               }
             : "Sin archivo",
           { text: "Ver en historial", hyperlink: row.historyUrl, tooltip: "Abrir este sustento exacto en Task Hub" }
@@ -6732,7 +6731,13 @@
             worksheet.addImage(imageId, {
               tl: { col: 18.08, row: dataRow.number - 1 + 0.08 },
               ext: { width: attachment.displaySize.width, height: attachment.displaySize.height },
-              editAs: "oneCell"
+              editAs: "oneCell",
+              hyperlinks: reportRow.fileUrl
+                ? {
+                    hyperlink: reportRow.fileUrl,
+                    tooltip: `Abrir ${reportRow.fileName || "imagen"} original en el navegador`
+                  }
+                : undefined
             });
           }
         });
@@ -8550,16 +8555,16 @@
             const links = Array.isArray(entry.links) ? entry.links : [];
             const isLinked = entry.id === linkedEvidenceId || files.some((file) => file.id === linkedFileId);
             const filesMarkup = files
-              .map((file, fileIndex) => {
-                const fileUrl = originalEvidenceFileUrl(file);
+              .map((file) => {
+                const fileUrl = originalEvidenceFileUrl(file, { absolute: true });
                 const image = file.mimeType.startsWith("image/");
                 return `
                   <div class="evidence-file-row">
                     <strong>${escapeHtml(file.name)}</strong>
                     <span class="muted">${escapeHtml(file.mimeType)}</span>
-                    ${image ? `<img class="evidence-photo" loading="lazy" src="${escapeHtml(fileUrl)}" alt="${escapeHtml(file.name)}" />` : ""}
+                    ${image ? `<a href="${escapeHtml(fileUrl)}" target="_blank" rel="noopener" title="Abrir imagen original en otra pestana"><img class="evidence-photo" loading="lazy" src="${escapeHtml(fileUrl)}" alt="${escapeHtml(file.name)}" /></a>` : ""}
                     <div class="actions">
-                      <button class="small preview-evidence-file" type="button" data-file-index="${fileIndex}">Ver archivo original</button>
+                      <a class="small" href="${escapeHtml(fileUrl)}" target="_blank" rel="noopener">Ver archivo original</a>
                       <a class="small" href="${escapeHtml(fileUrl)}" download="${escapeHtml(file.name)}">Descargar original</a>
                     </div>
                   </div>
@@ -8626,12 +8631,6 @@
               entryDetails.querySelector(".evidence-history-body").appendChild(actions);
             }
 
-            entryDetails.querySelectorAll(".preview-evidence-file").forEach((button) => {
-              button.addEventListener("click", () => {
-                const file = files[Number(button.dataset.fileIndex)];
-                openEvidenceFilePreview(file).catch(() => {});
-              });
-            });
             dayBody.appendChild(entryDetails);
           });
           els.evidenceList.appendChild(day);

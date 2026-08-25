@@ -300,7 +300,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "40-weekly-evidence-download1",
+    version: "41-original-evidence-links1",
     schema: SCHEMA_VERSION,
     r2: r2StorageEnabled(env),
     migration: {
