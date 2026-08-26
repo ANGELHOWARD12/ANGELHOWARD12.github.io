@@ -3660,7 +3660,7 @@
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
       const EARLIEST_OVERTIME_START = "05:00";
-      const APP_VERSION = "42-weekly-photo-report1";
+      const APP_VERSION = "43-weekly-photo-report2";
       const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
       const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
       const APP_MODE = document.documentElement.classList.contains("app-mode");
@@ -6428,6 +6428,7 @@
               taskDate: task.dueDate,
               schedule: taskTimeLabel(task),
               task: task.title,
+              taskDescription: task.description || "",
               line: task.product || "",
               category: task.category || "",
               trainingTopic: evidence?.trainingTopic || "",
@@ -7078,7 +7079,7 @@
             });
           }
           const trainerGroup = trainerGroups.get(row.trainerId);
-          const entryKey = `${row.taskId}:${row.evidenceId || row.evidenceDate}:${row.schedule}`;
+          const entryKey = `${row.taskId}:${row.taskDate}:${row.schedule}`;
           if (!trainerGroup.entries.has(entryKey)) {
             trainerGroup.entries.set(entryKey, {
               taskDate: row.taskDate,
@@ -7087,22 +7088,53 @@
               line: row.line || "GENERAL",
               store: row.store || "No aplica",
               topic: row.trainingTopic || row.reviewedProduct || row.category || "No aplica",
+              comments: new Set(),
               rows: []
             });
           }
-          trainerGroup.entries.get(entryKey).rows.push(row);
+          const entry = trainerGroup.entries.get(entryKey);
+          const comment = clean(row.notes || row.taskDescription);
+          if (comment) entry.comments.add(comment);
+          entry.rows.push(row);
         });
         return Array.from(trainerGroups.values())
           .map((group) => ({
             ...group,
-            entries: Array.from(group.entries.values()).sort(
-              (a, b) => a.taskDate.localeCompare(b.taskDate) || a.schedule.localeCompare(b.schedule) || a.task.localeCompare(b.task, "es")
-            )
+            entries: Array.from(group.entries.values())
+              .map((entry) => ({
+                ...entry,
+                comments: Array.from(entry.comments).join(" | ") || "Sin comentarios"
+              }))
+              .sort(
+                (a, b) => a.taskDate.localeCompare(b.taskDate) || a.schedule.localeCompare(b.schedule) || a.task.localeCompare(b.task, "es")
+              )
           }))
           .sort((a, b) => a.trainer.localeCompare(b.trainer, "es"));
       }
 
-      function addPhotoReportValue(slide, text, frame, fontSize = 15) {
+      function summarizePhotoReportText(value, maxLength = 80) {
+        const source = clean(value);
+        if (!source || source.length <= maxLength) return source || "No aplica";
+        const sentences = source.match(/[^.!?]+[.!?]+/g) || [];
+        let summary = "";
+        for (const sentence of sentences) {
+          const candidate = clean(`${summary} ${sentence}`);
+          if (candidate.length > maxLength) break;
+          summary = candidate;
+        }
+        if (summary.length >= Math.min(32, Math.floor(maxLength * 0.45))) return summary;
+        const words = source.split(/\s+/);
+        summary = "";
+        for (const word of words) {
+          const candidate = summary ? `${summary} ${word}` : word;
+          if (candidate.length > Math.max(8, maxLength - 3)) break;
+          summary = candidate;
+        }
+        return `${summary || source.slice(0, Math.max(8, maxLength - 3)).trim()}...`;
+      }
+
+      function addPhotoReportValue(slide, text, frame, options = {}) {
+        const { fontSize = 15, maxLength = 80, align = "left" } = options;
         slide.addShape("rect", {
           x: frame.x,
           y: frame.y,
@@ -7111,7 +7143,7 @@
           fill: { color: "FFFFFF" },
           line: { color: "FFFFFF", transparency: 100 }
         });
-        slide.addText(clean(text) || "No aplica", {
+        slide.addText(summarizePhotoReportText(text, maxLength), {
           x: frame.x + 0.06,
           y: frame.y + 0.01,
           w: frame.w - 0.12,
@@ -7120,6 +7152,7 @@
           fontSize,
           color: "222222",
           margin: 0,
+          align,
           valign: "mid",
           breakLine: false,
           fit: "shrink"
@@ -7235,22 +7268,68 @@
                 margin: 0,
                 fit: "shrink"
               });
-              addPhotoReportValue(detail, entry.task, { x: 3.21, y: 0.965, w: 3.26, h: 0.39 }, 15);
-              addPhotoReportValue(detail, entry.line, { x: 3.21, y: 1.365, w: 3.26, h: 0.39 }, 15);
-              addPhotoReportValue(detail, entry.store, { x: 8.99, y: 0.965, w: 2.77, h: 0.39 }, 14);
-              addPhotoReportValue(detail, entry.topic, { x: 8.99, y: 1.365, w: 2.77, h: 0.39 }, 14);
+              addPhotoReportValue(detail, entry.schedule, { x: 2.754, y: 0.052, w: 1.382, h: 0.634 }, {
+                fontSize: 14,
+                maxLength: 24,
+                align: "center"
+              });
+              addPhotoReportValue(detail, entry.task, { x: 3.21, y: 0.74, w: 3.26, h: 0.51 }, {
+                fontSize: 14,
+                maxLength: 58
+              });
+              addPhotoReportValue(detail, entry.line, { x: 3.21, y: 1.254, w: 3.26, h: 0.51 }, {
+                fontSize: 14,
+                maxLength: 32
+              });
+              addPhotoReportValue(detail, entry.store, { x: 8.99, y: 0.74, w: 2.77, h: 0.51 }, {
+                fontSize: 13,
+                maxLength: 42
+              });
+              addPhotoReportValue(detail, entry.topic, { x: 8.99, y: 1.254, w: 2.77, h: 0.51 }, {
+                fontSize: 13,
+                maxLength: 46
+              });
+              addPhotoReportValue(detail, entry.comments, { x: 3.21, y: 1.835, w: 8.54, h: 0.51 }, {
+                fontSize: 12,
+                maxLength: 155
+              });
+              detail.addNotes(
+                [
+                  `Fecha: ${entry.taskDate}`,
+                  `Week: ${isoWeekNumber(entry.taskDate)}`,
+                  `Horario: ${entry.schedule}`,
+                  `Tarea completa: ${entry.task}`,
+                  `Linea: ${entry.line}`,
+                  `Tienda / PDP: ${entry.store}`,
+                  `Tema revisado: ${entry.topic}`,
+                  `Comentarios completos: ${entry.comments}`
+                ].join("\n")
+              );
+              detail.addShape("rect", {
+                x: 1.106,
+                y: 2.672,
+                w: 11.122,
+                h: 4.012,
+                fill: { color: "FFFFFF" },
+                line: { color: "FFFFFF", transparency: 100 }
+              });
+              const singlePhotoFrame = { x: 3.984, y: 2.672, w: 5.365, h: 4.012 };
+              const leftPhotoFrame = { x: 1.106, y: 2.672, w: 5.365, h: 4.012 };
+              const rightPhotoFrame = { x: 6.863, y: 2.672, w: 5.365, h: 4.012 };
               addPhotoReportImage(
                 detail,
                 pageRows[0],
                 attachments.get(reportFileKey(pageRows[0])),
-                { x: 1.175, y: 2.528, w: 5.365, h: 4.014 }
+                pageRows.length === 1 ? singlePhotoFrame : leftPhotoFrame
               );
-              addPhotoReportImage(
-                detail,
-                pageRows[1],
-                pageRows[1] ? attachments.get(reportFileKey(pageRows[1])) : null,
-                { x: 6.793, y: 2.528, w: 5.365, h: 4.014 }
-              );
+              if (pageRows.length === 2) {
+                addPhotoReportImage(
+                  detail,
+                  pageRows[1],
+                  attachments.get(reportFileKey(pageRows[1])),
+                  rightPhotoFrame
+                );
+              }
             }
           });
         });

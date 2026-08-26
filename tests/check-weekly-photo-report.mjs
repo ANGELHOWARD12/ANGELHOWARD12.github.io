@@ -18,13 +18,21 @@ const requiredMarkers = [
   "async function downloadWeeklyPhotoReport()",
   "function buildWeeklyPhotoPresentation(",
   "function groupPhotoReportRows(",
+  "const entryKey = `${row.taskId}:${row.taskDate}:${row.schedule}`",
   "function addPhotoReportImage(",
+  "function summarizePhotoReportText(",
   "photo-report-cover.png",
   "photo-report-evidence.png",
   "rangeByTaskDate: true",
   "await pptx.writeFile({ fileName, compression: true })",
   "options.hyperlink",
-  "const end = addDaysIso(start, 5)"
+  "const end = addDaysIso(start, 5)",
+  "for (let index = 0; index < entry.rows.length; index += 2)",
+  "pageRows.length === 1 ? singlePhotoFrame : leftPhotoFrame",
+  "if (pageRows.length === 2)",
+  "addPhotoReportValue(detail, entry.schedule",
+  "addPhotoReportValue(detail, entry.comments",
+  "detail.addNotes("
 ];
 
 for (const marker of requiredMarkers) {
