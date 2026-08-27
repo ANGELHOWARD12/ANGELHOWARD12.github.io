@@ -11,19 +11,20 @@ const required = [
   'iterations: 180_000',
   '{ name: "AES-GCM", length: 256 }',
   "async function unlockOfflineSession",
+  "async function enterProtectedOfflineSession",
   "async function restoreCloudSessionIfNeeded",
-  "Modo sin conexion activo",
+  "Modo sin conexion.",
   "Sustento protegido en este dispositivo",
-  'offlineSessionMode || !navigator.onLine || cloudStatus === "error"'
+  "if (offlineSessionMode || !navigator.onLine)"
 ];
 
 for (const marker of required) {
   if (!html.includes(marker)) throw new Error(`Falta continuidad offline: ${marker}`);
 }
 
-const loginFallback = html.indexOf("const unlocked = await unlockOfflineSession(email, password)");
-const transientGuard = html.lastIndexOf("if (isTransientCloudError(error))", loginFallback);
-if (loginFallback < 0 || transientGuard < 0) {
+const transientGuard = html.indexOf("if (isTransientCloudError(error))");
+const loginFallback = html.indexOf("if (await enterProtectedOfflineSession(email, password)) return;", transientGuard);
+if (transientGuard < 0 || loginFallback < transientGuard) {
   throw new Error("El acceso local solo debe activarse ante errores transitorios de nube");
 }
 

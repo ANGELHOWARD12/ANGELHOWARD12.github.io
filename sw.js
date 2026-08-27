@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-hub-shell-v43-weekly-photo-report2";
+const CACHE_NAME = "task-hub-shell-v44-upload-resilience";
 const APP_SHELL = [
   "/",
   "/index.html",

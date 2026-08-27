@@ -1522,6 +1522,36 @@
         grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
       }
 
+      .evidence-receipt {
+        background: #fff8fa;
+        border: 1px solid #e7b7c6;
+        border-left: 4px solid var(--blue);
+        border-radius: 8px;
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+      }
+
+      .evidence-receipt .evidence-file-list {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      }
+
+      .evidence-receipt-file {
+        align-items: flex-start;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        display: grid;
+        gap: 7px;
+        min-width: 0;
+        padding: 10px;
+      }
+
+      .evidence-receipt-file strong,
+      .evidence-receipt-file span {
+        overflow-wrap: anywhere;
+      }
+
       .deadline-alert {
         background: var(--red-soft);
         border: 1px solid #f3b5bc;
@@ -3087,6 +3117,7 @@
               </form>
             </div>
             <p id="evidenceMessage" class="message" aria-live="polite"></p>
+            <section id="latestEvidenceReceipt" class="evidence-receipt hidden" aria-live="polite"></section>
           </section>
 
           <aside id="taskTrackingPanel" class="panel stack">
@@ -3660,7 +3691,7 @@
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
       const EARLIEST_OVERTIME_START = "05:00";
-      const APP_VERSION = "43-weekly-photo-report2";
+      const APP_VERSION = "44-upload-resilience";
       const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
       const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
       const APP_MODE = document.documentElement.classList.contains("app-mode");
@@ -3669,6 +3700,7 @@
       const MAX_EVIDENCE_FILES = 8;
       const MAX_EVIDENCE_FILE_BYTES = 15_000_000;
       const EVIDENCE_MULTIPART_PART_BYTES = 5 * 1024 * 1024;
+      const EVIDENCE_UPLOAD_TIMEOUT_MS = 180_000;
       const EVIDENCE_SELECTION_TASK_KEY = "lgtask-evidence-task-v1";
       const EVIDENCE_SELECTION_DATE_KEY = "lgtask-evidence-date-v1";
       const EVIDENCE_PENDING_SUBMISSION_KEY = "lgtask-evidence-pending-v1";
@@ -4056,6 +4088,7 @@
         evidenceUploadProgressBar: document.querySelector("#evidenceUploadProgressBar"),
         evidenceSubmitButton: document.querySelector("#evidenceSubmitButton"),
         evidenceMessage: document.querySelector("#evidenceMessage"),
+        latestEvidenceReceipt: document.querySelector("#latestEvidenceReceipt"),
         evidenceHistoryPanel: document.querySelector("#evidenceHistoryPanel"),
         evidenceHistoryCount: document.querySelector("#evidenceHistoryCount"),
         cloudPlanPanel: document.querySelector("#cloudPlanPanel"),
@@ -4346,6 +4379,16 @@
         } catch {
           return false;
         }
+      }
+
+      async function enterProtectedOfflineSession(email, password) {
+        const unlocked = await unlockOfflineSession(email, password).catch(() => false);
+        if (!unlocked) return false;
+        els.loginPassword.value = "";
+        setMessage(els.loginMessage, "", "");
+        render();
+        showToast("Acceso protegido activo. Puedes trabajar y los cambios se sincronizaran al volver la nube.", "success");
+        return true;
       }
 
       function isTransientCloudError(error) {
@@ -4982,11 +5025,11 @@
         throw lastError;
       }
 
-      async function apiBinaryRequestWithRetry(path, file, mimeType, attempts = 2) {
+      async function apiBinaryRequestWithRetry(path, file, mimeType, attempts = 3) {
         let lastError;
         for (let attempt = 1; attempt <= attempts; attempt += 1) {
           const controller = new AbortController();
-          const timeout = window.setTimeout(() => controller.abort(), 45_000);
+          const timeout = window.setTimeout(() => controller.abort(), EVIDENCE_UPLOAD_TIMEOUT_MS);
           try {
             const apiBase = attempt % 2 === 1 ? API_BASE : API_FALLBACK_BASE;
             const response = await fetch(`${apiBase}${path}`, {
@@ -8861,8 +8904,55 @@
         }
       }
 
+      function renderLatestEvidenceReceipt() {
+        const receipt = els.latestEvidenceReceipt;
+        if (!receipt) return;
+        const latest = state.tasks
+          .flatMap((task) =>
+            (task.evidence || [])
+              .filter((entry) => entry.submittedById === state.activeUserId)
+              .map((entry) => ({ ...entry, task }))
+          )
+          .sort((left, right) => Number(right.submittedAt || 0) - Number(left.submittedAt || 0))[0];
+
+        if (!latest || (canViewAll() && !isMaster())) {
+          receipt.classList.add("hidden");
+          receipt.innerHTML = "";
+          return;
+        }
+
+        const files = evidenceFilesForEntry(latest);
+        receipt.classList.remove("hidden");
+        receipt.innerHTML = `
+          <div class="title-row">
+            <div>
+              <h3>Ultimo sustento enviado</h3>
+              <p class="muted">${escapeHtml(latest.task.title)} | ${formatDateTime(latest.submittedAt)}</p>
+            </div>
+            <span class="pill ${latest.review === "Aprobado" ? "approved" : latest.review === "Observado" || latest.review === "Rechazado" ? "observed" : "review"}">${escapeHtml(evidenceReviewLabel(latest.review))}</span>
+          </div>
+          ${latest.notes ? `<p><strong>Comentario:</strong> ${escapeHtml(latest.notes)}</p>` : ""}
+          <div class="evidence-file-list">
+            ${files.map((file, index) => `
+              <div class="evidence-receipt-file">
+                <strong>${escapeHtml(file.name)}</strong>
+                <span class="muted">${escapeHtml(file.mimeType)}</span>
+                <div class="actions">
+                  <button class="small view-receipt-file" type="button" data-file-index="${index}">Ver archivo</button>
+                  <a class="small" href="${escapeHtml(originalEvidenceFileUrl(file, { absolute: true }))}" download="${escapeHtml(file.name)}">Descargar</a>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        `;
+        receipt.querySelectorAll(".view-receipt-file").forEach((button) => {
+          button.addEventListener("click", () => openEvidenceFilePreview(files[Number(button.dataset.fileIndex)]));
+        });
+      }
+
       function renderEvidence() {
         els.evidenceUploadPanel.classList.toggle("hidden", isObserver() || (isCoordinator() && !isMaster()));
+        renderLatestEvidenceReceipt();
         if (!canViewAll() || isMaster()) renderEvidenceTaskPicker(els.evidenceTask.value);
         let allEvidence = relevantTasks()
           .flatMap((task) => (task.evidence || []).map((evidence) => ({ ...evidence, task })))
@@ -9751,6 +9841,20 @@
           event.preventDefault();
           const email = clean(els.loginEmail.value).toLowerCase();
           const password = els.loginPassword.value;
+
+          if (!navigator.onLine || cloudStatus === "error") {
+            setMessage(els.loginMessage, "Buscando el acceso protegido de este dispositivo...", "");
+            if (await enterProtectedOfflineSession(email, password)) return;
+            if (!navigator.onLine) {
+              setMessage(
+                els.loginMessage,
+                "No hay conexion y este dispositivo aun no tiene un acceso protegido. Ingresa una vez con la nube disponible para habilitarlo.",
+                "err"
+              );
+              return;
+            }
+          }
+
           setMessage(els.loginMessage, "Conectando con Task Hub...", "");
           try {
             const data = await apiRequestWithRetry("/auth/login", {
@@ -9772,14 +9876,7 @@
             syncNotificationSubscription().catch(() => {});
           } catch (error) {
             if (isTransientCloudError(error)) {
-              const unlocked = await unlockOfflineSession(email, password).catch(() => false);
-              if (unlocked) {
-                els.loginPassword.value = "";
-                setMessage(els.loginMessage, "", "");
-                render();
-                showToast("Modo sin conexion activo. Puedes trabajar y guardar sustentos con seguridad.", "success");
-                return;
-              }
+              if (await enterProtectedOfflineSession(email, password)) return;
               setMessage(
                 els.loginMessage,
                 "Cloudflare no responde y este dispositivo aun no tiene un acceso protegido. Ingresa una vez cuando vuelva la nube para habilitarlo.",
@@ -10363,7 +10460,7 @@
           setMessage(els.taskMessage, "Guardando tarea en la nube...", "");
           let queuedForLater = false;
           try {
-            if (offlineSessionMode || !navigator.onLine || cloudStatus === "error") {
+            if (offlineSessionMode || !navigator.onLine) {
               const offlineError = new Error("La nube no esta disponible en este momento.");
               offlineError.status = 0;
               throw offlineError;
@@ -10595,7 +10692,7 @@
               return;
             }
             try {
-              if (offlineSessionMode || !navigator.onLine || cloudStatus === "error") {
+              if (offlineSessionMode || !navigator.onLine) {
                 const offlineError = new Error("La nube no esta disponible en este momento.");
                 offlineError.status = 0;
                 throw offlineError;
@@ -10713,12 +10810,14 @@
           const successMessage = `${recoveredAfterSyncError ? "Sustento confirmado en la nube" : "Sustento guardado"} con ${uploadedFiles.length} archivo${uploadedFiles.length === 1 ? "" : "s"}. ${isSelfManagedMasterTask(savedTask) ? "Quedo aprobado automaticamente por tu perfil Master." : "El coordinador del area debe aprobarlo para completar la tarea."}`;
           setEvidenceUploadProgress("Sustento guardado correctamente en la nube.", 100, "ok");
           setMessage(els.evidenceMessage, "", "");
+          openEvidenceDays.add(dateIsoInLima(evidence.submittedAt));
+          openEvidenceEntries.add(evidence.id);
+          els.evidenceHistoryPanel.open = true;
           activateView("evidenceView", { updateUrl: true, historyMode: "replace" });
           render();
           showToast(successMessage, "success");
           window.requestAnimationFrame(() => {
-            const taskCard = document.querySelector(`[data-task-id="${CSS.escape(task.id)}"]`);
-            taskCard?.scrollIntoView({ behavior: "smooth", block: "center" });
+            els.latestEvidenceReceipt?.scrollIntoView({ behavior: "smooth", block: "center" });
           });
         });
 
