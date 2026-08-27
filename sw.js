@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-hub-shell-v44-upload-resilience";
+const CACHE_NAME = "task-hub-shell-v45-direct-r2-upload";
 const APP_SHELL = [
   "/",
   "/index.html",

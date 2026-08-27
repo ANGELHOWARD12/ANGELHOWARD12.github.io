@@ -14,7 +14,7 @@ const MAINTENANCE_SETTING_KEY = "storage_maintenance_structured_v1";
 const LEGACY_EVIDENCE_MIGRATION_ENABLED = true;
 const R2_MULTIPART_PART_BYTES = 5 * 1024 * 1024;
 const WEEKLY_BACKUP_RETENTION = 12;
-const SCHEMA_VERSION = "27-uppercase-users-1";
+const SCHEMA_VERSION = "28-direct-r2-upload-1";
 const OBSERVER_ACCESS_LEVEL = "observer";
 const OBSERVER_EMAIL = "giuliana.parra@lgtask.local";
 const PRIMARY_COORDINATOR_EMAIL = "pablo.ramos@lgtask.local";
@@ -235,6 +235,12 @@ export async function onRequest(context) {
     }
     if (route === "storage/status" && request.method === "GET") return await storageStatus(env.DB, session.user, env);
     if (route === "storage/backup" && request.method === "POST") return await createStorageBackup(env.DB, session.user, env);
+    if (route === "evidence/upload/r2/presign" && request.method === "POST") {
+      return await presignEvidenceDirectUpload(request, env.DB, session.user, env);
+    }
+    if (route === "evidence/upload/r2/confirm" && request.method === "POST") {
+      return await confirmEvidenceDirectUpload(request, env.DB, session.user, env);
+    }
     if (route === "evidence/upload/r2" && request.method === "POST") {
       return await uploadEvidenceDirectToR2(request, env.DB, session.user, env);
     }
@@ -438,6 +444,20 @@ async function ensureSchema(db) {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS r2_direct_uploads (
+      id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
+      owner_id TEXT NOT NULL,
+      submitted_by_id TEXT NOT NULL,
+      client_key TEXT NOT NULL,
+      file_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      object_key TEXT NOT NULL,
+      parent_path TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`),
     db.prepare("INSERT OR IGNORE INTO app_data (id, data, updated_at) VALUES (1, ?, 0)").bind(JSON.stringify(EMPTY_DATA)),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at)"),
@@ -452,7 +472,9 @@ async function ensureSchema(db) {
     db.prepare("CREATE INDEX IF NOT EXISTS idx_task_records_archive_created ON task_records(archived, created_at)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_task_history_task ON task_history_records(task_id, entry_index)"),
     db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_r2_multipart_client ON r2_multipart_uploads(submitted_by_id, task_id, client_key)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS idx_r2_multipart_created ON r2_multipart_uploads(created_at)")
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_r2_multipart_created ON r2_multipart_uploads(created_at)"),
+    db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_r2_direct_client ON r2_direct_uploads(submitted_by_id, task_id, client_key)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_r2_direct_created ON r2_direct_uploads(created_at)")
   ]);
   const userColumns = await db.prepare("PRAGMA table_info(users)").all();
   if (!(userColumns.results || []).some((column) => column.name === "access_level")) {
@@ -635,6 +657,7 @@ async function runMaintenance(db, env) {
     await deleteExternalEvidenceItems(env, abandonedStoredItems.results);
   }
   await cleanupAbandonedMultipartUploads(db, env, now - ABANDONED_MULTIPART_TTL_MS);
+  await cleanupAbandonedDirectUploads(db, env, now - ABANDONED_MULTIPART_TTL_MS);
 
   await db.batch([
     db.prepare("DELETE FROM evidence_file_chunks WHERE file_id IN (SELECT file_id FROM evidence_storage)"),
@@ -1111,6 +1134,17 @@ async function cleanupAbandonedMultipartUploads(db, env, cutoff) {
       await env.EVIDENCE_BUCKET.resumeMultipartUpload(row.object_key, row.r2_upload_id).abort().catch(() => {});
     }
     await db.prepare("DELETE FROM r2_multipart_uploads WHERE id = ?").bind(row.id).run();
+  }
+}
+
+async function cleanupAbandonedDirectUploads(db, env, cutoff) {
+  const rows = await db
+    .prepare("SELECT id, object_key FROM r2_direct_uploads WHERE updated_at < ? LIMIT 50")
+    .bind(cutoff)
+    .all();
+  for (const row of rows.results || []) {
+    if (r2StorageEnabled(env)) await env.EVIDENCE_BUCKET.delete(clean(row.object_key)).catch(() => {});
+    await db.prepare("DELETE FROM r2_direct_uploads WHERE id = ?").bind(row.id).run();
   }
 }
 
@@ -1833,6 +1867,91 @@ function r2StorageEnabled(env) {
   return Boolean(env.EVIDENCE_BUCKET);
 }
 
+function directR2UploadEnabled(env) {
+  return Boolean(
+    r2StorageEnabled(env) &&
+      clean(env.R2_ACCOUNT_ID) &&
+      clean(env.R2_BUCKET_NAME) &&
+      clean(env.R2_ACCESS_KEY_ID) &&
+      clean(env.R2_SECRET_ACCESS_KEY)
+  );
+}
+
+function awsUriEncode(value) {
+  return encodeURIComponent(String(value || "")).replace(/[!'()*]/g, (character) =>
+    `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+  );
+}
+
+function bytesToHex(bytes) {
+  return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function hmacSha256(keyBytes, value) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    typeof keyBytes === "string" ? new TextEncoder().encode(keyBytes) : keyBytes,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  return new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(String(value))));
+}
+
+async function createR2PresignedPutUrl(env, objectKey, mimeType, expiresSeconds = 900) {
+  if (!directR2UploadEnabled(env)) throw new Error("Direct R2 upload credentials are not configured");
+  const accountId = clean(env.R2_ACCOUNT_ID);
+  const bucketName = clean(env.R2_BUCKET_NAME);
+  const accessKeyId = clean(env.R2_ACCESS_KEY_ID);
+  const secretAccessKey = clean(env.R2_SECRET_ACCESS_KEY);
+  const host = `${accountId}.r2.cloudflarestorage.com`;
+  const canonicalUri = `/${awsUriEncode(bucketName)}/${String(objectKey)
+    .split("/")
+    .map(awsUriEncode)
+    .join("/")}`;
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
+  const dateStamp = amzDate.slice(0, 8);
+  const credentialScope = `${dateStamp}/auto/s3/aws4_request`;
+  const signedHeaders = "content-type;host";
+  const query = {
+    "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+    "X-Amz-Content-Sha256": "UNSIGNED-PAYLOAD",
+    "X-Amz-Credential": `${accessKeyId}/${credentialScope}`,
+    "X-Amz-Date": amzDate,
+    "X-Amz-Expires": String(expiresSeconds),
+    "X-Amz-SignedHeaders": signedHeaders
+  };
+  const canonicalQuery = Object.entries(query)
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+    .map(([key, value]) => `${awsUriEncode(key)}=${awsUriEncode(value)}`)
+    .join("&");
+  const canonicalHeaders = `content-type:${mimeType}\nhost:${host}\n`;
+  const canonicalRequest = [
+    "PUT",
+    canonicalUri,
+    canonicalQuery,
+    canonicalHeaders,
+    signedHeaders,
+    "UNSIGNED-PAYLOAD"
+  ].join("\n");
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    amzDate,
+    credentialScope,
+    await sha256Hex(canonicalRequest)
+  ].join("\n");
+  const dateKey = await hmacSha256(`AWS4${secretAccessKey}`, dateStamp);
+  const regionKey = await hmacSha256(dateKey, "auto");
+  const serviceKey = await hmacSha256(regionKey, "s3");
+  const signingKey = await hmacSha256(serviceKey, "aws4_request");
+  const signature = bytesToHex(await hmacSha256(signingKey, stringToSign));
+  return {
+    url: `https://${host}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`,
+    expiresAt: now.getTime() + expiresSeconds * 1000
+  };
+}
+
 function externalStorageProvider(env) {
   if (r2StorageEnabled(env)) return R2_STORAGE_PROVIDER;
   if (microsoftStorageEnabled(env)) return MICROSOFT_STORAGE_PROVIDER;
@@ -1848,6 +1967,146 @@ async function r2EvidenceDescriptor(db, task, file) {
   const parentPath = `Task Hub / Sustentos / ${trainerName} / ${dueDate} / ${taskName}`;
   const objectKey = `sustentos/${trainerName}/${dueDate}/${taskName}/${storedName}`;
   return { objectKey, parentPath };
+}
+
+async function presignEvidenceDirectUpload(request, db, user, env) {
+  if (!directR2UploadEnabled(env)) {
+    return json({ ok: false, direct: false, message: "La carga directa R2 aun no esta configurada." }, 503);
+  }
+  const body = await readJson(request, 20_000);
+  const taskId = clean(body.taskId);
+  const offlineQueuedAt = Number(body.offlineQueuedAt || 0);
+  const data = await loadData(db);
+  const task = data.tasks.find((item) => clean(item.id) === taskId);
+  if (!task) return json({ ok: false, message: "La tarea ya no existe." }, 404);
+  if (clean(task.ownerId) !== clean(user.id) && !(await coordinatorCanManageOwner(db, user, task.ownerId))) {
+    return json({ ok: false, message: "No puedes subir sustentos para esa tarea." }, 403);
+  }
+  if (!userCanUploadTaskEvidence(user, task, data.lateEvidenceUploadsEnabled) && !validOfflineEvidenceQueue(task, offlineQueuedAt)) {
+    return json({ ok: false, message: evidenceUploadWindowError(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled) }, 409);
+  }
+
+  const fileName = clean(body.fileName).replace(/[\\/:*?"<>|]/g, "-").slice(0, 120) || "archivo-sustento";
+  const extension = fileName.includes(".") ? fileName.split(".").pop().toLowerCase() : "";
+  const mimeType = clean(body.mimeType).split(";", 1)[0].toLowerCase() || mimeTypeForExtension(extension);
+  const sizeBytes = Number(body.size);
+  const clientKey = clean(body.clientKey).slice(0, 220);
+  if (
+    !clientKey ||
+    !ALLOWED_FILE_EXTENSIONS.has(extension) ||
+    !ALLOWED_FILE_MIME_TYPES.has(mimeType) ||
+    !Number.isInteger(sizeBytes) ||
+    sizeBytes < 1 ||
+    sizeBytes > MAX_FILE_BYTES
+  ) {
+    return json({ ok: false, message: "El archivo no tiene un formato o tamano permitido." }, 400);
+  }
+
+  let pending = await db
+    .prepare("SELECT * FROM r2_direct_uploads WHERE submitted_by_id = ? AND task_id = ? AND client_key = ?")
+    .bind(user.id, task.id, clientKey)
+    .first();
+  if (
+    pending &&
+    (clean(pending.file_name) !== fileName || clean(pending.mime_type) !== mimeType || Number(pending.size_bytes) !== sizeBytes)
+  ) {
+    await env.EVIDENCE_BUCKET.delete(clean(pending.object_key)).catch(() => {});
+    await db.prepare("DELETE FROM r2_direct_uploads WHERE id = ?").bind(pending.id).run();
+    pending = null;
+  }
+
+  if (!pending) {
+    const fileId = crypto.randomUUID();
+    const descriptor = await r2EvidenceDescriptor(db, task, { id: fileId, fileName, mimeType });
+    const now = Date.now();
+    await db
+      .prepare(
+        `INSERT INTO r2_direct_uploads
+         (id, task_id, owner_id, submitted_by_id, client_key, file_name, mime_type, size_bytes,
+          object_key, parent_path, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        fileId,
+        task.id,
+        task.ownerId,
+        user.id,
+        clientKey,
+        fileName,
+        mimeType,
+        sizeBytes,
+        descriptor.objectKey,
+        descriptor.parentPath,
+        now,
+        now
+      )
+      .run();
+    pending = await db.prepare("SELECT * FROM r2_direct_uploads WHERE id = ?").bind(fileId).first();
+  }
+
+  const signed = await createR2PresignedPutUrl(env, pending.object_key, mimeType, 900);
+  return json({
+    ok: true,
+    direct: true,
+    uploadId: pending.id,
+    url: signed.url,
+    method: "PUT",
+    headers: { "Content-Type": mimeType },
+    expiresAt: signed.expiresAt
+  });
+}
+
+async function confirmEvidenceDirectUpload(request, db, user, env) {
+  if (!r2StorageEnabled(env)) return json({ ok: false, message: "R2 no esta disponible." }, 503);
+  const body = await readJson(request, 20_000);
+  const uploadId = clean(body.uploadId);
+  const offlineQueuedAt = Number(body.offlineQueuedAt || 0);
+  const completed = await db.prepare("SELECT id, file_name, mime_type, created_at FROM evidence_files WHERE id = ?").bind(uploadId).first();
+  if (completed) {
+    return json({
+      ok: true,
+      file: { id: completed.id, name: completed.file_name, mimeType: completed.mime_type, createdAt: completed.created_at, url: `/cloud/evidence/${completed.id}/file` }
+    });
+  }
+  const pending = await db.prepare("SELECT * FROM r2_direct_uploads WHERE id = ?").bind(uploadId).first();
+  if (!pending) return json({ ok: false, message: "La carga directa vencio. Solicita un nuevo intento." }, 409);
+  if (clean(pending.submitted_by_id) !== clean(user.id)) return json({ ok: false, message: "Carga no autorizada." }, 403);
+  const data = await loadData(db);
+  const task = data.tasks.find((item) => clean(item.id) === clean(pending.task_id));
+  if (!task) return json({ ok: false, message: "La tarea ya no existe." }, 404);
+  if (!userCanUploadTaskEvidence(user, task, data.lateEvidenceUploadsEnabled) && !validOfflineEvidenceQueue(task, offlineQueuedAt)) {
+    return json({ ok: false, message: evidenceUploadWindowError(task, dateIsoInLima(Date.now()), data.lateEvidenceUploadsEnabled) }, 409);
+  }
+  const object = await env.EVIDENCE_BUCKET.head(clean(pending.object_key)).catch(() => null);
+  if (!object) return json({ ok: false, message: "R2 aun no confirma el archivo. Vuelve a intentar." }, 503);
+  if (Number(object.size || 0) !== Number(pending.size_bytes)) {
+    return json({ ok: false, message: "R2 recibio un archivo incompleto. Inicia un nuevo intento." }, 409);
+  }
+  const createdAt = Date.now();
+  try {
+    await db.batch([
+      db
+        .prepare(
+          "INSERT INTO evidence_files (id, task_id, owner_id, submitted_by_id, file_name, mime_type, photo_base64, created_at) VALUES (?, ?, ?, ?, ?, ?, '', ?)"
+        )
+        .bind(pending.id, pending.task_id, pending.owner_id, pending.submitted_by_id, pending.file_name, pending.mime_type, createdAt),
+      db
+        .prepare(
+          `INSERT INTO evidence_storage
+           (file_id, provider, drive_id, drive_item_id, parent_path, size_bytes, sha256, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, '', ?)`
+        )
+        .bind(pending.id, R2_STORAGE_PROVIDER, "EVIDENCE_BUCKET", pending.object_key, pending.parent_path, pending.size_bytes, createdAt),
+      db.prepare("DELETE FROM r2_direct_uploads WHERE id = ?").bind(pending.id)
+    ]);
+  } catch (error) {
+    console.error("Direct R2 confirmation", error);
+    return json({ ok: false, message: "El archivo esta en R2, pero falta confirmar el registro. Reintenta." }, 503);
+  }
+  return json({
+    ok: true,
+    file: { id: pending.id, name: pending.file_name, mimeType: pending.mime_type, createdAt, url: `/cloud/evidence/${pending.id}/file` }
+  }, 201);
 }
 
 async function uploadEvidenceToR2(env, db, task, file, fileBase64) {

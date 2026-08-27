@@ -12,7 +12,13 @@ const required = [
   'id="latestEvidenceReceipt"',
   "function renderLatestEvidenceReceipt()",
   "openEvidenceEntries.add(evidence.id)",
-  "Acceso protegido activo"
+  "Acceso protegido activo",
+  "function uploadFileDirectlyToR2",
+  "function uploadMetricText",
+  "Subiendo directo a R2",
+  "restante ${etaLabel}",
+  '"/evidence/upload/r2/presign"',
+  '"/evidence/upload/r2/confirm"'
 ];
 
 for (const marker of required) {

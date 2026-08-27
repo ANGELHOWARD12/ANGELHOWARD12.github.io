@@ -15,7 +15,12 @@ const required = [
   "async function restoreCloudSessionIfNeeded",
   "Modo sin conexion.",
   "Sustento protegido en este dispositivo",
-  "if (offlineSessionMode || !navigator.onLine)"
+  "if (offlineSessionMode || !navigator.onLine)",
+  "async function encryptEvidenceOutboxEntry",
+  "async function decryptEvidenceOutboxEntry",
+  'additionalData: evidenceOutboxAdditionalData(evidence.id, "payload")',
+  "encryptedPayload",
+  "encryptedBytes"
 ];
 
 for (const marker of required) {

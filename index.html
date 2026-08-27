@@ -3691,7 +3691,7 @@
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
       const EARLIEST_OVERTIME_START = "05:00";
-      const APP_VERSION = "44-upload-resilience";
+      const APP_VERSION = "45-direct-r2-upload";
       const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
       const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
       const APP_MODE = document.documentElement.classList.contains("app-mode");
@@ -4342,7 +4342,8 @@
 
       async function enableOfflineContinuity(email, password) {
         const normalizedEmail = clean(email).toLowerCase();
-        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const existing = await readOfflineSession(normalizedEmail).catch(() => null);
+        const salt = existing?.salt ? new Uint8Array(existing.salt) : crypto.getRandomValues(new Uint8Array(16));
         const key = await deriveOfflineSessionKey(password, salt);
         offlineUnlockContext = { email: normalizedEmail, salt, key };
         offlineReauthCredentials = { email: normalizedEmail, password: String(password || "") };
@@ -4764,6 +4765,101 @@
         });
       }
 
+      function evidenceOutboxAdditionalData(evidenceId, part) {
+        return new TextEncoder().encode(`TaskHub:evidence:${evidenceId}:${part}`);
+      }
+
+      async function encryptEvidenceOutboxEntry(task, files, evidence, queuedAt) {
+        if (!offlineUnlockContext?.key) throw new Error("Vuelve a iniciar sesion para activar la proteccion local.");
+        const fileMetadata = files.map((file) => ({
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          lastModified: Number(file.lastModified || queuedAt)
+        }));
+        const payloadIv = crypto.getRandomValues(new Uint8Array(12));
+        const encryptedPayload = await crypto.subtle.encrypt(
+          {
+            name: "AES-GCM",
+            iv: payloadIv,
+            additionalData: evidenceOutboxAdditionalData(evidence.id, "payload")
+          },
+          offlineUnlockContext.key,
+          new TextEncoder().encode(
+            JSON.stringify({ taskId: task.id, taskDate: task.dueDate, evidence, fileMetadata })
+          )
+        );
+        const encryptedFiles = [];
+        for (let index = 0; index < files.length; index += 1) {
+          const iv = crypto.getRandomValues(new Uint8Array(12));
+          const encryptedBytes = await crypto.subtle.encrypt(
+            {
+              name: "AES-GCM",
+              iv,
+              additionalData: evidenceOutboxAdditionalData(evidence.id, `file:${index}`)
+            },
+            offlineUnlockContext.key,
+            await files[index].arrayBuffer()
+          );
+          encryptedFiles.push({ iv, encryptedBytes });
+        }
+        return {
+          id: evidence.id,
+          version: 2,
+          userId: state.activeUserId,
+          queuedAt,
+          payloadIv,
+          encryptedPayload,
+          files: encryptedFiles
+        };
+      }
+
+      async function decryptEvidenceOutboxEntry(entry) {
+        if (Number(entry.version || 0) < 2) {
+          return {
+            ...entry,
+            files: (entry.files || []).map(
+              (stored) => new File([stored.blob], stored.name, {
+                type: stored.type,
+                lastModified: stored.lastModified
+              })
+            )
+          };
+        }
+        if (!offlineUnlockContext?.key) throw new Error("La cola cifrada necesita que vuelvas a iniciar sesion.");
+        const decryptedPayload = await crypto.subtle.decrypt(
+          {
+            name: "AES-GCM",
+            iv: new Uint8Array(entry.payloadIv),
+            additionalData: evidenceOutboxAdditionalData(entry.id, "payload")
+          },
+          offlineUnlockContext.key,
+          entry.encryptedPayload
+        );
+        const payload = JSON.parse(new TextDecoder().decode(decryptedPayload));
+        const files = [];
+        for (let index = 0; index < (entry.files || []).length; index += 1) {
+          const stored = entry.files[index];
+          const metadata = payload.fileMetadata[index];
+          const decryptedBytes = await crypto.subtle.decrypt(
+            {
+              name: "AES-GCM",
+              iv: new Uint8Array(stored.iv),
+              additionalData: evidenceOutboxAdditionalData(entry.id, `file:${index}`)
+            },
+            offlineUnlockContext.key,
+            stored.encryptedBytes
+          );
+          files.push(
+            new File([decryptedBytes], metadata.name, {
+              type: metadata.type,
+              lastModified: metadata.lastModified
+            })
+          );
+        }
+        return { ...entry, ...payload, files };
+      }
+
       async function queueEvidenceForLater(task, files, details) {
         const queuedAt = Date.now();
         const evidence = {
@@ -4781,21 +4877,7 @@
           offlineQueuedAt: queuedAt
         };
         evidence.cloudPath = cloudFolderForEvidence(evidence, task);
-        const storedFiles = files.map((file) => ({
-          name: file.name,
-          type: file.type,
-          lastModified: Number(file.lastModified || queuedAt),
-          blob: file.slice(0, file.size, file.type)
-        }));
-        await putEvidenceOutbox({
-          id: evidence.id,
-          userId: state.activeUserId,
-          taskId: task.id,
-          taskDate: task.dueDate,
-          queuedAt,
-          evidence,
-          files: storedFiles
-        });
+        await putEvidenceOutbox(await encryptEvidenceOutboxEntry(task, files, evidence, queuedAt));
         serviceWorkerRegistration?.sync?.register("lgtask-cloud-sync").catch(() => {});
         return evidence;
       }
@@ -4804,16 +4886,16 @@
         if (!navigator.onLine || !state.activeUserId || evidenceSubmitInFlight) return 0;
         const entries = (await listEvidenceOutbox()).filter((entry) => entry.userId === state.activeUserId);
         let synced = 0;
-        for (const entry of entries) {
+        for (const storedEntry of entries) {
+          const entry = await decryptEvidenceOutboxEntry(storedEntry);
           const task = state.tasks.find((item) => item.id === entry.taskId);
           if (!task) continue;
           if (task.evidence?.some((item) => item.id === entry.evidence.id)) {
-            await deleteEvidenceOutbox(entry.id);
+            await deleteEvidenceOutbox(storedEntry.id);
             continue;
           }
           const uploadedFiles = [];
-          for (const stored of entry.files) {
-            const file = new File([stored.blob], stored.name, { type: stored.type, lastModified: stored.lastModified });
+          for (const file of entry.files) {
             const prepared = await prepareEvidenceFile(file);
             const upload = await uploadPreparedEvidenceFile(task.id, prepared, null, entry.queuedAt);
             uploadedFiles.push({ id: upload.file.id, name: upload.file.name, mimeType: upload.file.mimeType });
@@ -4826,7 +4908,7 @@
             timeoutMs: 90_000
           }, 6);
           applyCloudState(data.state);
-          await deleteEvidenceOutbox(entry.id);
+          await deleteEvidenceOutbox(storedEntry.id);
           synced += 1;
         }
         return synced;
@@ -5061,6 +5143,133 @@
             await new Promise((resolve) => window.setTimeout(resolve, cloudRetryDelay(attempt)));
           } finally {
             window.clearTimeout(timeout);
+          }
+        }
+        throw lastError;
+      }
+
+      function uploadEtaLabel(seconds) {
+        if (!Number.isFinite(seconds) || seconds < 0) return "calculando";
+        if (seconds < 60) return `${Math.max(1, Math.ceil(seconds))} s`;
+        const minutes = Math.floor(seconds / 60);
+        return `${minutes} min ${Math.ceil(seconds % 60)} s`;
+      }
+
+      function uploadMetricText(progress) {
+        const speed = Number(progress.speedMbps || 0);
+        const speedLabel = speed > 0 ? `${speed.toFixed(1)} Mbps` : "calculando velocidad";
+        const etaLabel = progress.loaded >= progress.total ? "0 s" : uploadEtaLabel(progress.etaSeconds);
+        return `${progress.stage} | ${speedLabel} | restante ${etaLabel}`;
+      }
+
+      function uploadFileDirectlyToR2(signed, file, mimeType, onProgress, attempt) {
+        return new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          const startedAt = performance.now();
+          let lastMetrics = { speedMbps: 0, etaSeconds: Number.POSITIVE_INFINITY };
+          xhr.open("PUT", signed.url, true);
+          xhr.timeout = EVIDENCE_UPLOAD_TIMEOUT_MS;
+          xhr.setRequestHeader("Content-Type", mimeType);
+          xhr.upload.addEventListener("progress", (event) => {
+            if (!event.lengthComputable) return;
+            const elapsedSeconds = Math.max(0.25, (performance.now() - startedAt) / 1000);
+            const bytesPerSecond = event.loaded / elapsedSeconds;
+            lastMetrics = {
+              speedMbps: (bytesPerSecond * 8) / 1_000_000,
+              etaSeconds: bytesPerSecond > 0 ? (event.total - event.loaded) / bytesPerSecond : Number.POSITIVE_INFINITY
+            };
+            onProgress?.({
+              stage: `Subiendo directo a R2 (intento ${attempt})`,
+              loaded: event.loaded,
+              total: event.total,
+              percent: event.total ? (event.loaded / event.total) * 100 : 0,
+              ...lastMetrics
+            });
+          });
+          xhr.addEventListener("load", () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(lastMetrics);
+              return;
+            }
+            const error = new Error(`R2 rechazo la carga directa (HTTP ${xhr.status || 0}).`);
+            error.status = xhr.status || 0;
+            reject(error);
+          });
+          xhr.addEventListener("error", () => {
+            const error = new Error("La conexion directa con R2 se interrumpio.");
+            error.status = 0;
+            reject(error);
+          });
+          xhr.addEventListener("timeout", () => {
+            const error = new Error("La carga directa demoro demasiado.");
+            error.status = 0;
+            reject(error);
+          });
+          xhr.addEventListener("abort", () => {
+            const error = new Error("La carga directa fue interrumpida.");
+            error.status = 0;
+            reject(error);
+          });
+          xhr.send(file);
+        });
+      }
+
+      async function uploadPreparedEvidenceDirect(taskId, prepared, onProgress, offlineQueuedAt = 0) {
+        const clientKey = `${taskId}:${prepared.fileName}:${prepared.file.size}:${prepared.file.lastModified || 0}`;
+        let lastError;
+        for (let attempt = 1; attempt <= 4; attempt += 1) {
+          let signed = null;
+          try {
+            onProgress?.({
+              stage: `Solicitando URL firmada R2 (intento ${attempt})`,
+              loaded: 0,
+              total: prepared.file.size,
+              percent: 0,
+              speedMbps: 0,
+              etaSeconds: Number.POSITIVE_INFINITY
+            });
+            signed = await apiRequestWithRetry("/evidence/upload/r2/presign", {
+              method: "POST",
+              body: JSON.stringify({
+                taskId,
+                fileName: prepared.fileName,
+                mimeType: prepared.mimeType,
+                size: prepared.file.size,
+                clientKey,
+                offlineQueuedAt
+              }),
+              timeoutMs: 30_000,
+              allowFallback: true
+            }, 2);
+            if (!signed.direct || !signed.url) return null;
+            const metrics = await uploadFileDirectlyToR2(signed, prepared.file, prepared.mimeType, onProgress, attempt);
+            onProgress?.({
+              stage: "Verificando archivo en R2",
+              loaded: prepared.file.size,
+              total: prepared.file.size,
+              percent: 100,
+              ...metrics,
+              etaSeconds: 0
+            });
+            return await apiRequestWithRetry("/evidence/upload/r2/confirm", {
+              method: "POST",
+              body: JSON.stringify({ uploadId: signed.uploadId, offlineQueuedAt }),
+              timeoutMs: 45_000,
+              allowFallback: true
+            }, 4);
+          } catch (error) {
+            lastError = error;
+            if (!signed && [404, 501, 503].includes(Number(error.status)) && attempt === 1) return null;
+            if (attempt >= 4 || (error.status && error.status < 500 && error.status !== 409)) throw error;
+            onProgress?.({
+              stage: `Reintentando carga directa (${attempt + 1} de 4)`,
+              loaded: 0,
+              total: prepared.file.size,
+              percent: 0,
+              speedMbps: 0,
+              etaSeconds: Number.POSITIVE_INFINITY
+            });
+            await new Promise((resolve) => window.setTimeout(resolve, cloudRetryDelay(attempt)));
           }
         }
         throw lastError;
@@ -9729,8 +9938,18 @@
       }
 
       async function uploadPreparedEvidenceFile(taskId, prepared, onChunk, offlineQueuedAt = 0) {
+        const directUpload = await uploadPreparedEvidenceDirect(taskId, prepared, onChunk, offlineQueuedAt);
+        if (directUpload) return directUpload;
+
         if (prepared.file.size <= EVIDENCE_MULTIPART_PART_BYTES) {
-          onChunk?.(1, 1);
+          onChunk?.({
+            stage: "Carga por ruta de respaldo",
+            loaded: 0,
+            total: prepared.file.size,
+            percent: 0,
+            speedMbps: 0,
+            etaSeconds: Number.POSITIVE_INFINITY
+          });
           const query = new URLSearchParams({
             taskId,
             fileName: prepared.fileName,
@@ -9777,7 +9996,14 @@
               3
             );
           }
-          onChunk?.(partNumber, totalParts);
+          onChunk?.({
+            stage: `Carga de respaldo | bloque ${partNumber} de ${totalParts}`,
+            loaded: Math.min(prepared.file.size, partNumber * partSize),
+            total: prepared.file.size,
+            percent: (partNumber / totalParts) * 100,
+            speedMbps: 0,
+            etaSeconds: Number.POSITIVE_INFINITY
+          });
         }
         return apiRequestWithRetry("/evidence/upload/r2/complete", {
           method: "POST",
@@ -10705,15 +10931,17 @@
                   `Archivo ${index + 1} de ${selectedFiles.length}: iniciando carga segura...`,
                   10 + Math.round((index / selectedFiles.length) * 80)
                 );
-                const upload = await uploadPreparedEvidenceFile(task.id, prepared, (chunk, total) => {
-                  const percent = 10 + Math.round(((index + chunk / total) / selectedFiles.length) * 80);
+                const upload = await uploadPreparedEvidenceFile(task.id, prepared, (uploadProgress) => {
+                  const fileRatio = uploadProgress.total > 0 ? uploadProgress.loaded / uploadProgress.total : 0;
+                  const percent = 10 + Math.round(((index + fileRatio) / selectedFiles.length) * 80);
+                  const detail = uploadMetricText(uploadProgress);
                   setMessage(
                     els.evidenceMessage,
-                    `Subiendo archivo ${index + 1} de ${selectedFiles.length} | bloque ${chunk} de ${total}...`,
+                    `Archivo ${index + 1} de ${selectedFiles.length} | ${detail}`,
                     ""
                   );
                   setEvidenceUploadProgress(
-                    `Archivo ${index + 1} de ${selectedFiles.length} | bloque ${chunk} de ${total} | ${percent}%`,
+                    `Archivo ${index + 1} de ${selectedFiles.length} | ${detail} | ${percent}%`,
                     percent
                   );
                 });
@@ -10772,7 +11000,7 @@
             rememberPendingEvidenceSubmission({ taskId: task.id, fileSignature: evidenceFileSignature(selectedFiles), evidence });
           }
           els.evidenceSubmitButton.textContent = "Confirmando sustento...";
-          setEvidenceUploadProgress("Archivos cargados. Confirmando el sustento en la nube...", 95);
+          setEvidenceUploadProgress("Etapa final: confirmando formulario y metadatos en D1...", 95);
           let recoveredAfterSyncError = false;
           try {
             const data = await apiRequestWithRetry("/tasks/evidence", {
