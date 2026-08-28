@@ -14,7 +14,7 @@ const MAINTENANCE_SETTING_KEY = "storage_maintenance_structured_v1";
 const LEGACY_EVIDENCE_MIGRATION_ENABLED = true;
 const R2_MULTIPART_PART_BYTES = 5 * 1024 * 1024;
 const WEEKLY_BACKUP_RETENTION = 12;
-const SCHEMA_VERSION = "28-direct-r2-upload-1";
+const SCHEMA_VERSION = "29-scoped-state-sync-1";
 const OBSERVER_ACCESS_LEVEL = "observer";
 const OBSERVER_EMAIL = "giuliana.parra@lgtask.local";
 const PRIMARY_COORDINATOR_EMAIL = "pablo.ramos@lgtask.local";
@@ -212,7 +212,7 @@ export async function onRequest(context) {
 
     const session = await authenticate(request, env.DB);
     if (!session) return json({ ok: false, message: "Sesion no valida." }, 401);
-    if ((route === "state" && request.method === "GET") || route === "storage/status") {
+    if (route === "storage/status") {
       scheduleMaintenance(env.DB, env, context);
     }
     if (
@@ -268,7 +268,7 @@ export async function onRequest(context) {
     if (route === "schedule/overtime" && request.method === "POST") return await saveOvertimeSchedule(request, env.DB, session.user, context);
     if (route === "schedule/overtime-request" && request.method === "POST") return await requestOvertimeSchedule(request, env.DB, session.user, context);
     if (route === "schedule/overtime-review" && request.method === "POST") return await reviewOvertimeSchedule(request, env.DB, session.user, context);
-    if (route === "state" && request.method === "GET") return await getState(env.DB, session.user, context);
+    if (route === "state" && request.method === "GET") return await getState(request, env.DB, session.user, context);
     if (route === "state" && request.method === "PUT") return await putState(request, env.DB, session.user, context, env);
     if (route === "settings/late-evidence" && request.method === "POST") {
       return await setLateEvidencePolicy(request, env.DB, session.user, context);
@@ -306,7 +306,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "43-weekly-photo-report2",
+    version: "46-scoped-state-sync",
     schema: SCHEMA_VERSION,
     r2: r2StorageEnabled(env),
     migration: {
@@ -470,6 +470,7 @@ async function ensureSchema(db) {
     db.prepare("CREATE INDEX IF NOT EXISTS idx_task_records_owner_date ON task_records(owner_id, due_date)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_task_records_status_date ON task_records(status, due_date)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_task_records_archive_created ON task_records(archived, created_at)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_task_records_updated ON task_records(updated_at DESC)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_task_history_task ON task_history_records(task_id, entry_index)"),
     db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_r2_multipart_client ON r2_multipart_uploads(submitted_by_id, task_id, client_key)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_r2_multipart_created ON r2_multipart_uploads(created_at)"),
@@ -1469,10 +1470,13 @@ async function authenticate(request, db) {
   return { user: row };
 }
 
-async function getState(db, user, context) {
-  const data = await loadData(db);
-  context.waitUntil(dispatchDueReminders(db, data));
-  return stateResponse(db, user, data);
+async function getState(request, db, user, context) {
+  const stateVersion = await readStateVersion(db);
+  const requestedVersion = clean(new URL(request.url).searchParams.get("since"));
+  if (requestedVersion && requestedVersion === stateVersion) {
+    return json({ ok: true, notModified: true, stateVersion, user: publicUser(user) });
+  }
+  return stateResponse(db, user, null, stateVersion);
 }
 
 async function setLateEvidencePolicy(request, db, user, context) {
@@ -1608,6 +1612,7 @@ async function unsubscribeNotifications(request, db, user) {
 async function pendingNotifications(db, user) {
   await queueWeeklyPlanningReminder(db, user);
   await queueEvidenceDeadlineReminder(db, user);
+  await dispatchDueReminders(db, null, user.id);
   const rows = await db
     .prepare(
       `SELECT id, title, body, target_url, created_at
@@ -1658,7 +1663,7 @@ async function queueEvidenceDeadlineReminder(db, user) {
     new Intl.DateTimeFormat("en", { timeZone: "America/Lima", hour: "2-digit", hourCycle: "h23" }).format(new Date(now))
   );
   if (hour < 17 || hour >= 19) return;
-  const data = await loadData(db);
+  const data = await loadData(db, { ownerIds: [user.id] });
   const pending = (data.tasks || []).filter(
     (task) =>
       clean(task.ownerId) === user.id &&
@@ -3716,8 +3721,20 @@ async function reviewOvertimeSchedule(request, db, user, context) {
   return stateResponse(db, user, data);
 }
 
-async function stateResponse(db, user, loadedData = null) {
-  const data = loadedData || (await loadData(db));
+async function readStateVersion(db) {
+  const [appResult, taskResult, userResult] = await db.batch([
+    db.prepare("SELECT updated_at FROM app_data WHERE id = 1"),
+    db.prepare("SELECT updated_at FROM task_records ORDER BY updated_at DESC LIMIT 1"),
+    db.prepare("SELECT COUNT(*) AS count, COALESCE(MAX(created_at), 0) AS latest FROM users")
+  ]);
+  const appUpdated = Number(appResult?.results?.[0]?.updated_at || 0);
+  const taskUpdated = Number(taskResult?.results?.[0]?.updated_at || 0);
+  const userCount = Number(userResult?.results?.[0]?.count || 0);
+  const userUpdated = Number(userResult?.results?.[0]?.latest || 0);
+  return `${appUpdated}.${taskUpdated}.${userCount}.${userUpdated}`;
+}
+
+async function stateResponse(db, user, loadedData = null, knownStateVersion = "") {
   const coordinator = user.role === "Coordinador";
   const observer = isObserverUser(user);
   const userRows = await db
@@ -3736,6 +3753,12 @@ async function stateResponse(db, user, loadedData = null) {
   const visibleTaskOwnerIds = coordinator
     ? new Set(visibleUserRows.filter((row) => coordinatorCanManageTaskUser(user, row)).map((row) => clean(row.id)))
     : visibleOwnerIds;
+  const requestedOwnerIds = observer
+    ? null
+    : coordinator
+      ? Array.from(visibleTaskOwnerIds)
+      : [clean(user.id)];
+  const data = loadedData || (await loadData(db, { ownerIds: requestedOwnerIds }));
   const users = visibleUserRows.map(publicUser);
   const visibleTasks = observer
     ? data.tasks
@@ -3787,7 +3810,8 @@ async function stateResponse(db, user, loadedData = null) {
       ? (data.registrationRequests || []).filter((item) => clean(item.team || TEAM_TRAINING) === userTeam(user))
       : []
   };
-  return json({ ok: true, state, user: publicUser(user) });
+  const stateVersion = knownStateVersion || (await readStateVersion(db));
+  return json({ ok: true, state, stateVersion, user: publicUser(user) });
 }
 
 async function putState(request, db, user, context, env) {
@@ -4239,23 +4263,62 @@ async function queueNotifications(db, notifications) {
   return Array.from(notifiedUsers);
 }
 
-async function dispatchDueReminders(db, data) {
+async function dueReminderNotifications(db, now, ownerId = "") {
+  const cleanOwnerId = clean(ownerId);
+  const ownerFilter = cleanOwnerId ? " AND task.owner_id = ?" : "";
+  let statement = db.prepare(
+      `SELECT task.id AS task_id,
+              task.owner_id,
+              task.due_date,
+              json_extract(task.data, '$.title') AS title,
+              json_extract(task.data, '$.startTime') AS start_time,
+              json_extract(task.data, '$.endTime') AS end_time,
+              json_extract(reminder.value, '$.id') AS reminder_id,
+              json_extract(reminder.value, '$.userId') AS reminder_user_id,
+              CAST(json_extract(reminder.value, '$.at') AS INTEGER) AS reminder_at
+       FROM task_records task, json_each(task.data, '$.reminders') reminder
+       WHERE task.archived = 0
+         AND task.status <> 'Cumplida'
+         AND CAST(json_extract(reminder.value, '$.at') AS INTEGER) > 0
+         AND CAST(json_extract(reminder.value, '$.at') AS INTEGER) <= ?${ownerFilter}`
+    );
+  statement = cleanOwnerId ? statement.bind(now, cleanOwnerId) : statement.bind(now);
+  const result = await statement.all();
+  return (result.results || []).map((row) => {
+    const taskId = clean(row.task_id);
+    const userId = clean(row.reminder_user_id || row.owner_id);
+    return {
+      userId,
+      title: "Recordatorio de tarea",
+      body: `${clean(row.title)} | ${clean(row.due_date)} ${clean(row.start_time)}-${clean(row.end_time)}`,
+      url: `/?view=tasksView&task=${encodeURIComponent(taskId)}`,
+      sourceKey: `reminder:${taskId}:${clean(row.reminder_id)}`
+    };
+  });
+}
+
+async function dispatchDueReminders(db, data = null, ownerId = "") {
   const now = Date.now();
-  const notifications = [];
-  for (const task of data.tasks || []) {
-    if (task.status === "Cumplida") continue;
-    for (const reminder of task.reminders || []) {
-      const reminderAt = Number(reminder.at || 0);
-      const userId = clean(reminder.userId || task.ownerId);
-      if (!userId || !reminderAt || reminderAt > now) continue;
-      notifications.push({
-        userId,
-        title: "Recordatorio de tarea",
-        body: `${clean(task.title)} | ${clean(task.dueDate)} ${clean(task.startTime)}-${clean(task.endTime)}`,
-        url: `/?view=tasksView&task=${encodeURIComponent(clean(task.id))}`,
-        sourceKey: `reminder:${clean(task.id)}:${clean(reminder.id)}`
-      });
+  let notifications;
+  if (data) {
+    notifications = [];
+    for (const task of data.tasks || []) {
+      if (task.status === "Cumplida") continue;
+      for (const reminder of task.reminders || []) {
+        const reminderAt = Number(reminder.at || 0);
+        const userId = clean(reminder.userId || task.ownerId);
+        if (!userId || !reminderAt || reminderAt > now) continue;
+        notifications.push({
+          userId,
+          title: "Recordatorio de tarea",
+          body: `${clean(task.title)} | ${clean(task.dueDate)} ${clean(task.startTime)}-${clean(task.endTime)}`,
+          url: `/?view=tasksView&task=${encodeURIComponent(clean(task.id))}`,
+          sourceKey: `reminder:${clean(task.id)}:${clean(reminder.id)}`
+        });
+      }
     }
+  } else {
+    notifications = await dueReminderNotifications(db, now, ownerId);
   }
   const notifiedUsers = await queueNotifications(db, notifications);
   if (notifiedUsers.length) await pushNotificationsForUsers(db, notifiedUsers);
@@ -4675,11 +4738,37 @@ function hasTaskConflict(tasks, ownerId, dateValue, startTime, endTime, excludeT
   });
 }
 
-async function loadData(db) {
+async function loadData(db, { ownerIds = null } = {}) {
+  const scopedOwnerIds = Array.isArray(ownerIds)
+    ? Array.from(new Set(ownerIds.map((value) => clean(value)).filter(Boolean)))
+    : null;
+  const ownerFilter = scopedOwnerIds === null
+    ? ""
+    : scopedOwnerIds.length
+      ? ` WHERE owner_id IN (${scopedOwnerIds.map(() => "?").join(", ")})`
+      : " WHERE 1 = 0";
+  const historyOwnerFilter = scopedOwnerIds === null
+    ? ""
+    : scopedOwnerIds.length
+      ? ` WHERE task.owner_id IN (${scopedOwnerIds.map(() => "?").join(", ")})`
+      : " WHERE 1 = 0";
+  let taskStatement = db.prepare(
+    `SELECT id, archived, data FROM task_records${ownerFilter} ORDER BY archived ASC, created_at DESC, id ASC`
+  );
+  let historyStatement = db.prepare(
+    `SELECT history.task_id, history.entry_index, history.data
+     FROM task_history_records history
+     INNER JOIN task_records task ON task.id = history.task_id${historyOwnerFilter}
+     ORDER BY history.task_id ASC, history.entry_index ASC`
+  );
+  if (scopedOwnerIds?.length) {
+    taskStatement = taskStatement.bind(...scopedOwnerIds);
+    historyStatement = historyStatement.bind(...scopedOwnerIds);
+  }
   const [appResult, taskResult, historyResult] = await db.batch([
     db.prepare("SELECT data FROM app_data WHERE id = 1"),
-    db.prepare("SELECT id, archived, data FROM task_records ORDER BY archived ASC, created_at DESC, id ASC"),
-    db.prepare("SELECT task_id, entry_index, data FROM task_history_records ORDER BY task_id ASC, entry_index ASC")
+    taskStatement,
+    historyStatement
   ]);
   try {
     const parsed = JSON.parse(appResult?.results?.[0]?.data || "{}");
@@ -4766,7 +4855,13 @@ async function saveData(db, data) {
   const previous = data.__taskSnapshot instanceof Map ? data.__taskSnapshot : new Map();
   const current = createTaskSnapshot(data);
   const statements = [
-    db.prepare("UPDATE app_data SET data = ?, updated_at = ? WHERE id = 1").bind(JSON.stringify(payload), now)
+    db
+      .prepare(
+        `UPDATE app_data
+         SET data = ?, updated_at = CASE WHEN updated_at >= ? THEN updated_at + 1 ELSE ? END
+         WHERE id = 1`
+      )
+      .bind(JSON.stringify(payload), now, now)
   ];
 
   for (const [taskId, snapshot] of current) {

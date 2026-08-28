@@ -21,7 +21,7 @@ for (const email of expectedEmails) {
 }
 
 for (const marker of [
-  'const SCHEMA_VERSION = "28-direct-r2-upload-1"',
+  'const SCHEMA_VERSION = "29-scoped-state-sync-1"',
   'UPDATE users SET name = UPPER(TRIM(name))',
   '["team", "TEXT NOT NULL DEFAULT',
   '["job_title", "TEXT NOT NULL DEFAULT',
@@ -53,7 +53,7 @@ for (const marker of [
   'function isSelfManagedMasterTask(task)',
   'function hasCoordinatorPersonalWeek()',
   'function updateMasterTask(taskId)',
-  'const APP_VERSION = "45-direct-r2-upload"',
+  'const APP_VERSION = "46-scoped-state-sync"',
   'const APP_MODE = document.documentElement.classList.contains("app-mode")',
   '<title>Task Hub</title>',
   '<span class="brand-mark" aria-label="Task Hub">TH</span>',
@@ -68,7 +68,7 @@ for (const marker of [
 
 if (cloud !== api) throw new Error("Las rutas /cloud y /api no son identicas");
 if (html !== operative) throw new Error("index.html y operativo.html no son identicos");
-if (!sw.includes('task-hub-shell-v45-direct-r2-upload')) throw new Error("El cache del Service Worker no fue actualizado");
+if (!sw.includes('task-hub-shell-v46-scoped-state-sync')) throw new Error("El cache del Service Worker no fue actualizado");
 if (html.includes('id="evidenceLinks"') || html.includes("els.evidenceLinks")) {
   throw new Error("El campo de enlaces continua visible en el formulario de sustentos");
 }

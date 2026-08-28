@@ -3691,9 +3691,11 @@
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
       const EARLIEST_OVERTIME_START = "05:00";
-      const APP_VERSION = "45-direct-r2-upload";
+      const APP_VERSION = "46-scoped-state-sync";
       const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
       const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
+      const STATE_REFRESH_INTERVAL_MS = 60 * 1000;
+      const STATE_REFRESH_JITTER_MS = 15 * 1000;
       const APP_MODE = document.documentElement.classList.contains("app-mode");
       const TEAM_TRAINING = "Training";
       const TEAM_AUDIOVISUAL = "Audiovisuales";
@@ -3879,6 +3881,7 @@
       let syncInFlight = null;
       let syncQueued = false;
       let stateRevision = 0;
+      let serverStateVersion = "";
       let serviceWorkerRegistration = null;
       let hourlyCloudMaintenanceInFlight = null;
       let pendingAppReload = false;
@@ -5066,6 +5069,7 @@
             error.status = response.status;
             throw error;
           }
+          if (data.stateVersion) serverStateVersion = String(data.stateVersion);
           setCloudStatus("online");
           return data;
         } catch (error) {
@@ -5475,7 +5479,14 @@
 
       async function refreshStateFromServer({ quiet = false } = {}) {
         try {
-          const data = await apiRequestWithRetry("/state", {}, 4);
+          const statePath = serverStateVersion
+            ? `/state?since=${encodeURIComponent(serverStateVersion)}`
+            : "/state";
+          const data = await apiRequestWithRetry(statePath, {}, 4);
+          if (data.notModified) {
+            checkPendingNotifications();
+            return true;
+          }
           applyCloudState(data.state);
           if (!quiet) render();
           checkPendingNotifications();
@@ -5495,6 +5506,29 @@
           if (!quiet) setMessage(els.loginMessage, error.message, "err");
           return false;
         }
+      }
+
+      function schedulePeriodicStateRefresh() {
+        const delay = STATE_REFRESH_INTERVAL_MS + Math.floor(Math.random() * STATE_REFRESH_JITTER_MS);
+        window.setTimeout(async () => {
+          if (maybeApplyPendingAppReload()) {
+            schedulePeriodicStateRefresh();
+            return;
+          }
+          if (
+            state.activeUserId &&
+            !document.hidden &&
+            !syncInFlight &&
+            !evidenceSubmitInFlight &&
+            !taskCreateInFlight &&
+            !(activeViewId === "evidenceView" && evidenceDraftActive())
+          ) {
+            await syncOfflineOutboxes()
+              .then(() => refreshStateFromServer())
+              .catch(() => {});
+          }
+          schedulePeriodicStateRefresh();
+        }, delay);
       }
 
       async function runSyncQueue() {
@@ -11161,6 +11195,7 @@
           if (!document.hidden && state.activeUserId && navigator.onLine) {
             maybeApplyPendingAppReload();
             runHourlyCloudMaintenance().catch(() => {});
+            if (!protectedWorkInProgress()) refreshStateFromServer().catch(() => {});
           }
         });
 
@@ -11220,21 +11255,7 @@
         await syncNotificationSubscription().catch(() => {});
         recordHourlyCloudMaintenance();
         window.setInterval(() => runHourlyCloudMaintenance({ force: true }).catch(() => {}), HOURLY_CLOUD_MAINTENANCE_MS);
-        window.setInterval(() => {
-          if (maybeApplyPendingAppReload()) return;
-          if (
-            state.activeUserId &&
-            !document.hidden &&
-            !syncInFlight &&
-            !evidenceSubmitInFlight &&
-            !taskCreateInFlight &&
-            !(activeViewId === "evidenceView" && evidenceDraftActive())
-          ) {
-            syncOfflineOutboxes()
-              .then(() => refreshStateFromServer())
-              .catch(() => {});
-          }
-        }, 30000);
+        schedulePeriodicStateRefresh();
       }
 
       bootstrap();
