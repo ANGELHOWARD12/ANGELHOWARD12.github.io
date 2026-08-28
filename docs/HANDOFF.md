@@ -6,9 +6,9 @@ Actualizado: 2026-08-28
 
 - Producto visible: Task Hub.
 - Snapshot local activo: `publish-v23/`.
-- Frontend: `APP_VERSION = 46-scoped-state-sync`.
-- Cache PWA: `task-hub-shell-v46-scoped-state-sync`.
-- Respuesta `/health`: `46-scoped-state-sync`.
+- Frontend: `APP_VERSION = 47-idempotent-task-actions`.
+- Cache PWA: `task-hub-shell-v47-idempotent-task-actions`.
+- Respuesta `/health`: `47-idempotent-task-actions`.
 - Esquema D1: `29-scoped-state-sync-1`.
 - `index.html` y `operativo.html` son copias exactas.
 - `functions/api/[[path]].js` y `functions/cloud/[[path]].js` son copias exactas.
@@ -74,6 +74,13 @@ Actualizado: 2026-08-28
   regreso a la aplicacion mantienen sincronizacion inmediata.
 - Agregada `tests/check-state-sync-optimization.mjs`. Las 14 pruebas locales
   finalizan correctamente.
+- Inicio, cambio de nombre, reprogramacion, reasignacion y recordatorios usan
+  `POST /tasks/action` con `mutationId`, payload pequeno y validacion en servidor.
+- Estas acciones leen solamente las tareas del propietario actual y del nuevo
+  propietario cuando existe una reasignacion. El envio del tablero completo queda
+  como compatibilidad para la cola offline.
+- Agregada `tests/check-idempotent-task-actions.mjs`. Las 15 pruebas locales
+  finalizan correctamente.
 - No se modificaron usuarios, tareas ni sustentos existentes. Esta entrega local
   aun no fue publicada en produccion.
 
@@ -93,13 +100,13 @@ confirmarse en Cloudflare Analytics despues de publicar.
 
 ## Siguiente mejora recomendada
 
-Objetivo: reemplazar gradualmente los cambios generales mediante `PUT /state` por
-operaciones pequenas y especificas para iniciar, mover, reasignar y recordar tareas.
+Objetivo: cargar el historial completo solamente al abrir una tarea y continuar
+reduciendo los usos restantes de `PUT /state`.
 
 Secuencia segura:
 
-1. Agregar endpoints especificos e idempotentes para cada cambio de tarea.
-2. Mantener temporalmente `PUT /state` como compatibilidad y cola offline.
+1. Mantener temporalmente `PUT /state` como compatibilidad y cola offline.
+2. Agregar lectura de historial por tarea con permiso verificado.
 3. Cargar el historial completo solamente al abrir una tarea concreta.
 4. Medir filas leidas, escrituras, CPU y latencia en Cloudflare Analytics.
 5. Probar conflictos concurrentes entre dos usuarios antes de retirar el flujo

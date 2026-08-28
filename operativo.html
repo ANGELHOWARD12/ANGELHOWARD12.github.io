@@ -3691,7 +3691,7 @@
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
       const EARLIEST_OVERTIME_START = "05:00";
-      const APP_VERSION = "46-scoped-state-sync";
+      const APP_VERSION = "47-idempotent-task-actions";
       const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
       const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
       const STATE_REFRESH_INTERVAL_MS = 60 * 1000;
@@ -8212,7 +8212,32 @@
         els.reassignDialog.showModal();
       }
 
-      function reassignTask(taskId, newOwnerId, reason) {
+      async function requestTaskAction(action, taskId, payload, applyOffline, messageElement = null) {
+        const mutationId = id();
+        try {
+          const data = await apiRequest("/tasks/action", {
+            method: "POST",
+            body: JSON.stringify({ action, taskId, mutationId, ...payload })
+          });
+          applyCloudState(data.state);
+          render();
+          return true;
+        } catch (error) {
+          const transient = !navigator.onLine || !error.status || error.status >= 500;
+          if (!transient) {
+            if (messageElement) setMessage(messageElement, error.message, "err");
+            else showToast(error.message, "error");
+            return false;
+          }
+          applyOffline(mutationId);
+          saveState();
+          render();
+          showToast("Cambio guardado. Task Hub lo sincronizara al volver la nube.", "success");
+          return true;
+        }
+      }
+
+      async function reassignTask(taskId, newOwnerId, reason) {
         const task = state.tasks.find((item) => item.id === taskId);
         const nextOwner = state.users.find((user) => user.id === newOwnerId && user.role === "Trainer" && user.status === "Activo");
         if (!els.reassignConfirm.checked) {
@@ -8230,22 +8255,29 @@
           return false;
         }
         const previousOwnerId = task.ownerId;
-        task.history = task.history || [];
-        task.history.push({
-          type: "Reasignacion",
-          fromId: previousOwnerId,
-          toId: newOwnerId,
-          reason: clean(reason),
-          byId: state.activeUserId,
-          at: Date.now()
-        });
-        task.ownerId = newOwnerId;
-        task.status = "Pendiente";
-        task.blockedReason = "";
-        task.blockedAt = "";
-        saveState();
-        render();
-        return true;
+        return requestTaskAction(
+          "reassign",
+          taskId,
+          { ownerId: newOwnerId, reason: clean(reason) },
+          (mutationId) => {
+            task.history = task.history || [];
+            task.history.push({
+              type: "Reasignacion",
+              fromId: previousOwnerId,
+              toId: newOwnerId,
+              reason: clean(reason),
+              byId: state.activeUserId,
+              at: Date.now(),
+              mutationId
+            });
+            task.ownerId = newOwnerId;
+            task.status = "Pendiente";
+            task.blockedReason = "";
+            task.blockedAt = "";
+            task.reminders = [];
+          },
+          els.reassignMessage
+        );
       }
 
       function renderReassignControl(container, task) {
@@ -8318,7 +8350,7 @@
         }
       }
 
-      function renameTask(taskId, nextTitle, reason) {
+      async function renameTask(taskId, nextTitle, reason) {
         const task = state.tasks.find((item) => item.id === taskId);
         const title = clean(nextTitle).slice(0, 140);
         const cleanReason = clean(reason);
@@ -8327,19 +8359,25 @@
           return false;
         }
         const previousTitle = task.title;
-        task.history = task.history || [];
-        task.history.push({
-          type: "CorreccionNombre",
-          fromTitle: previousTitle,
-          toTitle: title,
-          reason: cleanReason,
-          byId: state.activeUserId,
-          at: Date.now()
-        });
-        task.title = title;
-        saveState();
-        render();
-        return true;
+        return requestTaskAction(
+          "rename",
+          taskId,
+          { title, reason: cleanReason },
+          (mutationId) => {
+            task.history = task.history || [];
+            task.history.push({
+              type: "CorreccionNombre",
+              fromTitle: previousTitle,
+              toTitle: title,
+              reason: cleanReason,
+              byId: state.activeUserId,
+              at: Date.now(),
+              mutationId
+            });
+            task.title = title;
+          },
+          els.renameTaskMessage
+        );
       }
 
       function renderRenameControl(container, task) {
@@ -8381,7 +8419,7 @@
         els.scheduleDialog.showModal();
       }
 
-      function rescheduleTask(taskId, dateValue, startTime, endTime, reason) {
+      async function rescheduleTask(taskId, dateValue, startTime, endTime, reason) {
         const task = state.tasks.find((item) => item.id === taskId);
         if (!canRescheduleTask(task)) return false;
         const scheduleError = validateTaskSchedule(dateValue, startTime, endTime, task.ownerId);
@@ -8401,25 +8439,32 @@
           setMessage(els.scheduleMessage, "Elige una fecha u horario diferente.", "err");
           return false;
         }
-        task.history = task.history || [];
-        task.history.push({
-          type: "Reprogramacion",
-          fromDate: task.dueDate,
-          toDate: dateValue,
-          fromStartTime: task.startTime || WORKDAY_START,
-          fromEndTime: task.endTime || "09:30",
-          toStartTime: startTime,
-          toEndTime: endTime,
-          reason: clean(reason),
-          byId: state.activeUserId,
-          at: Date.now()
-        });
-        task.dueDate = dateValue;
-        task.startTime = startTime;
-        task.endTime = endTime;
-        saveState();
-        render();
-        return true;
+        const previous = { dueDate: task.dueDate, startTime: task.startTime, endTime: task.endTime };
+        return requestTaskAction(
+          "reschedule",
+          taskId,
+          { dueDate: dateValue, startTime, endTime, reason: clean(reason) },
+          (mutationId) => {
+            task.history = task.history || [];
+            task.history.push({
+              type: "Reprogramacion",
+              fromDate: previous.dueDate,
+              toDate: dateValue,
+              fromStartTime: previous.startTime || WORKDAY_START,
+              fromEndTime: previous.endTime || "09:30",
+              toStartTime: startTime,
+              toEndTime: endTime,
+              reason: clean(reason),
+              byId: state.activeUserId,
+              at: Date.now(),
+              mutationId
+            });
+            task.dueDate = dateValue;
+            task.startTime = startTime;
+            task.endTime = endTime;
+          },
+          els.scheduleMessage
+        );
       }
 
       function renderScheduleControl(container, task) {
@@ -8463,32 +8508,38 @@
         els.reminderDialog.showModal();
       }
 
-      function saveTaskReminder(taskId, value) {
+      async function saveTaskReminder(taskId, value) {
         const task = state.tasks.find((item) => item.id === taskId);
         const reminderAt = new Date(value).getTime();
         if (!canManageReminder(task) || !Number.isFinite(reminderAt) || reminderAt <= Date.now()) {
           setMessage(els.reminderMessage, "Elige una fecha y hora futura.", "err");
           return false;
         }
-        task.reminders = task.reminders || [];
-        const reminder = {
-          id: id(),
-          userId: task.ownerId,
-          at: reminderAt,
-          createdAt: Date.now(),
-          createdById: state.activeUserId
-        };
-        task.reminders.push(reminder);
-        task.history = task.history || [];
-        task.history.push({
-          type: "Recordatorio",
-          byId: state.activeUserId,
-          reminderAt,
-          at: Date.now()
-        });
-        saveState();
-        render();
-        return true;
+        return requestTaskAction(
+          "reminder",
+          taskId,
+          { reminderAt },
+          (mutationId) => {
+            const createdAt = Date.now();
+            task.reminders = task.reminders || [];
+            task.reminders.push({
+              id: mutationId,
+              userId: task.ownerId,
+              at: reminderAt,
+              createdAt,
+              createdById: state.activeUserId
+            });
+            task.history = task.history || [];
+            task.history.push({
+              type: "Recordatorio",
+              byId: state.activeUserId,
+              reminderAt,
+              at: createdAt,
+              mutationId
+            });
+          },
+          els.reminderMessage
+        );
       }
 
       function renderReminderControl(container, task) {
@@ -8661,18 +8712,11 @@
 
       async function startTask(task) {
         if (!task || task.status !== "Pendiente" || task.ownerId !== state.activeUserId) return;
-        task.history = task.history || [];
-        task.history.push({ type: "Inicio", byId: state.activeUserId, at: Date.now() });
-        task.status = "En proceso";
-        saveState();
-        render();
-        window.clearTimeout(syncTimer);
-        syncTimer = 0;
-        try {
-          await syncState();
-        } catch (error) {
-          showToast(`La tarea se inicio, pero falta sincronizar: ${error.message}`, "error");
-        }
+        await requestTaskAction("start", task.id, {}, (mutationId) => {
+          task.history = task.history || [];
+          task.history.push({ type: "Inicio", byId: state.activeUserId, at: Date.now(), mutationId });
+          task.status = "En proceso";
+        });
       }
 
       async function openEvidenceModuleForTask(task) {
@@ -10394,12 +10438,12 @@
 
         els.cancelReassign.addEventListener("click", () => els.reassignDialog.close());
 
-        els.reassignForm.addEventListener("submit", (event) => {
+        els.reassignForm.addEventListener("submit", async (event) => {
           event.preventDefault();
           const task = state.tasks.find((item) => item.id === els.reassignForm.dataset.taskId);
           const nextOwner = state.users.find((user) => user.id === els.reassignOwner.value);
           if (!window.confirm(`Confirmar reasignacion de "${task?.title || "esta tarea"}" a ${nextOwner?.name || "el trainer seleccionado"}?`)) return;
-          const success = reassignTask(els.reassignForm.dataset.taskId, els.reassignOwner.value, els.reassignReason.value);
+          const success = await reassignTask(els.reassignForm.dataset.taskId, els.reassignOwner.value, els.reassignReason.value);
           if (success) els.reassignDialog.close();
         });
 
@@ -10409,7 +10453,7 @@
           const taskId = els.renameTaskForm.dataset.taskId;
           const success = els.renameTaskForm.dataset.masterEdit === "true"
             ? await updateMasterTask(taskId)
-            : renameTask(taskId, els.renameTaskTitle.value, els.renameTaskReason.value);
+            : await renameTask(taskId, els.renameTaskTitle.value, els.renameTaskReason.value);
           if (success) els.renameTaskDialog.close();
         });
         els.closeTaskPreview.addEventListener("click", () => els.taskPreviewDialog.close());
@@ -10456,9 +10500,9 @@
           setMessage(els.scheduleMessage, "", "");
         });
 
-        els.scheduleForm.addEventListener("submit", (event) => {
+        els.scheduleForm.addEventListener("submit", async (event) => {
           event.preventDefault();
-          const success = rescheduleTask(
+          const success = await rescheduleTask(
             els.scheduleForm.dataset.taskId,
             els.scheduleDate.value,
             els.scheduleStartTime.value,
@@ -10469,9 +10513,9 @@
         });
 
         els.cancelReminder.addEventListener("click", () => els.reminderDialog.close());
-        els.reminderForm.addEventListener("submit", (event) => {
+        els.reminderForm.addEventListener("submit", async (event) => {
           event.preventDefault();
-          const success = saveTaskReminder(els.reminderForm.dataset.taskId, els.reminderDateTime.value);
+          const success = await saveTaskReminder(els.reminderForm.dataset.taskId, els.reminderDateTime.value);
           if (success) els.reminderDialog.close();
         });
 

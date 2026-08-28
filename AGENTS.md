@@ -100,7 +100,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath `
 
 ## Prioridad tecnica
 
-La lectura condicional y filtrada de D1 ya esta implementada. La siguiente prioridad
-es reemplazar gradualmente `PUT /state` por endpoints pequenos e idempotentes y
-cargar el historial completo bajo demanda. No retirar la compatibilidad actual ni
-la cola offline hasta probar concurrencia, permisos, historial y sustentos.
+La lectura condicional y filtrada de D1 y las acciones idempotentes de tarea ya
+estan implementadas. La siguiente prioridad es cargar el historial completo bajo
+demanda y reducir los usos restantes de `PUT /state`. No retirar la compatibilidad
+actual ni la cola offline hasta probar concurrencia, permisos, historial y sustentos.

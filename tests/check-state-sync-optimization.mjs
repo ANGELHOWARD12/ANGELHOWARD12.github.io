@@ -24,7 +24,7 @@ if (/\(route === "state" && request\.method === "GET"\) \|\| route === "storage\
 }
 
 for (const marker of [
-  'const APP_VERSION = "46-scoped-state-sync"',
+  'const APP_VERSION = "47-idempotent-task-actions"',
   "const STATE_REFRESH_INTERVAL_MS = 60 * 1000",
   "const STATE_REFRESH_JITTER_MS = 15 * 1000",
   "let serverStateVersion = \"\"",

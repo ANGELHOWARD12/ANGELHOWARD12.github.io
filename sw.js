@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-hub-shell-v46-scoped-state-sync";
+const CACHE_NAME = "task-hub-shell-v47-idempotent-task-actions";
 const APP_SHELL = [
   "/",
   "/index.html",

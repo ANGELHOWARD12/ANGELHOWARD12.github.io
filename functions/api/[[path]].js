@@ -261,6 +261,7 @@ export async function onRequest(context) {
     if (evidenceFileMatch && request.method === "GET") return await evidenceFile(env.DB, session.user, evidenceFileMatch[1], env);
     if (route === "tasks/evidence" && request.method === "POST") return await submitTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/create" && request.method === "POST") return await createTask(request, env.DB, session.user, context);
+    if (route === "tasks/action" && request.method === "POST") return await mutateTaskAction(request, env.DB, session.user, context);
     if (route === "tasks/master-update" && request.method === "POST") return await updateMasterTask(request, env.DB, session.user);
     if (route === "tasks/evidence-authorize" && request.method === "POST") return await authorizeLateTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/review" && request.method === "POST") return await reviewTaskEvidence(request, env.DB, session.user, context);
@@ -306,7 +307,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "46-scoped-state-sync",
+    version: "47-idempotent-task-actions",
     schema: SCHEMA_VERSION,
     r2: r2StorageEnabled(env),
     migration: {
@@ -3009,6 +3010,193 @@ async function createTask(request, db, user, context) {
     if (notifiedUsers.length) context.waitUntil(pushNotificationsForUsers(db, notifiedUsers));
   }
   return stateResponse(db, user, data);
+}
+
+async function mutateTaskAction(request, db, user, context) {
+  const body = await readJson(request);
+  const taskId = clean(body.taskId);
+  const action = clean(body.action).toLowerCase();
+  const mutationId = clean(body.mutationId).slice(0, 100) || crypto.randomUUID();
+  if (!taskId || !["start", "rename", "reschedule", "reassign", "reminder"].includes(action)) {
+    return json({ ok: false, message: "Accion de tarea no valida." }, 400);
+  }
+
+  const taskRecord = await db
+    .prepare("SELECT owner_id FROM task_records WHERE id = ? AND archived = 0")
+    .bind(taskId)
+    .first();
+  if (!taskRecord) return json({ ok: false, message: "La tarea ya no esta disponible." }, 404);
+  const actionOwnerIds = [clean(taskRecord.owner_id)];
+  if (action === "reassign" && clean(body.ownerId)) actionOwnerIds.push(clean(body.ownerId));
+  const data = await loadData(db, { ownerIds: actionOwnerIds });
+  const task = data.tasks.find((item) => clean(item.id) === taskId);
+  if (!task) return json({ ok: false, message: "La tarea ya no esta disponible." }, 404);
+  if ((task.history || []).some((entry) => clean(entry.mutationId) === mutationId)) {
+    return stateResponse(db, user, user.role === "Trainer" ? data : null);
+  }
+
+  const userRows = await db
+    .prepare("SELECT id, name, email, role, status, access_level, team, job_title, member_type FROM users WHERE status = 'Activo'")
+    .all();
+  const activeUsers = userRows.results || [];
+  const owner = activeUsers.find((item) => clean(item.id) === clean(task.ownerId));
+  const ownerIsActor = clean(task.ownerId) === clean(user.id);
+  const coordinatorManagesOwner = coordinatorCanManageTaskUser(user, owner);
+  if (!ownerIsActor && !coordinatorManagesOwner) {
+    return json({ ok: false, message: "No tienes permiso para modificar esta tarea." }, 403);
+  }
+
+  const now = Date.now();
+  const reason = clean(body.reason).slice(0, 500);
+  const notifications = [];
+  task.history = Array.isArray(task.history) ? task.history : [];
+
+  if (action === "start") {
+    if (!ownerIsActor || task.status !== "Pendiente") {
+      return json({ ok: false, message: "La tarea ya no se encuentra pendiente." }, 409);
+    }
+    task.status = "En proceso";
+    task.history.push({ type: "Inicio", byId: user.id, at: now, mutationId });
+  }
+
+  if (action === "rename") {
+    const title = clean(body.title).slice(0, 140);
+    if (title.length < 2 || title === clean(task.title) || !reason) {
+      return json({ ok: false, message: "Escribe un nombre diferente y el motivo de la correccion." }, 400);
+    }
+    const previousTitle = task.title;
+    task.title = title;
+    task.history.push({
+      type: "CorreccionNombre",
+      fromTitle: previousTitle,
+      toTitle: title,
+      reason,
+      byId: user.id,
+      at: now,
+      mutationId
+    });
+  }
+
+  if (action === "reschedule") {
+    const dueDate = clean(body.dueDate);
+    const startTime = clean(body.startTime);
+    const endTime = clean(body.endTime);
+    const ownerName = clean(owner?.name);
+    if (task.status === "Cumplida" || !reason) {
+      return json({ ok: false, message: "La tarea aprobada no puede reprogramarse." }, 409);
+    }
+    if (
+      !validWorkSchedule(
+        dueDate,
+        startTime,
+        endTime,
+        breakSettingsForUser(data, task.ownerId, dueDate),
+        ownerName,
+        workScheduleEndForUser(data, task.ownerId, dueDate, ownerName),
+        workScheduleStartForUser(data, task.ownerId, dueDate, ownerName)
+      ) ||
+      hasTaskConflict(data.tasks, task.ownerId, dueDate, startTime, endTime, task.id)
+    ) {
+      return json({ ok: false, message: "El horario elegido ya no esta disponible." }, 409);
+    }
+    if (task.dueDate === dueDate && task.startTime === startTime && task.endTime === endTime) {
+      return json({ ok: false, message: "Elige una fecha u horario diferente." }, 400);
+    }
+    const previous = { dueDate: task.dueDate, startTime: task.startTime, endTime: task.endTime };
+    task.dueDate = dueDate;
+    task.startTime = startTime;
+    task.endTime = endTime;
+    task.history.push({
+      type: "Reprogramacion",
+      fromDate: previous.dueDate,
+      toDate: dueDate,
+      fromStartTime: previous.startTime || WORKDAY_START,
+      fromEndTime: previous.endTime || "09:30",
+      toStartTime: startTime,
+      toEndTime: endTime,
+      reason,
+      byId: user.id,
+      at: now,
+      mutationId
+    });
+    if (!ownerIsActor) {
+      notifications.push({
+        userId: task.ownerId,
+        title: "Horario actualizado",
+        body: `${clean(task.title)} | ${dueDate} ${startTime}-${endTime}`,
+        url: `/?view=tasksView&task=${encodeURIComponent(taskId)}`,
+        sourceKey: `task-action:${mutationId}`
+      });
+    }
+  }
+
+  if (action === "reassign") {
+    const nextOwnerId = clean(body.ownerId);
+    const nextOwner = activeUsers.find((item) => clean(item.id) === nextOwnerId);
+    const validTarget = Boolean(
+      nextOwner &&
+        nextOwner.role === "Trainer" &&
+        !isObserverUser(nextOwner) &&
+        userMemberType(nextOwner) !== "master" &&
+        userTeam(nextOwner) === userTeam(user) &&
+        (ownerIsActor || coordinatorCanManageTaskUser(user, nextOwner))
+    );
+    if (task.status === "Cumplida" || isMasterUser(owner) || !validTarget || nextOwnerId === clean(task.ownerId) || !reason) {
+      return json({ ok: false, message: "La reasignacion ya no es valida." }, 409);
+    }
+    if (
+      !validWorkSchedule(
+        task.dueDate,
+        task.startTime,
+        task.endTime,
+        breakSettingsForUser(data, nextOwnerId, task.dueDate),
+        nextOwner.name,
+        workScheduleEndForUser(data, nextOwnerId, task.dueDate, nextOwner.name),
+        workScheduleStartForUser(data, nextOwnerId, task.dueDate, nextOwner.name)
+      ) ||
+      hasTaskConflict(data.tasks, nextOwnerId, task.dueDate, task.startTime, task.endTime, task.id)
+    ) {
+      return json({ ok: false, message: `${nextOwner.name} ya no tiene libre ese horario.` }, 409);
+    }
+    const previousOwnerId = task.ownerId;
+    task.ownerId = nextOwnerId;
+    task.status = "Pendiente";
+    task.blockedReason = "";
+    task.blockedAt = 0;
+    task.reminders = [];
+    task.history.push({
+      type: "Reasignacion",
+      fromId: previousOwnerId,
+      toId: nextOwnerId,
+      reason,
+      byId: user.id,
+      at: now,
+      mutationId
+    });
+    notifications.push({
+      userId: nextOwnerId,
+      title: "Tarea reasignada",
+      body: `${clean(task.title)} | ${clean(task.dueDate)} ${clean(task.startTime)}-${clean(task.endTime)}`,
+      url: `/?view=tasksView&task=${encodeURIComponent(taskId)}`,
+      sourceKey: `task-action:${mutationId}`
+    });
+  }
+
+  if (action === "reminder") {
+    const reminderAt = Number(body.reminderAt || 0);
+    if (task.status === "Cumplida" || !Number.isFinite(reminderAt) || reminderAt <= now) {
+      return json({ ok: false, message: "Elige una fecha y hora futura." }, 400);
+    }
+    task.reminders = Array.isArray(task.reminders) ? task.reminders : [];
+    task.reminders.push({ id: mutationId, userId: task.ownerId, at: reminderAt, createdAt: now, createdById: user.id });
+    task.history.push({ type: "Recordatorio", byId: user.id, reminderAt, at: now, mutationId });
+  }
+
+  await saveData(db, data);
+  const notifiedUsers = await queueNotifications(db, notifications);
+  if (notifiedUsers.length) context.waitUntil(pushNotificationsForUsers(db, notifiedUsers));
+  context.waitUntil(dispatchDueReminders(db, data));
+  return stateResponse(db, user, user.role === "Trainer" ? data : null);
 }
 
 async function updateMasterTask(request, db, user) {
