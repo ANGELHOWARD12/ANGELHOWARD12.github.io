@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-hub-shell-v47-idempotent-task-actions";
+const CACHE_NAME = "task-hub-shell-v48-lazy-task-history";
 const APP_SHELL = [
   "/",
   "/index.html",

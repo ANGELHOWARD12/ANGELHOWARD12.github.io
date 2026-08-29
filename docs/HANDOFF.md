@@ -6,9 +6,9 @@ Actualizado: 2026-08-28
 
 - Producto visible: Task Hub.
 - Snapshot local activo: `publish-v23/`.
-- Frontend: `APP_VERSION = 47-idempotent-task-actions`.
-- Cache PWA: `task-hub-shell-v47-idempotent-task-actions`.
-- Respuesta `/health`: `47-idempotent-task-actions`.
+- Frontend: `APP_VERSION = 48-lazy-task-history`.
+- Cache PWA: `task-hub-shell-v48-lazy-task-history`.
+- Respuesta `/health`: `48-lazy-task-history`.
 - Esquema D1: `29-scoped-state-sync-1`.
 - `index.html` y `operativo.html` son copias exactas.
 - `functions/api/[[path]].js` y `functions/cloud/[[path]].js` son copias exactas.
@@ -81,6 +81,13 @@ Actualizado: 2026-08-28
   como compatibilidad para la cola offline.
 - Agregada `tests/check-idempotent-task-actions.mjs`. Las 15 pruebas locales
   finalizan correctamente.
+- El estado normal omite `task_history_records`. `GET /tasks/:id/history` carga
+  el historial completo solamente al abrir una tarea y valida propietario, equipo,
+  coordinador u observador antes de responder.
+- La cola offline fusiona solo las entradas nuevas con el historial existente para
+  evitar perdida o duplicacion cuando la tarea llego sin historial en el tablero.
+- Agregada `tests/check-lazy-task-history.mjs`. Las 16 pruebas locales finalizan
+  correctamente.
 - No se modificaron usuarios, tareas ni sustentos existentes. Esta entrega local
   aun no fue publicada en produccion.
 
@@ -100,16 +107,16 @@ confirmarse en Cloudflare Analytics despues de publicar.
 
 ## Siguiente mejora recomendada
 
-Objetivo: cargar el historial completo solamente al abrir una tarea y continuar
-reduciendo los usos restantes de `PUT /state`.
+Objetivo: reducir los usos restantes de `PUT /state` y medir el comportamiento
+real en Cloudflare Analytics.
 
 Secuencia segura:
 
 1. Mantener temporalmente `PUT /state` como compatibilidad y cola offline.
-2. Agregar lectura de historial por tarea con permiso verificado.
-3. Cargar el historial completo solamente al abrir una tarea concreta.
-4. Medir filas leidas, escrituras, CPU y latencia en Cloudflare Analytics.
-5. Probar conflictos concurrentes entre dos usuarios antes de retirar el flujo
+2. Convertir configuracion de break y otros cambios generales en operaciones
+   pequenas e idempotentes.
+3. Medir filas leidas, escrituras, CPU y latencia en Cloudflare Analytics.
+4. Probar conflictos concurrentes entre dos usuarios antes de retirar el flujo
    general de estado.
 
 No combinar esta mejora con rediseño visual, nuevos usuarios o cambios de APK.

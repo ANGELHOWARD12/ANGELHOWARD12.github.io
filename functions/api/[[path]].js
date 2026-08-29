@@ -262,6 +262,8 @@ export async function onRequest(context) {
     if (route === "tasks/evidence" && request.method === "POST") return await submitTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/create" && request.method === "POST") return await createTask(request, env.DB, session.user, context);
     if (route === "tasks/action" && request.method === "POST") return await mutateTaskAction(request, env.DB, session.user, context);
+    const taskHistoryMatch = route.match(/^tasks\/([^/]+)\/history$/);
+    if (taskHistoryMatch && request.method === "GET") return await getTaskHistory(env.DB, session.user, taskHistoryMatch[1]);
     if (route === "tasks/master-update" && request.method === "POST") return await updateMasterTask(request, env.DB, session.user);
     if (route === "tasks/evidence-authorize" && request.method === "POST") return await authorizeLateTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/review" && request.method === "POST") return await reviewTaskEvidence(request, env.DB, session.user, context);
@@ -307,7 +309,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "47-idempotent-task-actions",
+    version: "48-lazy-task-history",
     schema: SCHEMA_VERSION,
     r2: r2StorageEnabled(env),
     migration: {
@@ -1758,6 +1760,22 @@ function historyIsAppendOnly(previousHistory, nextHistory) {
   return next.length >= previous.length && previous.every((entry, index) => JSON.stringify(entry) === JSON.stringify(next[index]));
 }
 
+function mergeSubmittedTaskHistory(previousHistory, submittedTask) {
+  const previous = Array.isArray(previousHistory) ? previousHistory : [];
+  const submitted = Array.isArray(submittedTask?.history) ? submittedTask.history : previous;
+  if (submittedTask?.historyLoaded !== false) return submitted;
+  const knownEntries = new Set(previous.map((entry) => JSON.stringify(entry)));
+  return [
+    ...previous,
+    ...submitted.filter((entry) => {
+      const signature = JSON.stringify(entry);
+      if (knownEntries.has(signature)) return false;
+      knownEntries.add(signature);
+      return true;
+    })
+  ];
+}
+
 function microsoftStorageConfigured(env) {
   return Boolean(
     clean(env.MS_TENANT_ID) &&
@@ -3012,6 +3030,40 @@ async function createTask(request, db, user, context) {
   return stateResponse(db, user, data);
 }
 
+async function getTaskHistory(db, user, rawTaskId) {
+  const taskId = clean(decodeURIComponent(rawTaskId));
+  const task = await db
+    .prepare("SELECT owner_id FROM task_records WHERE id = ?")
+    .bind(taskId)
+    .first();
+  if (!task) return json({ ok: false, message: "La tarea ya no esta disponible." }, 404);
+
+  const owner = await db
+    .prepare("SELECT id, email, role, status, access_level, team, member_type FROM users WHERE id = ?")
+    .bind(clean(task.owner_id))
+    .first();
+  const allowed = Boolean(
+    isObserverUser(user) ||
+      clean(task.owner_id) === clean(user.id) ||
+      coordinatorCanManageTaskUser(user, owner)
+  );
+  if (!allowed) return json({ ok: false, message: "No tienes permiso para consultar este historial." }, 403);
+
+  const rows = await db
+    .prepare("SELECT data FROM task_history_records WHERE task_id = ? ORDER BY entry_index ASC")
+    .bind(taskId)
+    .all();
+  const history = [];
+  for (const row of rows.results || []) {
+    try {
+      history.push(JSON.parse(row.data || "{}"));
+    } catch {
+      console.error("Invalid task history row", taskId);
+    }
+  }
+  return json({ ok: true, taskId, history, historyCount: history.length });
+}
+
 async function mutateTaskAction(request, db, user, context) {
   const body = await readJson(request);
   const taskId = clean(body.taskId);
@@ -3922,6 +3974,16 @@ async function readStateVersion(db) {
   return `${appUpdated}.${taskUpdated}.${userCount}.${userUpdated}`;
 }
 
+function taskWithoutHistory(task) {
+  const history = Array.isArray(task?.history) ? task.history : [];
+  return {
+    ...task,
+    history: [],
+    historyCount: Number.isFinite(Number(task?.historyCount)) ? Number(task.historyCount) : history.length,
+    historyLoaded: false
+  };
+}
+
 async function stateResponse(db, user, loadedData = null, knownStateVersion = "") {
   const coordinator = user.role === "Coordinador";
   const observer = isObserverUser(user);
@@ -3946,7 +4008,7 @@ async function stateResponse(db, user, loadedData = null, knownStateVersion = ""
     : coordinator
       ? Array.from(visibleTaskOwnerIds)
       : [clean(user.id)];
-  const data = loadedData || (await loadData(db, { ownerIds: requestedOwnerIds }));
+  const data = loadedData || (await loadData(db, { ownerIds: requestedOwnerIds, includeHistory: false }));
   const users = visibleUserRows.map(publicUser);
   const visibleTasks = observer
     ? data.tasks
@@ -3973,8 +4035,8 @@ async function stateResponse(db, user, loadedData = null, knownStateVersion = ""
     ...data,
     activeUserId: user.id,
     users,
-    tasks: visibleTasks,
-    deletedTasks: visibleDeletedTasks,
+    tasks: visibleTasks.map(taskWithoutHistory),
+    deletedTasks: visibleDeletedTasks.map(taskWithoutHistory),
     workScheduleByUserDate: visibleSchedules,
     overtimeRequests: visibleOvertime,
     announcements: coordinator || observer
@@ -4085,7 +4147,7 @@ async function putState(request, db, user, context, env) {
           const previous = previousTasks.get(clean(normalizedTask.id));
           if (!previous && (!managedUserIds.has(clean(normalizedTask.ownerId)) || clean(normalizedTask.title).length < 2)) return null;
           const previousHistory = Array.isArray(previous?.history) ? previous.history : [];
-          const submittedHistory = Array.isArray(normalizedTask.history) ? normalizedTask.history : previousHistory;
+          const submittedHistory = mergeSubmittedTaskHistory(previousHistory, normalizedTask);
           const appendOnlyHistory = historyIsAppendOnly(previousHistory, submittedHistory);
           const lastHistory = submittedHistory.at(-1);
           if (previous) {
@@ -4230,7 +4292,7 @@ async function putState(request, db, user, context, env) {
         requestedOwnerId &&
         requestedOwnerId !== task.ownerId &&
         activeTrainerIds.has(requestedOwnerId);
-      const nextHistory = Array.isArray(next.history) ? next.history : task.history;
+      const nextHistory = mergeSubmittedTaskHistory(task.history, next);
       const appendOnlyHistory = historyIsAppendOnly(task.history, nextHistory);
       const lastHistory = nextHistory?.at(-1);
       const validReassignment =
@@ -4926,7 +4988,7 @@ function hasTaskConflict(tasks, ownerId, dateValue, startTime, endTime, excludeT
   });
 }
 
-async function loadData(db, { ownerIds = null } = {}) {
+async function loadData(db, { ownerIds = null, includeHistory = true } = {}) {
   const scopedOwnerIds = Array.isArray(ownerIds)
     ? Array.from(new Set(ownerIds.map((value) => clean(value)).filter(Boolean)))
     : null;
@@ -4943,21 +5005,24 @@ async function loadData(db, { ownerIds = null } = {}) {
   let taskStatement = db.prepare(
     `SELECT id, archived, data FROM task_records${ownerFilter} ORDER BY archived ASC, created_at DESC, id ASC`
   );
-  let historyStatement = db.prepare(
-    `SELECT history.task_id, history.entry_index, history.data
-     FROM task_history_records history
-     INNER JOIN task_records task ON task.id = history.task_id${historyOwnerFilter}
-     ORDER BY history.task_id ASC, history.entry_index ASC`
-  );
+  let historyStatement = includeHistory
+    ? db.prepare(
+        `SELECT history.task_id, history.entry_index, history.data
+         FROM task_history_records history
+         INNER JOIN task_records task ON task.id = history.task_id${historyOwnerFilter}
+         ORDER BY history.task_id ASC, history.entry_index ASC`
+      )
+    : null;
   if (scopedOwnerIds?.length) {
     taskStatement = taskStatement.bind(...scopedOwnerIds);
-    historyStatement = historyStatement.bind(...scopedOwnerIds);
+    if (historyStatement) historyStatement = historyStatement.bind(...scopedOwnerIds);
   }
-  const [appResult, taskResult, historyResult] = await db.batch([
+  const statements = [
     db.prepare("SELECT data FROM app_data WHERE id = 1"),
-    taskStatement,
-    historyStatement
-  ]);
+    taskStatement
+  ];
+  if (historyStatement) statements.push(historyStatement);
+  const [appResult, taskResult, historyResult = { results: [] }] = await db.batch(statements);
   try {
     const parsed = JSON.parse(appResult?.results?.[0]?.data || "{}");
     const historyByTask = new Map();
@@ -4977,7 +5042,9 @@ async function loadData(db, { ownerIds = null } = {}) {
         const task = {
           ...JSON.parse(row.data || "{}"),
           id: row.id,
-          history: (historyByTask.get(row.id) || []).filter(Boolean)
+          history: includeHistory ? (historyByTask.get(row.id) || []).filter(Boolean) : [],
+          historyCount: includeHistory ? (historyByTask.get(row.id) || []).filter(Boolean).length : null,
+          historyLoaded: includeHistory
         };
         (Number(row.archived) ? storedDeletedTasks : storedTasks).push(task);
       } catch {
@@ -4995,8 +5062,26 @@ async function loadData(db, { ownerIds = null } = {}) {
       breakSettingsByUserDate: normalizeBreakSettingsByUserDate(parsed.breakSettingsByUserDate),
       workScheduleByUserDate: normalizeWorkScheduleByUserDate(parsed.workScheduleByUserDate),
       overtimeRequests: normalizeOvertimeRequests(parsed.overtimeRequests),
-      tasks: tasks.map((task) => ({ ...task, category: normalizeTaskCategory(task.category) })),
-      deletedTasks: deletedTasks.map((task) => ({ ...task, category: normalizeTaskCategory(task.category) })),
+      tasks: tasks.map((task) => {
+        const history = Array.isArray(task.history) ? task.history : [];
+        return {
+          ...task,
+          category: normalizeTaskCategory(task.category),
+          history: includeHistory ? history : [],
+          historyCount: includeHistory ? history.length : null,
+          historyLoaded: includeHistory
+        };
+      }),
+      deletedTasks: deletedTasks.map((task) => {
+        const history = Array.isArray(task.history) ? task.history : [];
+        return {
+          ...task,
+          category: normalizeTaskCategory(task.category),
+          history: includeHistory ? history : [],
+          historyCount: includeHistory ? history.length : null,
+          historyLoaded: includeHistory
+        };
+      }),
       lgUpdates: normalizeLgUpdates(parsed.lgUpdates),
       lateEvidenceUploadsEnabled: Boolean(parsed.lateEvidenceUploadsEnabled),
       lateEvidencePolicyHistory: Array.isArray(parsed.lateEvidencePolicyHistory)
@@ -5119,6 +5204,8 @@ function createTaskSnapshot(data) {
       const task = { ...source };
       const history = Array.isArray(task.history) ? task.history : [];
       delete task.history;
+      delete task.historyCount;
+      delete task.historyLoaded;
       snapshot.set(taskId, {
         task: source,
         archived,

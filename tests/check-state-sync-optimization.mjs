@@ -8,7 +8,7 @@ for (const marker of [
   "async function readStateVersion(db)",
   'searchParams.get("since")',
   "notModified: true",
-  "loadData(db, { ownerIds: requestedOwnerIds })",
+  "loadData(db, { ownerIds: requestedOwnerIds, includeHistory: false })",
   "INNER JOIN task_records task ON task.id = history.task_id",
   "idx_task_records_updated",
   'async function dueReminderNotifications(db, now, ownerId = "")',
@@ -24,7 +24,7 @@ if (/\(route === "state" && request\.method === "GET"\) \|\| route === "storage\
 }
 
 for (const marker of [
-  'const APP_VERSION = "47-idempotent-task-actions"',
+  'const APP_VERSION = "48-lazy-task-history"',
   "const STATE_REFRESH_INTERVAL_MS = 60 * 1000",
   "const STATE_REFRESH_JITTER_MS = 15 * 1000",
   "let serverStateVersion = \"\"",

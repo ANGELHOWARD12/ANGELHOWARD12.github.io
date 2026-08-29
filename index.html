@@ -3691,7 +3691,7 @@
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
       const EARLIEST_OVERTIME_START = "05:00";
-      const APP_VERSION = "47-idempotent-task-actions";
+      const APP_VERSION = "48-lazy-task-history";
       const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
       const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
       const STATE_REFRESH_INTERVAL_MS = 60 * 1000;
@@ -4528,6 +4528,8 @@
           startTime: task.startTime || "08:30",
           endTime: task.endTime || "09:30",
           history: Array.isArray(task.history) ? task.history : [],
+          historyCount: Number.isFinite(Number(task.historyCount)) ? Number(task.historyCount) : (task.history || []).length,
+          historyLoaded: task.historyLoaded !== false,
           reminders: Array.isArray(task.reminders) ? task.reminders : [],
           evidence: (task.evidence || []).map((entry) => ({
             ...entry,
@@ -4537,7 +4539,10 @@
         }));
         nextState.deletedTasks = (nextState.deletedTasks || []).map((task) => ({
           ...task,
-          category: normalizedTaskCategory(task.category)
+          category: normalizedTaskCategory(task.category),
+          history: Array.isArray(task.history) ? task.history : [],
+          historyCount: Number.isFinite(Number(task.historyCount)) ? Number(task.historyCount) : (task.history || []).length,
+          historyLoaded: task.historyLoaded !== false
         }));
         nextState.announcements = nextState.announcements || [];
         nextState.supportRequests = nextState.supportRequests || [];
@@ -6268,6 +6273,14 @@
       }
 
       function taskAuditPreviewMarkup(task) {
+        if (task.historyLoaded === false) {
+          return `
+            <section class="task-expedient-section">
+              <h3>Historial de modificaciones</h3>
+              <div class="note">Cargando historial completo...</div>
+            </section>
+          `;
+        }
         const entries = (task.history || []).slice().reverse();
         return `
           <section class="task-expedient-section">
@@ -6466,20 +6479,48 @@
         els.taskPreviewContent.innerHTML = taskPreviewMarkup(task);
       }
 
+      function taskById(taskId) {
+        return state.tasks.find((item) => item.id === taskId) || (state.deletedTasks || []).find((item) => item.id === taskId);
+      }
+
+      async function ensureTaskHistory(taskId) {
+        const task = taskById(taskId);
+        if (!task || task.historyLoaded !== false) return task;
+        const data = await apiRequest(`/tasks/${encodeURIComponent(taskId)}/history`);
+        task.history = Array.isArray(data.history) ? data.history : [];
+        task.historyCount = Number(data.historyCount || task.history.length);
+        task.historyLoaded = true;
+        return task;
+      }
+
       function openTaskPreviewDialog(taskId) {
         const task = state.tasks.find((item) => item.id === taskId);
         if (!task) return;
         previewedTaskId = task.id;
         refreshTaskPreviewDialog();
         els.taskPreviewDialog.showModal();
+        ensureTaskHistory(task.id)
+          .then(() => {
+            if (previewedTaskId === task.id && els.taskPreviewDialog.open) refreshTaskPreviewDialog();
+          })
+          .catch((error) => showToast(error.message || "No se pudo cargar el historial.", "error"));
       }
 
-      function openTaskHistoryDialog(taskId) {
-        const task = state.tasks.find((item) => item.id === taskId);
+      async function openTaskHistoryDialog(taskId) {
+        let task = taskById(taskId);
         if (!task) return;
         historyTaskId = task.id;
         els.taskHistoryTitle.textContent = `Historial: ${task.title}`;
         els.taskHistorySubtitle.textContent = `${userName(task.ownerId)} | ${formatDate(task.dueDate)} | Registro de solo lectura`;
+        els.taskHistoryList.innerHTML = `<li class="audit-entry"><span>Cargando historial completo...</span></li>`;
+        els.taskHistoryDialog.showModal();
+        try {
+          task = await ensureTaskHistory(taskId);
+        } catch (error) {
+          els.taskHistoryList.innerHTML = `<li class="audit-entry"><span>${escapeHtml(error.message || "No se pudo cargar el historial.")}</span></li>`;
+          return;
+        }
+        if (!task || historyTaskId !== taskId || !els.taskHistoryDialog.open) return;
         const entries = (task.history || []).slice().reverse();
         els.taskHistoryList.innerHTML = entries.length
           ? entries.map((entry) => `
@@ -6490,7 +6531,6 @@
               </li>
             `).join("")
           : `<li class="audit-entry"><span>No hay modificaciones registradas.</span></li>`;
-        els.taskHistoryDialog.showModal();
       }
 
       function folderSafe(value) {

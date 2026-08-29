@@ -100,7 +100,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath `
 
 ## Prioridad tecnica
 
-La lectura condicional y filtrada de D1 y las acciones idempotentes de tarea ya
-estan implementadas. La siguiente prioridad es cargar el historial completo bajo
-demanda y reducir los usos restantes de `PUT /state`. No retirar la compatibilidad
+La lectura condicional y filtrada de D1, las acciones idempotentes y el historial
+bajo demanda ya estan implementados. La siguiente prioridad es reducir los usos
+restantes de `PUT /state` y medir Cloudflare Analytics. No retirar la compatibilidad
 actual ni la cola offline hasta probar concurrencia, permisos, historial y sustentos.
