@@ -3691,7 +3691,7 @@
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
       const EARLIEST_OVERTIME_START = "05:00";
-      const APP_VERSION = "48-lazy-task-history";
+      const APP_VERSION = "49-idempotent-daily-break";
       const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
       const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
       const STATE_REFRESH_INTERVAL_MS = 60 * 1000;
@@ -8232,6 +8232,60 @@
         );
       }
 
+      function applyDailyBreakLocally(dateValue, settings) {
+        state.breakSettingsByUserDate = {
+          ...(state.breakSettingsByUserDate || {}),
+          [state.activeUserId]: {
+            ...(state.breakSettingsByUserDate?.[state.activeUserId] || {}),
+            [dateValue]: settings
+          }
+        };
+      }
+
+      async function saveDailyBreakSetting(dateValue, settings) {
+        const mutationId = id();
+        els.saveBreakButton.disabled = true;
+        els.saveBreakButton.textContent = "Guardando...";
+        try {
+          const data = await apiRequestWithRetry("/schedule/break", {
+            method: "POST",
+            body: JSON.stringify({ date: dateValue, ...settings, mutationId }),
+            allowFallback: true,
+            timeoutMs: 30_000
+          }, 2);
+          applyCloudState(data.state);
+          breakEditorKey = "";
+          render();
+          setMessage(
+            els.breakSettingsMessage,
+            `Break guardado solo para ${formatDate(dateValue)}: ${settings.breakStart}-${settings.breakEnd}.`,
+            "ok"
+          );
+          return true;
+        } catch (error) {
+          const transient = !navigator.onLine || !error.status || error.status >= 500;
+          if (!transient) {
+            setMessage(els.breakSettingsMessage, error.message, "err");
+            return false;
+          }
+          applyDailyBreakLocally(dateValue, settings);
+          breakEditorKey = "";
+          saveState();
+          persistOfflineState(JSON.parse(JSON.stringify(state)));
+          render();
+          setMessage(
+            els.breakSettingsMessage,
+            `Break guardado en este dispositivo para ${formatDate(dateValue)}. Se sincronizara cuando vuelva la nube.`,
+            "ok"
+          );
+          showToast("Break protegido para sincronizar.", "success");
+          return true;
+        } finally {
+          els.saveBreakButton.textContent = "Guardar este dia";
+          els.saveBreakButton.disabled = isObserver() || !els.breakAvailableSlot.value;
+        }
+      }
+
       function openReassignDialog(taskId) {
         const task = state.tasks.find((item) => item.id === taskId);
         if (!canReassignTask(task)) return;
@@ -10581,7 +10635,7 @@
         });
         els.breakAvailableSlot.addEventListener("change", () => setMessage(els.breakSettingsMessage, "", ""));
 
-        els.breakSettingsForm.addEventListener("submit", (event) => {
+        els.breakSettingsForm.addEventListener("submit", async (event) => {
           event.preventDefault();
           const dateValue = els.breakDate.value;
           const selectedSlot = parseSlotValue(els.breakAvailableSlot.value);
@@ -10607,21 +10661,7 @@
             renderBreakAvailability();
             return;
           }
-          state.breakSettingsByUserDate = {
-            ...(state.breakSettingsByUserDate || {}),
-            [state.activeUserId]: {
-              ...(state.breakSettingsByUserDate?.[state.activeUserId] || {}),
-              [dateValue]: normalized
-            }
-          };
-          breakEditorKey = "";
-          saveState();
-          render();
-          setMessage(
-            els.breakSettingsMessage,
-            `Break guardado solo para ${formatDate(dateValue)}: ${normalized.breakStart}-${normalized.breakEnd}.`,
-            "ok"
-          );
+          await saveDailyBreakSetting(dateValue, normalized);
         });
 
         els.overtimeUser.addEventListener("change", () => {

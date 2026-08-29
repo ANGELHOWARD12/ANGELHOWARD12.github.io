@@ -19,7 +19,7 @@ for (const marker of [
 }
 
 for (const marker of [
-  'const APP_VERSION = "48-lazy-task-history"',
+  'const APP_VERSION = "49-idempotent-daily-break"',
   "async function requestTaskAction",
   'apiRequest("/tasks/action"',
   'requestTaskAction("start"',

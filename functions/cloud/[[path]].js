@@ -268,6 +268,7 @@ export async function onRequest(context) {
     if (route === "tasks/evidence-authorize" && request.method === "POST") return await authorizeLateTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/review" && request.method === "POST") return await reviewTaskEvidence(request, env.DB, session.user, context);
     if (route === "tasks/delete" && request.method === "POST") return await deleteTaskAndArchive(request, env.DB, session.user, context, env);
+    if (route === "schedule/break" && request.method === "POST") return await saveDailyBreakSchedule(request, env.DB, session.user);
     if (route === "schedule/overtime" && request.method === "POST") return await saveOvertimeSchedule(request, env.DB, session.user, context);
     if (route === "schedule/overtime-request" && request.method === "POST") return await requestOvertimeSchedule(request, env.DB, session.user, context);
     if (route === "schedule/overtime-review" && request.method === "POST") return await reviewOvertimeSchedule(request, env.DB, session.user, context);
@@ -309,7 +310,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "48-lazy-task-history",
+    version: "49-idempotent-daily-break",
     schema: SCHEMA_VERSION,
     r2: r2StorageEnabled(env),
     migration: {
@@ -3721,6 +3722,56 @@ async function deleteTaskAndArchive(request, db, user, context, env) {
   const notifiedUsers = await queueNotifications(db, notifications);
   if (notifiedUsers.length) context.waitUntil(pushNotificationsForUsers(db, notifiedUsers));
   return stateResponse(db, user, data);
+}
+
+async function saveDailyBreakSchedule(request, db, user) {
+  const body = await readJson(request, 20_000);
+  const dateValue = clean(body.date);
+  const breakStart = clean(body.breakStart);
+  const breakEnd = clean(body.breakEnd);
+  const mutationId = clean(body.mutationId).slice(0, 100) || crypto.randomUUID();
+  const parsedDate = new Date(`${dateValue}T12:00:00Z`);
+  const validDate =
+    /^\d{4}-\d{2}-\d{2}$/.test(dateValue) &&
+    !Number.isNaN(parsedDate.getTime()) &&
+    parsedDate.toISOString().slice(0, 10) === dateValue;
+  const day = validDate ? parsedDate.getUTCDay() : -1;
+  if (!validDate || day === 0 || day === 6) {
+    return json({ ok: false, message: "Selecciona un dia laborable de lunes a viernes." }, 400);
+  }
+
+  const requested = { breakStart, breakEnd };
+  if (!validWorkSettings(requested)) {
+    return json({ ok: false, message: "El break debe durar entre 15 minutos y 3 horas, dentro del horario 08:30-19:00." }, 400);
+  }
+
+  const data = await loadData(db, { ownerIds: [user.id], includeHistory: false });
+  const today = dateIsoInLima(Date.now());
+  if (dateValue < today && !data.lateEvidenceUploadsEnabled) {
+    return json({ ok: false, message: "Pablo debe habilitar los cambios de dias anteriores." }, 409);
+  }
+  if (hasTaskConflict(data.tasks, user.id, dateValue, breakStart, breakEnd)) {
+    return json({ ok: false, message: "Ese horario ya esta ocupado por una tarea. Elige otro espacio disponible." }, 409);
+  }
+
+  const normalized = normalizeWorkSettings(requested);
+  const previous = data.breakSettingsByUserDate?.[user.id]?.[dateValue];
+  const alreadySaved =
+    clean(previous?.breakStart) === normalized.breakStart && clean(previous?.breakEnd) === normalized.breakEnd;
+  if (!alreadySaved) {
+    data.breakSettingsByUserDate = {
+      ...(data.breakSettingsByUserDate || {}),
+      [user.id]: {
+        ...(data.breakSettingsByUserDate?.[user.id] || {}),
+        [dateValue]: normalized
+      }
+    };
+    await saveData(db, data);
+  }
+
+  const response = await stateResponse(db, user, user.role === "Trainer" ? data : null);
+  const payload = await response.json();
+  return json({ ...payload, mutationId, idempotent: alreadySaved });
 }
 
 async function saveOvertimeSchedule(request, db, user, context) {

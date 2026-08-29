@@ -1,19 +1,19 @@
 # Task Hub - Handoff tecnico
 
-Actualizado: 2026-08-28
+Actualizado: 2026-08-29
 
 ## Estado actual
 
 - Producto visible: Task Hub.
 - Snapshot local activo: `publish-v23/`.
-- Frontend: `APP_VERSION = 48-lazy-task-history`.
-- Cache PWA: `task-hub-shell-v48-lazy-task-history`.
-- Respuesta `/health`: `48-lazy-task-history`.
+- Frontend: `APP_VERSION = 49-idempotent-daily-break`.
+- Cache PWA: `task-hub-shell-v49-idempotent-daily-break`.
+- Respuesta `/health`: `49-idempotent-daily-break`.
 - Esquema D1: `29-scoped-state-sync-1`.
 - `index.html` y `operativo.html` son copias exactas.
 - `functions/api/[[path]].js` y `functions/cloud/[[path]].js` son copias exactas.
-- El workspace local no contiene metadatos Git utilizables. Verificar repositorio,
-  rama y commit remoto antes de cualquier despliegue.
+- El repositorio local usa la rama `publish-final`. Verificar siempre el commit
+  remoto y el despliegue de Cloudflare antes de declarar una version publicada.
 
 ## Capacidades ya presentes
 
@@ -41,11 +41,10 @@ Actualizado: 2026-08-28
 
 ## Riesgos conocidos
 
-1. `GET /state` arma un estado agregado y las funciones `loadData()` y
-   `stateResponse()` pueden leer muchas tareas e historiales. Es el principal
-   candidato para reducir CPU y filas leidas en D1.
-2. El frontend mantiene comprobaciones periodicas cada 30 segundos. Aunque evita
-   algunas ejecuciones concurrentes, todavia puede provocar lecturas repetidas.
+1. `GET /state` arma un estado agregado y todavia puede leer muchas tareas para
+   coordinadores u observadores. El historial ya se obtiene bajo demanda.
+2. El frontend mantiene comprobaciones periodicas cada 60-75 segundos. Aunque
+   evita algunas ejecuciones concurrentes, todavia puede provocar lecturas repetidas.
 3. Frontend y backend son archivos monoliticos grandes. Los cambios deben ser
    pequenos y cubiertos por pruebas.
 4. Las rutas `/api` y `/cloud` comparten implementacion y proveedor. Son fallback
@@ -88,6 +87,13 @@ Actualizado: 2026-08-28
   evitar perdida o duplicacion cuando la tarea llego sin historial en el tablero.
 - Agregada `tests/check-lazy-task-history.mjs`. Las 16 pruebas locales finalizan
   correctamente.
+- El break por fecha usa `POST /schedule/break`, valida dia, permiso para fechas
+  anteriores y cruces con tareas en el servidor, y evita una nueva escritura si
+  el horario solicitado ya estaba guardado.
+- El cliente bloquea el boton durante el guardado y conserva el cambio localmente
+  cuando la nube falla, manteniendo `PUT /state` solo como compatibilidad offline.
+- Agregada `tests/check-idempotent-daily-break.mjs`. Las 17 pruebas locales
+  finalizan correctamente.
 - No se modificaron usuarios, tareas ni sustentos existentes. Esta entrega local
   aun no fue publicada en produccion.
 
@@ -98,8 +104,9 @@ todo el historial y todos los usuarios, ademas de intentar mantenimiento. Ahora:
 
 - Sin cambios: tres lecturas escalares de version en un solo `batch`, sin transferir
   tareas ni historial.
-- Con cambios para trainer: `app_data`, sus tareas y el historial de esas tareas.
-- Con cambios para coordinador: `app_data`, tareas e historial de su equipo.
+- Con cambios para trainer: `app_data` y sus tareas; el historial se carga al abrirlo.
+- Con cambios para coordinador: `app_data` y tareas de su equipo; el historial se
+  carga al abrirlo.
 - Con cambios para Giuliana: lectura global, necesaria por su alcance de supervision.
 
 La reduccion exacta de filas depende de los datos reales de produccion y debe
@@ -113,8 +120,8 @@ real en Cloudflare Analytics.
 Secuencia segura:
 
 1. Mantener temporalmente `PUT /state` como compatibilidad y cola offline.
-2. Convertir configuracion de break y otros cambios generales en operaciones
-   pequenas e idempotentes.
+2. Convertir los otros cambios generales que aun sincronizan el estado completo
+   en operaciones pequenas e idempotentes.
 3. Medir filas leidas, escrituras, CPU y latencia en Cloudflare Analytics.
 4. Probar conflictos concurrentes entre dos usuarios antes de retirar el flujo
    general de estado.

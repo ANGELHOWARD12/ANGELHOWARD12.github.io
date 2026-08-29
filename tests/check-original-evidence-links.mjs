@@ -9,7 +9,7 @@ if (html !== operative) throw new Error("index.html y operativo.html no son iden
 if (cloud !== api) throw new Error("Los endpoints cloud y api no son identicos");
 
 for (const marker of [
-  'const APP_VERSION = "48-lazy-task-history"',
+  'const APP_VERSION = "49-idempotent-daily-break"',
   "function originalEvidenceFileUrl(file, { absolute = false } = {})",
   "return new URL(source, PUBLIC_APP_ORIGIN).href",
   '{ header: "Direccion del original", width: 48 }',
