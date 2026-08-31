@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-hub-shell-v50-concurrent-app-actions";
+const CACHE_NAME = "task-hub-shell-v51-team-access-control";
 const APP_SHELL = [
   "/",
   "/index.html",

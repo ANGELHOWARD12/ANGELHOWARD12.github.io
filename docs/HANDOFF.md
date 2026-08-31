@@ -6,10 +6,10 @@ Actualizado: 2026-08-31
 
 - Producto visible: Task Hub.
 - Snapshot local activo: `publish-v23/`.
-- Candidato local: `APP_VERSION = 50-concurrent-app-actions`.
-- Cache PWA local: `task-hub-shell-v50-concurrent-app-actions`.
-- Respuesta `/health` local: `50-concurrent-app-actions`.
-- Produccion verificada: `49-idempotent-daily-break`, commit `d6fd9f3`.
+- Candidato local: `APP_VERSION = 51-team-access-control`.
+- Cache PWA local: `task-hub-shell-v51-team-access-control`.
+- Respuesta `/health` local: `51-team-access-control`.
+- Produccion verificada antes de este cambio: `50-concurrent-app-actions`, commit `0787c44`.
 - Esquema D1: `29-scoped-state-sync-1`.
 - `index.html` y `operativo.html` son copias exactas.
 - `functions/api/[[path]].js` y `functions/cloud/[[path]].js` son copias exactas.
@@ -19,6 +19,7 @@ Actualizado: 2026-08-31
 ## Capacidades ya presentes
 
 - Roles de coordinador, trainer, master y observador de solo lectura.
+- Desactivacion y reactivacion de personal por el coordinador de su equipo, sin borrar tareas ni sustentos.
 - Segmentacion Training y Audiovisuales.
 - Calendario semanal, horarios, breaks y ampliacion de jornada.
 - Tareas, historial, reasignacion, revision y aprobacion.

@@ -18,7 +18,7 @@ for (const marker of [
 }
 
 for (const marker of [
-  'const APP_VERSION = "50-concurrent-app-actions"',
+  'const APP_VERSION = "51-team-access-control"',
   "async function ensureTaskHistory",
   "/history`)",
   "task.historyLoaded = true",

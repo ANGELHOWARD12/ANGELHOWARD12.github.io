@@ -280,6 +280,7 @@ export async function onRequest(context) {
     }
     if (route === "info/updates" && request.method === "POST") return await saveInfoUpdate(request, env.DB, session.user);
     if (route === "admin/users" && request.method === "POST") return await createUser(request, env.DB, session.user);
+    if (route === "admin/user-status" && request.method === "POST") return await setUserStatus(request, env.DB, session.user);
     if (route === "admin/reset-password" && request.method === "POST") return await resetPassword(request, env.DB, session.user);
 
     return json({ ok: false, message: "Ruta no encontrada." }, 404);
@@ -311,7 +312,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "50-concurrent-app-actions",
+    version: "51-team-access-control",
     schema: SCHEMA_VERSION,
     r2: r2StorageEnabled(env),
     migration: {
@@ -4919,6 +4920,39 @@ async function createUser(request, db, actor) {
       createdAt
     })
   }, 201);
+}
+
+async function setUserStatus(request, db, actor) {
+  if (actor.role !== "Coordinador" || isObserverUser(actor)) {
+    return json({ ok: false, message: "Permiso insuficiente." }, 403);
+  }
+  const body = await readJson(request);
+  const userId = clean(body.userId);
+  const enabled = body.enabled;
+  if (!userId || typeof enabled !== "boolean") {
+    return json({ ok: false, message: "Selecciona un usuario y un estado valido." }, 400);
+  }
+  const target = await db
+    .prepare("SELECT id, name, email, zone, role, status, access_level, team, job_title, member_type, created_at FROM users WHERE id = ?")
+    .bind(userId)
+    .first();
+  if (!target) return json({ ok: false, message: "Usuario no encontrado." }, 404);
+  if (target.role !== "Trainer" || !coordinatorCanManageUser(actor, target) || clean(target.id) === clean(actor.id)) {
+    return json({ ok: false, message: "Solo puedes administrar al personal de tu propio equipo." }, 403);
+  }
+
+  const nextStatus = enabled ? "Activo" : "Inactivo";
+  if (target.status !== nextStatus) {
+    const now = Date.now();
+    const statements = [
+      db.prepare("UPDATE users SET status = ? WHERE id = ?").bind(nextStatus, target.id),
+      db.prepare("UPDATE app_data SET updated_at = CASE WHEN updated_at >= ? THEN updated_at + 1 ELSE ? END WHERE id = 1").bind(now, now)
+    ];
+    if (!enabled) statements.push(db.prepare("DELETE FROM sessions WHERE user_id = ?").bind(target.id));
+    await db.batch(statements);
+  }
+  target.status = nextStatus;
+  return json({ ok: true, user: publicUser(target), tasksPreserved: true });
 }
 
 async function resetPassword(request, db, actor) {

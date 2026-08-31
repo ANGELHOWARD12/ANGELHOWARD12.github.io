@@ -3691,7 +3691,7 @@
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
       const EARLIEST_OVERTIME_START = "05:00";
-      const APP_VERSION = "50-concurrent-app-actions";
+      const APP_VERSION = "51-team-access-control";
       const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
       const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
       const STATE_REFRESH_INTERVAL_MS = 60 * 1000;
@@ -8401,6 +8401,25 @@
         );
       }
 
+      async function setTeamUserStatus(user, enabled) {
+        if (!isCoordinator() || !user?.id) return false;
+        const action = enabled ? "reactivar" : "desactivar";
+        if (!window.confirm(`¿Deseas ${action} el acceso de ${user.name}? Sus tareas y sustentos se conservaran.`)) return false;
+        try {
+          const data = await apiRequest("/admin/user-status", {
+            method: "POST",
+            body: JSON.stringify({ userId: user.id, enabled })
+          });
+          const index = state.users.findIndex((item) => item.id === user.id);
+          if (index >= 0) state.users[index] = { ...state.users[index], ...data.user };
+          render();
+          return true;
+        } catch (error) {
+          window.alert(error.message || "No se pudo actualizar el acceso.");
+          return false;
+        }
+      }
+
       async function closeRecoveryRequest(request) {
         if (!isCoordinator() || !request?.id) return false;
         return requestAppAction(
@@ -9642,6 +9661,8 @@
         const activeUsers = state.users.filter((user) => user.status === "Activo");
         const visibleUsers = isObserver()
           ? organizationScopeUsers()
+          : isCoordinator()
+            ? state.users
           : canViewAll()
             ? activeUsers
             : activeUsers.filter((user) => user.role === "Trainer");
@@ -9664,6 +9685,7 @@
             card.innerHTML = `
               <div class="title-row">
                 <h3>${escapeHtml(user.name)}</h3>
+                <span class="pill ${user.status === "Activo" ? "done" : "high"}">${escapeHtml(user.status || "Activo")}</span>
                 <span class="pill">${escapeHtml(user.jobTitle || user.role)}</span>
               </div>
               <div class="meta">
@@ -9701,6 +9723,19 @@
               resetButton.title = isObserver() ? "Cuenta Admin de solo lectura" : "";
               if (isCoordinator()) resetButton.addEventListener("click", () => resetUserPassword(user.id));
               actions.appendChild(resetButton);
+              if (isCoordinator() && user.role === "Trainer") {
+                const statusButton = document.createElement("button");
+                const enabled = user.status === "Activo";
+                statusButton.className = enabled ? "small danger" : "small";
+                statusButton.type = "button";
+                statusButton.textContent = enabled ? "Desactivar acceso" : "Reactivar acceso";
+                statusButton.addEventListener("click", async () => {
+                  statusButton.disabled = true;
+                  await setTeamUserStatus(user, !enabled);
+                  statusButton.disabled = false;
+                });
+                actions.appendChild(statusButton);
+              }
               if (isCoordinator() && user.passwordResetTemp) {
                 const mailLink = document.createElement("a");
                 mailLink.className = "small";
