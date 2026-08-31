@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-hub-shell-v51-team-access-control";
+const CACHE_NAME = "task-hub-shell-v52-team-member-retirement";
 const APP_SHELL = [
   "/",
   "/index.html",

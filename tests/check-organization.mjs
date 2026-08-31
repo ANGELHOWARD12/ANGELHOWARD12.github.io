@@ -53,7 +53,7 @@ for (const marker of [
   'function isSelfManagedMasterTask(task)',
   'function hasCoordinatorPersonalWeek()',
   'function updateMasterTask(taskId)',
-  'const APP_VERSION = "51-team-access-control"',
+  'const APP_VERSION = "52-team-member-retirement"',
   'const APP_MODE = document.documentElement.classList.contains("app-mode")',
   '<title>Task Hub</title>',
   '<span class="brand-mark" aria-label="Task Hub">TH</span>',
@@ -68,7 +68,7 @@ for (const marker of [
 
 if (cloud !== api) throw new Error("Las rutas /cloud y /api no son identicas");
 if (html !== operative) throw new Error("index.html y operativo.html no son identicos");
-if (!sw.includes('task-hub-shell-v51-team-access-control')) throw new Error("El cache del Service Worker no fue actualizado");
+if (!sw.includes('task-hub-shell-v52-team-member-retirement')) throw new Error("El cache del Service Worker no fue actualizado");
 if (html.includes('id="evidenceLinks"') || html.includes("els.evidenceLinks")) {
   throw new Error("El campo de enlaces continua visible en el formulario de sustentos");
 }

@@ -17,7 +17,7 @@ for (const marker of [
 }
 
 for (const marker of [
-  'const APP_VERSION = "51-team-access-control"',
+  'const APP_VERSION = "52-team-member-retirement"',
   "async function saveDailyBreakSetting",
   'apiRequestWithRetry("/schedule/break"',
   "applyDailyBreakLocally(dateValue, settings)",

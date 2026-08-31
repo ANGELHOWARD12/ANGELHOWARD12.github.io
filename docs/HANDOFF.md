@@ -6,10 +6,10 @@ Actualizado: 2026-08-31
 
 - Producto visible: Task Hub.
 - Snapshot local activo: `publish-v23/`.
-- Candidato local: `APP_VERSION = 51-team-access-control`.
-- Cache PWA local: `task-hub-shell-v51-team-access-control`.
-- Respuesta `/health` local: `51-team-access-control`.
-- Produccion verificada antes de este cambio: `50-concurrent-app-actions`, commit `0787c44`.
+- Candidato local: `APP_VERSION = 52-team-member-retirement`.
+- Cache PWA local: `task-hub-shell-v52-team-member-retirement`.
+- Respuesta `/health` local: `52-team-member-retirement`.
+- Produccion verificada antes de este cambio: `51-team-access-control`, commit `ab8bb97`.
 - Esquema D1: `29-scoped-state-sync-1`.
 - `index.html` y `operativo.html` son copias exactas.
 - `functions/api/[[path]].js` y `functions/cloud/[[path]].js` son copias exactas.
@@ -20,6 +20,7 @@ Actualizado: 2026-08-31
 
 - Roles de coordinador, trainer, master y observador de solo lectura.
 - Desactivacion y reactivacion de personal por el coordinador de su equipo, sin borrar tareas ni sustentos.
+- Retiro definitivo de personal de los listados activos, conservando su historial para reportes y auditoria.
 - Segmentacion Training y Audiovisuales.
 - Calendario semanal, horarios, breaks y ampliacion de jornada.
 - Tareas, historial, reasignacion, revision y aprobacion.

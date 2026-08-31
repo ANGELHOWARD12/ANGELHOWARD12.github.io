@@ -3691,7 +3691,7 @@
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
       const EARLIEST_OVERTIME_START = "05:00";
-      const APP_VERSION = "51-team-access-control";
+      const APP_VERSION = "52-team-member-retirement";
       const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
       const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
       const STATE_REFRESH_INTERVAL_MS = 60 * 1000;
@@ -8420,6 +8420,27 @@
         }
       }
 
+      async function retireTeamUser(user) {
+        if (!isCoordinator() || !user?.id) return false;
+        const confirmed = window.confirm(
+          `¿Retirar definitivamente a ${user.name} del Task? Desaparecera de los listados, pero sus tareas y sustentos historicos se conservaran.`
+        );
+        if (!confirmed) return false;
+        try {
+          const data = await apiRequest("/admin/user-status", {
+            method: "POST",
+            body: JSON.stringify({ userId: user.id, retire: true })
+          });
+          const index = state.users.findIndex((item) => item.id === user.id);
+          if (index >= 0) state.users[index] = { ...state.users[index], ...data.user };
+          render();
+          return true;
+        } catch (error) {
+          window.alert(error.message || "No se pudo retirar al usuario.");
+          return false;
+        }
+      }
+
       async function closeRecoveryRequest(request) {
         if (!isCoordinator() || !request?.id) return false;
         return requestAppAction(
@@ -9662,7 +9683,7 @@
         const visibleUsers = isObserver()
           ? organizationScopeUsers()
           : isCoordinator()
-            ? state.users
+            ? state.users.filter((user) => user.status !== "Retirado")
           : canViewAll()
             ? activeUsers
             : activeUsers.filter((user) => user.role === "Trainer");
@@ -9735,6 +9756,16 @@
                   statusButton.disabled = false;
                 });
                 actions.appendChild(statusButton);
+                const retireButton = document.createElement("button");
+                retireButton.className = "small danger";
+                retireButton.type = "button";
+                retireButton.textContent = "Retirar del Task";
+                retireButton.addEventListener("click", async () => {
+                  retireButton.disabled = true;
+                  await retireTeamUser(user);
+                  retireButton.disabled = false;
+                });
+                actions.appendChild(retireButton);
               }
               if (isCoordinator() && user.passwordResetTemp) {
                 const mailLink = document.createElement("a");
@@ -9756,8 +9787,15 @@
             els.teamList.appendChild(card);
           });
 
+        const retiredProfileNames = new Set(
+          state.users
+            .filter((user) => user.status === "Retirado")
+            .map((user) => teamProfileForName(user.name)?.name)
+            .filter(Boolean)
+        );
         TEAM_PROFILE_DEFAULTS
           .filter((profile) => !matchedProfiles.has(profile.name))
+          .filter((profile) => !retiredProfileNames.has(profile.name))
           .filter((profile) => {
             if (isObserver()) return (profile.scope || "training") === selectedOrganizationScope;
             return (profile.team || TEAM_TRAINING) === userTeam(activeUser());

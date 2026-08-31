@@ -10,10 +10,14 @@ assert.match(api, /UPDATE users SET status = \? WHERE id = \?/);
 assert.match(api, /UPDATE app_data SET updated_at = CASE WHEN updated_at >= \?/);
 assert.match(api, /DELETE FROM sessions WHERE user_id = \?/);
 assert.match(api, /tasksPreserved: true/);
+assert.match(api, /nextStatus = retire \? "Retirado"/);
 assert.doesNotMatch(api.slice(api.indexOf("async function setUserStatus"), api.indexOf("async function resetPassword")), /DELETE FROM task_records|DELETE FROM evidence/);
 assert.match(html, /Desactivar acceso/);
 assert.match(html, /Reactivar acceso/);
 assert.match(html, /Sus tareas y sustentos se conservaran/);
+assert.match(html, /Retirar del Task/);
+assert.match(html, /user\.status !== "Retirado"/);
 
 console.log("TeamAccess=CoordinatorScopedDisableReactivate");
 console.log("HistoricalTasksAndEvidence=Preserved");
+console.log("RetiredMembers=HiddenFromActiveLists");
