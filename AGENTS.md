@@ -101,7 +101,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath `
 ## Prioridad tecnica
 
 La lectura condicional y filtrada de D1, las acciones idempotentes, el historial
-bajo demanda y el break diario independiente ya estan implementados. La siguiente
-prioridad es convertir los otros usos generales de `PUT /state` y medir Cloudflare
-Analytics. No retirar la compatibilidad actual ni la cola offline hasta probar
-concurrencia, permisos, historial y sustentos.
+bajo demanda, el break diario y las acciones generales concurrentes ya estan
+implementados. La siguiente prioridad es publicar el candidato de etapa 6 y medir
+Cloudflare Analytics siguiendo `docs/STAGE-6-VALIDATION.md`. No retirar la
+compatibilidad offline ni ampliar funciones hasta validar produccion.

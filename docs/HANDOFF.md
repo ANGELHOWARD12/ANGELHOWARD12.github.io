@@ -1,14 +1,15 @@
 # Task Hub - Handoff tecnico
 
-Actualizado: 2026-08-29
+Actualizado: 2026-08-31
 
 ## Estado actual
 
 - Producto visible: Task Hub.
 - Snapshot local activo: `publish-v23/`.
-- Frontend: `APP_VERSION = 49-idempotent-daily-break`.
-- Cache PWA: `task-hub-shell-v49-idempotent-daily-break`.
-- Respuesta `/health`: `49-idempotent-daily-break`.
+- Candidato local: `APP_VERSION = 50-concurrent-app-actions`.
+- Cache PWA local: `task-hub-shell-v50-concurrent-app-actions`.
+- Respuesta `/health` local: `50-concurrent-app-actions`.
+- Produccion verificada: `49-idempotent-daily-break`, commit `d6fd9f3`.
 - Esquema D1: `29-scoped-state-sync-1`.
 - `index.html` y `operativo.html` son copias exactas.
 - `functions/api/[[path]].js` y `functions/cloud/[[path]].js` son copias exactas.
@@ -43,8 +44,8 @@ Actualizado: 2026-08-29
 
 1. `GET /state` arma un estado agregado y todavia puede leer muchas tareas para
    coordinadores u observadores. El historial ya se obtiene bajo demanda.
-2. El frontend mantiene comprobaciones periodicas cada 60-75 segundos. Aunque
-   evita algunas ejecuciones concurrentes, todavia puede provocar lecturas repetidas.
+2. El frontend mantiene comprobaciones periodicas cada 60-75 segundos. La version
+   condicional evita reconstruir el tablero cuando no existen cambios.
 3. Frontend y backend son archivos monoliticos grandes. Los cambios deben ser
    pequenos y cubiertos por pruebas.
 4. Las rutas `/api` y `/cloud` comparten implementacion y proveedor. Son fallback
@@ -94,8 +95,18 @@ Actualizado: 2026-08-29
   cuando la nube falla, manteniendo `PUT /state` solo como compatibilidad offline.
 - Agregada `tests/check-idempotent-daily-break.mjs`. Las 17 pruebas locales
   finalizan correctamente.
-- No se modificaron usuarios, tareas ni sustentos existentes. Esta entrega local
-  aun no fue publicada en produccion.
+- Comunicados, frase diaria, revision de registros y cierre de recuperaciones usan
+  `POST /app/action` con payload pequeno, validacion de rol e idempotencia.
+- Las tareas ya no reescriben `app_data` cuando solo cambia `task_records`. Los
+  cambios generales comparan `updated_at` y reintentan ante concurrencia.
+- Recuperacion de clave, Info LG e interruptor de fechas anteriores modifican
+  solamente `app_data` y ya no cargan todas las tareas para guardar.
+- `PUT /state` queda limitado a tres respaldos offline y la importacion manual.
+- Agregada `tests/check-concurrent-app-actions.mjs`, que simula 100 escrituras de
+  tareas independientes. Las 18 pruebas locales finalizan correctamente.
+- La guia `docs/STAGE-6-VALIDATION.md` define umbrales, observacion y rollback.
+- No se modificaron usuarios, tareas ni sustentos existentes. El candidato local
+  de etapa 6 aun no fue publicado.
 
 ## Comparacion de carga D1
 
@@ -114,19 +125,10 @@ confirmarse en Cloudflare Analytics despues de publicar.
 
 ## Siguiente mejora recomendada
 
-Objetivo: reducir los usos restantes de `PUT /state` y medir el comportamiento
-real en Cloudflare Analytics.
-
-Secuencia segura:
-
-1. Mantener temporalmente `PUT /state` como compatibilidad y cola offline.
-2. Convertir los otros cambios generales que aun sincronizan el estado completo
-   en operaciones pequenas e idempotentes.
-3. Medir filas leidas, escrituras, CPU y latencia en Cloudflare Analytics.
-4. Probar conflictos concurrentes entre dos usuarios antes de retirar el flujo
-   general de estado.
-
-No combinar esta mejora con rediseño visual, nuevos usuarios o cambios de APK.
+Publicar el candidato de etapa 6 con autorizacion explicita y aplicar la guia
+`docs/STAGE-6-VALIDATION.md`. Medir errores, latencia, CPU y filas D1 con trafico
+real antes de ampliar nuevas funciones. No retirar la compatibilidad offline ni
+combinar esta validacion con rediseño visual, nuevos usuarios o cambios de APK.
 
 ## Criterios de aceptacion de la siguiente mejora
 

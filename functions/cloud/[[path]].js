@@ -272,6 +272,7 @@ export async function onRequest(context) {
     if (route === "schedule/overtime" && request.method === "POST") return await saveOvertimeSchedule(request, env.DB, session.user, context);
     if (route === "schedule/overtime-request" && request.method === "POST") return await requestOvertimeSchedule(request, env.DB, session.user, context);
     if (route === "schedule/overtime-review" && request.method === "POST") return await reviewOvertimeSchedule(request, env.DB, session.user, context);
+    if (route === "app/action" && request.method === "POST") return await mutateAppAction(request, env.DB, session.user);
     if (route === "state" && request.method === "GET") return await getState(request, env.DB, session.user, context);
     if (route === "state" && request.method === "PUT") return await putState(request, env.DB, session.user, context, env);
     if (route === "settings/late-evidence" && request.method === "POST") {
@@ -310,7 +311,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "49-idempotent-daily-break",
+    version: "50-concurrent-app-actions",
     schema: SCHEMA_VERSION,
     r2: r2StorageEnabled(env),
     migration: {
@@ -1447,9 +1448,9 @@ async function requestRecovery(request, db) {
   const email = clean(body.email).toLowerCase();
   const user = validEmail(email) ? await db.prepare("SELECT id, email FROM users WHERE email = ?").bind(email).first() : null;
   if (user) {
-    const data = await loadData(db);
-    const pending = data.passwordRecoveryRequests.some((item) => item.userId === user.id && item.status === "Pendiente");
-    if (!pending) {
+    await mutateAppData(db, (data) => {
+      const pending = data.passwordRecoveryRequests.some((item) => item.userId === user.id && item.status === "Pendiente");
+      if (pending) return { changed: false };
       data.passwordRecoveryRequests.unshift({
         id: crypto.randomUUID(),
         userId: user.id,
@@ -1457,8 +1458,8 @@ async function requestRecovery(request, db) {
         status: "Pendiente",
         createdAt: Date.now()
       });
-      await saveData(db, data);
-    }
+      return { changed: true };
+    });
   }
   return json({ ok: true, message: "Si el correo esta registrado, el coordinador recibira la solicitud." });
 }
@@ -1492,55 +1493,63 @@ async function setLateEvidencePolicy(request, db, user, context) {
     return json({ ok: false, message: "Selecciona si el permiso para sustentos y breaks anteriores debe estar encendido o apagado." }, 400);
   }
 
-  const data = await loadData(db);
   const enabled = body.enabled;
   const changedAt = Date.now();
-  data.lateEvidenceUploadsEnabled = enabled;
-  data.lateEvidencePolicyHistory = Array.isArray(data.lateEvidencePolicyHistory)
-    ? data.lateEvidencePolicyHistory
-    : [];
-  data.lateEvidencePolicyHistory.unshift({
-    enabled,
-    byId: user.id,
-    byName: user.name,
-    at: changedAt
+  const result = await mutateAppData(db, (data) => {
+    if (data.lateEvidenceUploadsEnabled === enabled) return { changed: false };
+    data.lateEvidenceUploadsEnabled = enabled;
+    data.lateEvidencePolicyHistory = Array.isArray(data.lateEvidencePolicyHistory)
+      ? data.lateEvidencePolicyHistory
+      : [];
+    data.lateEvidencePolicyHistory.unshift({
+      enabled,
+      byId: user.id,
+      byName: user.name,
+      at: changedAt
+    });
+    data.lateEvidencePolicyHistory = data.lateEvidencePolicyHistory.slice(0, 100);
+    return { changed: true };
   });
-  data.lateEvidencePolicyHistory = data.lateEvidencePolicyHistory.slice(0, 100);
-  await saveData(db, data);
 
-  const trainers = await db
-    .prepare("SELECT id FROM users WHERE role = 'Trainer' AND status = 'Activo' AND access_level <> ?")
-    .bind(OBSERVER_ACCESS_LEVEL)
-    .all();
-  const notifiedUsers = await queueNotifications(
-    db,
-    (trainers.results || []).map((trainer) => ({
-      userId: trainer.id,
-      title: enabled ? "Fechas anteriores habilitadas" : "Fechas anteriores bloqueadas",
-      body: enabled
-        ? "Pablo habilito temporalmente la carga de sustentos y la modificacion de breaks de dias anteriores."
-        : "Los sustentos y los breaks anteriores vuelven a estar protegidos.",
-      url: "/?view=evidenceView",
-      sourceKey: `late-evidence-policy:${enabled ? "on" : "off"}:${changedAt}:${trainer.id}`
-    }))
-  );
-  if (notifiedUsers.length) context.waitUntil(pushNotificationsForUsers(db, notifiedUsers));
-  return stateResponse(db, user, data);
+  if (result.outcome.changed) {
+    const trainers = await db
+      .prepare("SELECT id FROM users WHERE role = 'Trainer' AND status = 'Activo' AND access_level <> ?")
+      .bind(OBSERVER_ACCESS_LEVEL)
+      .all();
+    const notifiedUsers = await queueNotifications(
+      db,
+      (trainers.results || []).map((trainer) => ({
+        userId: trainer.id,
+        title: enabled ? "Fechas anteriores habilitadas" : "Fechas anteriores bloqueadas",
+        body: enabled
+          ? "Pablo habilito temporalmente la carga de sustentos y la modificacion de breaks de dias anteriores."
+          : "Los sustentos y los breaks anteriores vuelven a estar protegidos.",
+        url: "/?view=evidenceView",
+        sourceKey: `late-evidence-policy:${enabled ? "on" : "off"}:${changedAt}:${trainer.id}`
+      }))
+    );
+    if (notifiedUsers.length) context.waitUntil(pushNotificationsForUsers(db, notifiedUsers));
+  }
+  return stateResponse(db, user);
 }
 
 async function saveInfoUpdate(request, db, user) {
   const body = await readJson(request);
-  const data = await loadData(db);
   const action = clean(body.action) || "upsert";
   const itemId = clean(body.id);
 
   if (action === "delete") {
-    if (!itemId || !data.lgUpdates.some((item) => item.id === itemId)) {
-      return json({ ok: false, message: "La publicacion de Info LG ya no existe." }, 404);
-    }
-    data.lgUpdates = data.lgUpdates.filter((item) => item.id !== itemId);
-    await saveData(db, data);
-    return stateResponse(db, user, data);
+    if (!itemId) return json({ ok: false, message: "Selecciona la publicacion de Info LG." }, 400);
+    await mutateAppData(db, (data) => {
+      if (!data.lgUpdates.some((item) => item.id === itemId)) {
+        const error = new Error("La publicacion de Info LG ya no existe.");
+        error.status = 404;
+        throw error;
+      }
+      data.lgUpdates = data.lgUpdates.filter((item) => item.id !== itemId);
+      return { changed: true };
+    });
+    return stateResponse(db, user);
   }
 
   const line = ["HS", "TV", "AV"].includes(body.line) ? body.line : "";
@@ -1553,27 +1562,163 @@ async function saveInfoUpdate(request, db, user) {
   }
 
   const now = Date.now();
-  const existingIndex = itemId ? data.lgUpdates.findIndex((item) => item.id === itemId) : -1;
-  const existing = existingIndex >= 0 ? data.lgUpdates[existingIndex] : null;
-  const nextItem = {
-    id: existing?.id || crypto.randomUUID(),
-    line,
-    type,
-    title,
-    product,
-    description,
-    createdById: existing?.createdById || user.id,
-    createdByName: existing?.createdByName || user.name,
-    createdAt: existing?.createdAt || now,
-    updatedById: user.id,
-    updatedByName: user.name,
-    updatedAt: now
-  };
-  if (existingIndex >= 0) data.lgUpdates[existingIndex] = nextItem;
-  else data.lgUpdates.unshift(nextItem);
-  data.lgUpdates = normalizeLgUpdates(data.lgUpdates).slice(0, 500);
-  await saveData(db, data);
-  return stateResponse(db, user, data);
+  await mutateAppData(db, (data) => {
+    const existingIndex = itemId ? data.lgUpdates.findIndex((item) => item.id === itemId) : -1;
+    const existing = existingIndex >= 0 ? data.lgUpdates[existingIndex] : null;
+    const nextItem = {
+      id: existing?.id || itemId || crypto.randomUUID(),
+      line,
+      type,
+      title,
+      product,
+      description,
+      createdById: existing?.createdById || user.id,
+      createdByName: existing?.createdByName || user.name,
+      createdAt: existing?.createdAt || now,
+      updatedById: user.id,
+      updatedByName: user.name,
+      updatedAt: now
+    };
+    if (existingIndex >= 0) data.lgUpdates[existingIndex] = nextItem;
+    else data.lgUpdates.unshift(nextItem);
+    data.lgUpdates = normalizeLgUpdates(data.lgUpdates).slice(0, 500);
+    return { changed: true };
+  });
+  return stateResponse(db, user);
+}
+
+async function mutateAppAction(request, db, user) {
+  const body = await readJson(request, 30_000);
+  const action = clean(body.action);
+  const mutationId = clean(body.mutationId).slice(0, 100) || crypto.randomUUID();
+  const now = Date.now();
+
+  if (action === "motivation") {
+    if (!isPrimaryCoordinatorUser(user)) {
+      return json({ ok: false, message: "Solo Pablo puede editar la frase diaria." }, 403);
+    }
+    const dateValue = clean(body.date);
+    const text = clean(body.text).slice(0, 500);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue) || text.length < 3) {
+      return json({ ok: false, message: "Completa la fecha y la frase diaria." }, 400);
+    }
+    const result = await mutateAppData(db, (data) => {
+      const index = (data.dailyMotivations || []).findIndex((item) => clean(item.date) === dateValue);
+      const previous = index >= 0 ? data.dailyMotivations[index] : null;
+      if (clean(previous?.text) === text) return { changed: false };
+      const next = { date: dateValue, text, updatedAt: now, updatedById: user.id };
+      if (index >= 0) data.dailyMotivations[index] = next;
+      else data.dailyMotivations.unshift(next);
+      data.dailyMotivations = data.dailyMotivations.slice(0, 400);
+      return { changed: true };
+    });
+    return appActionStateResponse(db, user, mutationId, result);
+  }
+
+  if (action === "announcement") {
+    if (!isPrimaryCoordinatorUser(user)) {
+      return json({ ok: false, message: "Solo Pablo puede publicar comunicados." }, 403);
+    }
+    const item = {
+      id: clean(body.id).slice(0, 100),
+      title: clean(body.title).slice(0, 140),
+      audience: body.audience === "person" ? "person" : "all",
+      targetId: body.audience === "person" ? clean(body.targetId) : "",
+      priority: ["Alta", "Media", "Baja"].includes(body.priority) ? body.priority : "Media",
+      body: clean(body.body).slice(0, 2000),
+      createdById: user.id,
+      createdAt: Number(body.createdAt || now)
+    };
+    if (!item.id || item.title.length < 3 || item.body.length < 5 || (item.audience === "person" && !item.targetId)) {
+      return json({ ok: false, message: "Completa el comunicado y su destinatario." }, 400);
+    }
+    if (item.targetId) {
+      const target = await db.prepare("SELECT id FROM users WHERE id = ? AND status = 'Activo'").bind(item.targetId).first();
+      if (!target) return json({ ok: false, message: "El destinatario ya no esta disponible." }, 400);
+    }
+    const result = await mutateAppData(db, (data) => {
+      const existing = (data.announcements || []).find((entry) => clean(entry.id) === item.id);
+      if (existing) {
+        const same = ["title", "audience", "targetId", "priority", "body"].every(
+          (key) => clean(existing[key]) === clean(item[key])
+        );
+        if (same) return { changed: false };
+        const error = new Error("El identificador del comunicado ya fue utilizado.");
+        error.status = 409;
+        throw error;
+      }
+      data.announcements.unshift(item);
+      data.announcements = data.announcements.slice(0, 500);
+      return { changed: true };
+    });
+    return appActionStateResponse(db, user, mutationId, result);
+  }
+
+  if (action === "registration-review") {
+    if (user.role !== "Coordinador") return json({ ok: false, message: "Permiso insuficiente." }, 403);
+    const requestId = clean(body.requestId);
+    const decision = clean(body.decision);
+    if (!requestId || !["Aprobada", "Rechazada"].includes(decision)) {
+      return json({ ok: false, message: "Selecciona una decision valida." }, 400);
+    }
+    const result = await mutateAppData(db, (data) => {
+      const item = (data.registrationRequests || []).find((entry) => clean(entry.id) === requestId);
+      if (!item || clean(item.team || TEAM_TRAINING) !== userTeam(user)) {
+        const error = new Error("La solicitud ya no existe o pertenece a otro equipo.");
+        error.status = 404;
+        throw error;
+      }
+      if (item.status === decision) return { changed: false };
+      item.status = decision;
+      item.reviewedAt = now;
+      item.reviewedById = user.id;
+      return { changed: true };
+    });
+    return appActionStateResponse(db, user, mutationId, result);
+  }
+
+  if (action === "recovery-close") {
+    if (user.role !== "Coordinador") return json({ ok: false, message: "Permiso insuficiente." }, 403);
+    const requestId = clean(body.requestId);
+    if (!requestId) return json({ ok: false, message: "Selecciona la solicitud." }, 400);
+    let targetUser = null;
+    const result = await mutateAppData(db, async (data) => {
+      const item = (data.passwordRecoveryRequests || []).find((entry) => clean(entry.id) === requestId);
+      if (!item) {
+        const error = new Error("La solicitud ya no existe.");
+        error.status = 404;
+        throw error;
+      }
+      targetUser = targetUser || (await db
+        .prepare("SELECT id, role, status, access_level, team, member_type FROM users WHERE id = ?")
+        .bind(clean(item.userId))
+        .first());
+      if (!targetUser || !coordinatorCanManageUser(user, targetUser)) {
+        const error = new Error("No puedes cerrar solicitudes de otro equipo.");
+        error.status = 403;
+        throw error;
+      }
+      if (item.status === "Cerrada") return { changed: false };
+      item.status = "Cerrada";
+      item.closedAt = now;
+      item.closedById = user.id;
+      return { changed: true };
+    });
+    return appActionStateResponse(db, user, mutationId, result);
+  }
+
+  return json({ ok: false, message: "Accion general no reconocida." }, 400);
+}
+
+async function appActionStateResponse(db, user, mutationId, result) {
+  const response = await stateResponse(db, user);
+  const payload = await response.json();
+  return json({
+    ...payload,
+    mutationId,
+    idempotent: result?.outcome?.changed === false,
+    concurrencyRetries: Number(result?.retries || 0)
+  });
 }
 
 async function notificationConfig(db) {
@@ -4796,14 +4941,17 @@ async function resetPassword(request, db, actor) {
   await db.prepare("DELETE FROM sessions WHERE user_id = ?").bind(user.id).run();
 
   if (body.requestId) {
-    const data = await loadData(db);
-    const requestItem = data.passwordRecoveryRequests.find((item) => item.id === body.requestId);
-    if (requestItem) {
+    await mutateAppData(db, (data) => {
+      const requestItem = data.passwordRecoveryRequests.find((item) => item.id === body.requestId);
+      if (!requestItem) return { changed: false };
+      if (requestItem.status === "Clave temporal generada" && clean(requestItem.resolvedById) === actor.id) {
+        return { changed: false };
+      }
       requestItem.status = "Clave temporal generada";
       requestItem.resolvedAt = Date.now();
       requestItem.resolvedById = actor.id;
-      await saveData(db, data);
-    }
+      return { changed: true };
+    });
   }
   return json({ ok: true, tempPassword, user: publicUser(user) });
 }
@@ -5069,7 +5217,7 @@ async function loadData(db, { ownerIds = null, includeHistory = true } = {}) {
     if (historyStatement) historyStatement = historyStatement.bind(...scopedOwnerIds);
   }
   const statements = [
-    db.prepare("SELECT data FROM app_data WHERE id = 1"),
+    db.prepare("SELECT data, updated_at FROM app_data WHERE id = 1"),
     taskStatement
   ];
   if (historyStatement) statements.push(historyStatement);
@@ -5144,6 +5292,16 @@ async function loadData(db, { ownerIds = null, includeHistory = true } = {}) {
       enumerable: false,
       value: createTaskSnapshot(data)
     });
+    Object.defineProperty(data, "__appDataSnapshot", {
+      configurable: true,
+      enumerable: false,
+      value: JSON.stringify(appDataPayload(data))
+    });
+    Object.defineProperty(data, "__appDataUpdatedAt", {
+      configurable: true,
+      enumerable: false,
+      value: Number(appResult?.results?.[0]?.updated_at || 0)
+    });
     return data;
   } catch {
     const data = structuredClone(EMPTY_DATA);
@@ -5152,12 +5310,22 @@ async function loadData(db, { ownerIds = null, includeHistory = true } = {}) {
       enumerable: false,
       value: new Map()
     });
+    Object.defineProperty(data, "__appDataSnapshot", {
+      configurable: true,
+      enumerable: false,
+      value: JSON.stringify(appDataPayload(data))
+    });
+    Object.defineProperty(data, "__appDataUpdatedAt", {
+      configurable: true,
+      enumerable: false,
+      value: Number(appResult?.results?.[0]?.updated_at || 0)
+    });
     return data;
   }
 }
 
-async function saveData(db, data) {
-  const payload = {
+function appDataPayload(data) {
+  return {
     version: 23,
     workSettings: normalizeWorkSettings(data.workSettings),
     breakSettingsByUser: normalizeBreakSettingsByUser(data.breakSettingsByUser),
@@ -5175,18 +5343,68 @@ async function saveData(db, data) {
       ? data.lateEvidencePolicyHistory.slice(0, 100)
       : []
   };
+}
+
+async function mutateAppData(db, mutate, attempts = 6) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const row = await db.prepare("SELECT data, updated_at FROM app_data WHERE id = 1").first();
+    let parsed;
+    try {
+      parsed = JSON.parse(row?.data || "{}");
+    } catch {
+      parsed = {};
+    }
+    const data = {
+      ...structuredClone(EMPTY_DATA),
+      ...parsed,
+      workSettings: normalizeWorkSettings(parsed.workSettings),
+      breakSettingsByUser: normalizeBreakSettingsByUser(parsed.breakSettingsByUser),
+      breakSettingsByUserDate: normalizeBreakSettingsByUserDate(parsed.breakSettingsByUserDate),
+      workScheduleByUserDate: normalizeWorkScheduleByUserDate(parsed.workScheduleByUserDate),
+      overtimeRequests: normalizeOvertimeRequests(parsed.overtimeRequests),
+      lgUpdates: normalizeLgUpdates(parsed.lgUpdates),
+      lateEvidenceUploadsEnabled: Boolean(parsed.lateEvidenceUploadsEnabled),
+      lateEvidencePolicyHistory: Array.isArray(parsed.lateEvidencePolicyHistory)
+        ? parsed.lateEvidencePolicyHistory.slice(0, 100)
+        : []
+    };
+    const outcome = (await mutate(data)) || { changed: true };
+    if (outcome.changed === false) return { data, outcome, retries: attempt - 1 };
+    const previousUpdatedAt = Number(row?.updated_at || 0);
+    const nextUpdatedAt = Math.max(Date.now(), previousUpdatedAt + 1);
+    const result = await db
+      .prepare("UPDATE app_data SET data = ?, updated_at = ? WHERE id = 1 AND updated_at = ?")
+      .bind(JSON.stringify(appDataPayload(data)), nextUpdatedAt, previousUpdatedAt)
+      .run();
+    if (Number(result?.meta?.changes || 0) === 1) {
+      return { data, outcome, retries: attempt - 1 };
+    }
+  }
+  const error = new Error("Otro cambio se guardo al mismo tiempo. Task Hub volvera a intentarlo.");
+  error.status = 503;
+  throw error;
+}
+
+async function saveData(db, data) {
+  const payload = appDataPayload(data);
+  const payloadJson = JSON.stringify(payload);
   const now = Date.now();
   const previous = data.__taskSnapshot instanceof Map ? data.__taskSnapshot : new Map();
   const current = createTaskSnapshot(data);
-  const statements = [
-    db
+  const statements = [];
+  let appUpdateIndex = -1;
+  let nextAppUpdatedAt = Number(data.__appDataUpdatedAt || 0);
+  if (payloadJson !== data.__appDataSnapshot) {
+    appUpdateIndex = statements.length;
+    nextAppUpdatedAt = Math.max(now, Number(data.__appDataUpdatedAt || 0) + 1);
+    statements.push(db
       .prepare(
         `UPDATE app_data
-         SET data = ?, updated_at = CASE WHEN updated_at >= ? THEN updated_at + 1 ELSE ? END
-         WHERE id = 1`
+         SET data = ?, updated_at = ?
+         WHERE id = 1 AND updated_at = ?`
       )
-      .bind(JSON.stringify(payload), now, now)
-  ];
+      .bind(payloadJson, nextAppUpdatedAt, Number(data.__appDataUpdatedAt || 0)));
+  }
 
   for (const [taskId, snapshot] of current) {
     const before = previous.get(taskId);
@@ -5238,11 +5456,26 @@ async function saveData(db, data) {
     statements.push(db.prepare("DELETE FROM task_records WHERE id = ?").bind(taskId));
   }
 
-  await db.batch(statements);
+  const results = statements.length ? await db.batch(statements) : [];
+  if (appUpdateIndex >= 0 && Number(results[appUpdateIndex]?.meta?.changes || 0) !== 1) {
+    const error = new Error("La configuracion cambio mientras se guardaba. Vuelve a intentarlo.");
+    error.status = 503;
+    throw error;
+  }
   Object.defineProperty(data, "__taskSnapshot", {
     configurable: true,
     enumerable: false,
     value: current
+  });
+  Object.defineProperty(data, "__appDataSnapshot", {
+    configurable: true,
+    enumerable: false,
+    value: payloadJson
+  });
+  Object.defineProperty(data, "__appDataUpdatedAt", {
+    configurable: true,
+    enumerable: false,
+    value: nextAppUpdatedAt
   });
 }
 

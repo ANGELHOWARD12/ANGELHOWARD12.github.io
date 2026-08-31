@@ -18,7 +18,7 @@ for (const marker of [
 }
 
 for (const marker of [
-  'const APP_VERSION = "49-idempotent-daily-break"',
+  'const APP_VERSION = "50-concurrent-app-actions"',
   "async function ensureTaskHistory",
   "/history`)",
   "task.historyLoaded = true",

@@ -3691,7 +3691,7 @@
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
       const EARLIEST_OVERTIME_START = "05:00";
-      const APP_VERSION = "49-idempotent-daily-break";
+      const APP_VERSION = "50-concurrent-app-actions";
       const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
       const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
       const STATE_REFRESH_INTERVAL_MS = 60 * 1000;
@@ -8331,6 +8331,85 @@
         }
       }
 
+      async function requestAppAction(action, payload, applyOffline = null, messageElement = null) {
+        const mutationId = id();
+        try {
+          const data = await apiRequestWithRetry("/app/action", {
+            method: "POST",
+            body: JSON.stringify({ action, mutationId, ...payload }),
+            allowFallback: true,
+            timeoutMs: 30_000
+          }, 3);
+          applyCloudState(data.state);
+          render();
+          return true;
+        } catch (error) {
+          const transient = !navigator.onLine || !error.status || error.status >= 500;
+          if (!transient || typeof applyOffline !== "function") {
+            if (messageElement) setMessage(messageElement, error.message, "err");
+            else showToast(error.message, "error");
+            return false;
+          }
+          applyOffline(mutationId);
+          saveState();
+          render();
+          showToast("Cambio protegido para sincronizar cuando vuelva la nube.", "success");
+          return true;
+        }
+      }
+
+      function upsertDailyMotivationLocally(dateValue, text) {
+        const existing = state.dailyMotivations.find((item) => item.date === dateValue);
+        if (existing) {
+          existing.text = text;
+          existing.updatedAt = Date.now();
+          existing.updatedById = state.activeUserId;
+          return;
+        }
+        state.dailyMotivations.unshift({
+          date: dateValue,
+          text,
+          updatedAt: Date.now(),
+          updatedById: state.activeUserId
+        });
+      }
+
+      async function reviewRegistrationRequest(request, decision) {
+        if (!isCoordinator() || !request?.id) return false;
+        if (decision === "Aprobada") {
+          try {
+            await apiRequest("/admin/users", {
+              method: "POST",
+              body: JSON.stringify({
+                name: request.name,
+                email: request.email,
+                zone: request.zone,
+                password: request.password
+              })
+            });
+          } catch (error) {
+            if (error.status !== 409) {
+              showToast(error.message, "error");
+              return false;
+            }
+          }
+        }
+        return requestAppAction(
+          "registration-review",
+          { requestId: request.id, decision },
+          decision === "Rechazada" ? () => { request.status = decision; } : null
+        );
+      }
+
+      async function closeRecoveryRequest(request) {
+        if (!isCoordinator() || !request?.id) return false;
+        return requestAppAction(
+          "recovery-close",
+          { requestId: request.id },
+          () => { request.status = "Cerrada"; }
+        );
+      }
+
       async function reassignTask(taskId, newOwnerId, reason) {
         const task = state.tasks.find((item) => item.id === taskId);
         const nextOwner = state.users.find((user) => user.id === newOwnerId && user.role === "Trainer" && user.status === "Activo");
@@ -9537,20 +9616,19 @@
               approveButton.className = "small";
               approveButton.type = "button";
               approveButton.textContent = "Aprobar";
-              approveButton.addEventListener("click", () => {
-                createTrainer(request.name, request.email, request.zone, request.password);
-                request.status = "Aprobada";
-                saveState();
-                render();
+              approveButton.addEventListener("click", async () => {
+                approveButton.disabled = true;
+                await reviewRegistrationRequest(request, "Aprobada");
+                approveButton.disabled = false;
               });
               const rejectButton = document.createElement("button");
               rejectButton.className = "small";
               rejectButton.type = "button";
               rejectButton.textContent = "Rechazar";
-              rejectButton.addEventListener("click", () => {
-                request.status = "Rechazada";
-                saveState();
-                render();
+              rejectButton.addEventListener("click", async () => {
+                rejectButton.disabled = true;
+                await reviewRegistrationRequest(request, "Rechazada");
+                rejectButton.disabled = false;
               });
               actions.append(approveButton, rejectButton);
             }
@@ -9635,7 +9713,6 @@
                 clearButton.textContent = "Ocultar temporal";
                 clearButton.addEventListener("click", () => {
                   user.passwordResetTemp = "";
-                  saveState();
                   render();
                 });
                 actions.appendChild(clearButton);
@@ -9708,16 +9785,18 @@
               actions.appendChild(mailLink);
             }
           }
-          const closeButton = document.createElement("button");
-          closeButton.className = "small";
-          closeButton.type = "button";
-          closeButton.textContent = "Cerrar solicitud";
-          closeButton.addEventListener("click", () => {
-            request.status = "Cerrada";
-            saveState();
-            render();
-          });
-          actions.appendChild(closeButton);
+          if (isCoordinator()) {
+            const closeButton = document.createElement("button");
+            closeButton.className = "small";
+            closeButton.type = "button";
+            closeButton.textContent = "Cerrar solicitud";
+            closeButton.addEventListener("click", async () => {
+              closeButton.disabled = true;
+              await closeRecoveryRequest(request);
+              closeButton.disabled = false;
+            });
+            actions.appendChild(closeButton);
+          }
           els.passwordRecoveryList.appendChild(card);
         });
       }
@@ -10436,25 +10515,16 @@
           els.motivationForm.classList.add("hidden");
         });
 
-        els.motivationForm.addEventListener("submit", (event) => {
+        els.motivationForm.addEventListener("submit", async (event) => {
           event.preventDefault();
-          if (!isPrimaryCoordinator() || !clean(els.motivationInput.value)) return;
-          const existing = state.dailyMotivations.find((item) => item.date === todayIso);
-          if (existing) {
-            existing.text = clean(els.motivationInput.value);
-            existing.updatedAt = Date.now();
-            existing.updatedById = state.activeUserId;
-          } else {
-            state.dailyMotivations.unshift({
-              date: todayIso,
-              text: clean(els.motivationInput.value),
-              updatedAt: Date.now(),
-              updatedById: state.activeUserId
-            });
-          }
-          els.motivationForm.classList.add("hidden");
-          saveState();
-          renderMotivation();
+          const text = clean(els.motivationInput.value);
+          if (!isPrimaryCoordinator() || !text) return;
+          const saved = await requestAppAction(
+            "motivation",
+            { date: todayIso, text },
+            () => upsertDailyMotivationLocally(todayIso, text)
+          );
+          if (saved) els.motivationForm.classList.add("hidden");
         });
 
         els.prevDay.addEventListener("click", () => {
@@ -11232,21 +11302,22 @@
         els.cancelLgUpdateEdit.addEventListener("click", resetLgUpdateEditor);
         els.lgUpdateForm.addEventListener("submit", async (event) => {
           event.preventDefault();
+          const updateId = infoEditingId || id();
           els.saveLgUpdate.disabled = true;
           setMessage(els.lgUpdateMessage, infoEditingId ? "Guardando cambios..." : "Publicando informacion...", "");
           try {
-            const data = await apiRequest("/info/updates", {
+            const data = await apiRequestWithRetry("/info/updates", {
               method: "POST",
               body: JSON.stringify({
                 action: "upsert",
-                id: infoEditingId,
+                id: updateId,
                 line: els.lgUpdateLine.value,
                 type: els.lgUpdateType.value,
                 title: els.lgUpdateTitle.value,
                 product: els.lgUpdateProduct.value,
                 description: els.lgUpdateDescription.value
               })
-            });
+            }, 3);
             applyCloudState(data.state);
             resetLgUpdateEditor();
             renderProducts();
@@ -11262,10 +11333,10 @@
           els.announcementTargetWrap.classList.toggle("hidden", els.announcementAudience.value !== "person");
         });
 
-        els.announcementForm.addEventListener("submit", (event) => {
+        els.announcementForm.addEventListener("submit", async (event) => {
           event.preventDefault();
           if (!isPrimaryCoordinator()) return;
-          state.announcements.unshift({
+          const announcement = {
             id: id(),
             title: clean(els.announcementTitle.value),
             audience: els.announcementAudience.value,
@@ -11274,10 +11345,16 @@
             body: clean(els.announcementBody.value),
             createdById: state.activeUserId,
             createdAt: Date.now()
-          });
-          saveState();
-          els.announcementForm.reset();
-          render();
+          };
+          const submitButton = els.announcementForm.querySelector('button[type="submit"]');
+          if (submitButton) submitButton.disabled = true;
+          const saved = await requestAppAction(
+            "announcement",
+            announcement,
+            () => state.announcements.unshift(announcement)
+          );
+          if (submitButton) submitButton.disabled = false;
+          if (saved) els.announcementForm.reset();
         });
 
         els.refreshStorageStatus.addEventListener("click", async () => {

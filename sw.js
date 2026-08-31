@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-hub-shell-v49-idempotent-daily-break";
+const CACHE_NAME = "task-hub-shell-v50-concurrent-app-actions";
 const APP_SHELL = [
   "/",
   "/index.html",
