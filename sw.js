@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-hub-shell-v52-team-member-retirement";
+const CACHE_NAME = "task-hub-shell-v53-historical-retired-roster";
 const APP_SHELL = [
   "/",
   "/index.html",

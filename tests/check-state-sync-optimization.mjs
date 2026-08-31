@@ -4,7 +4,7 @@ const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const api = fs.readFileSync(new URL("../functions/api/[[path]].js", import.meta.url), "utf8");
 
 for (const marker of [
-  'const SCHEMA_VERSION = "29-scoped-state-sync-1"',
+  'const SCHEMA_VERSION = "30-user-retirement-date-1"',
   "async function readStateVersion(db)",
   'searchParams.get("since")',
   "notModified: true",
@@ -24,7 +24,7 @@ if (/\(route === "state" && request\.method === "GET"\) \|\| route === "storage\
 }
 
 for (const marker of [
-  'const APP_VERSION = "52-team-member-retirement"',
+  'const APP_VERSION = "53-historical-retired-roster"',
   "const STATE_REFRESH_INTERVAL_MS = 60 * 1000",
   "const STATE_REFRESH_JITTER_MS = 15 * 1000",
   "let serverStateVersion = \"\"",

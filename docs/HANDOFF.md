@@ -6,10 +6,10 @@ Actualizado: 2026-08-31
 
 - Producto visible: Task Hub.
 - Snapshot local activo: `publish-v23/`.
-- Candidato local: `APP_VERSION = 52-team-member-retirement`.
-- Cache PWA local: `task-hub-shell-v52-team-member-retirement`.
-- Respuesta `/health` local: `52-team-member-retirement`.
-- Produccion verificada antes de este cambio: `51-team-access-control`, commit `ab8bb97`.
+- Candidato local: `APP_VERSION = 53-historical-retired-roster`.
+- Cache PWA local: `task-hub-shell-v53-historical-retired-roster`.
+- Respuesta `/health` local: `53-historical-retired-roster`.
+- Produccion verificada antes de este cambio: `52-team-member-retirement`, commit `80cd093`.
 - Esquema D1: `29-scoped-state-sync-1`.
 - `index.html` y `operativo.html` son copias exactas.
 - `functions/api/[[path]].js` y `functions/cloud/[[path]].js` son copias exactas.

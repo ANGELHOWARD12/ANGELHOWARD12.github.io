@@ -3691,7 +3691,7 @@
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
       const EARLIEST_OVERTIME_START = "05:00";
-      const APP_VERSION = "52-team-member-retirement";
+      const APP_VERSION = "53-historical-retired-roster";
       const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
       const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
       const STATE_REFRESH_INTERVAL_MS = 60 * 1000;
@@ -8851,9 +8851,17 @@
           </div>
         `;
 
-        const rosterPeople = isObserver()
+        const activeRosterPeople = isObserver()
           ? organizationScopeUsers()
           : assignableUsers();
+        const activeRosterIds = new Set(activeRosterPeople.map((person) => person.id));
+        const historicalRetired = state.users.filter((person) => {
+          if (person.status !== "Retirado" || person.role !== "Trainer" || activeRosterIds.has(person.id)) return false;
+          if (!isObserver() && userTeam(person) !== userTeam(activeUser())) return false;
+          const retiredDate = person.retiredAt ? dateIsoInLima(person.retiredAt) : todayIso;
+          return dateValue < retiredDate && state.tasks.some((task) => task.ownerId === person.id && task.dueDate === dateValue);
+        });
+        const rosterPeople = [...activeRosterPeople, ...historicalRetired];
         rosterPeople.forEach((person) => {
           const personSchedule = workScheduleForDate(dateValue, person.id);
           const tasks = state.tasks

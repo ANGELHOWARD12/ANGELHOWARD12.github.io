@@ -18,7 +18,7 @@ for (const marker of [
 }
 
 for (const marker of [
-  'const APP_VERSION = "52-team-member-retirement"',
+  'const APP_VERSION = "53-historical-retired-roster"',
   "async function ensureTaskHistory",
   "/history`)",
   "task.historyLoaded = true",

@@ -14,7 +14,7 @@ const MAINTENANCE_SETTING_KEY = "storage_maintenance_structured_v1";
 const LEGACY_EVIDENCE_MIGRATION_ENABLED = true;
 const R2_MULTIPART_PART_BYTES = 5 * 1024 * 1024;
 const WEEKLY_BACKUP_RETENTION = 12;
-const SCHEMA_VERSION = "29-scoped-state-sync-1";
+const SCHEMA_VERSION = "30-user-retirement-date-1";
 const OBSERVER_ACCESS_LEVEL = "observer";
 const OBSERVER_EMAIL = "giuliana.parra@lgtask.local";
 const PRIMARY_COORDINATOR_EMAIL = "pablo.ramos@lgtask.local";
@@ -312,7 +312,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "52-team-member-retirement",
+    version: "53-historical-retired-roster",
     schema: SCHEMA_VERSION,
     r2: r2StorageEnabled(env),
     migration: {
@@ -349,7 +349,8 @@ async function ensureSchema(db) {
       status TEXT NOT NULL DEFAULT 'Activo',
       password_hash TEXT NOT NULL,
       password_salt TEXT NOT NULL,
-      created_at INTEGER NOT NULL
+      created_at INTEGER NOT NULL,
+      retired_at INTEGER NOT NULL DEFAULT 0
     )`),
     db.prepare(`CREATE TABLE IF NOT EXISTS sessions (
       token_hash TEXT PRIMARY KEY,
@@ -494,7 +495,8 @@ async function ensureSchema(db) {
   for (const [column, definition] of [
     ["team", "TEXT NOT NULL DEFAULT 'Training'"],
     ["job_title", "TEXT NOT NULL DEFAULT ''"],
-    ["member_type", "TEXT NOT NULL DEFAULT 'trainer'"]
+    ["member_type", "TEXT NOT NULL DEFAULT 'trainer'"],
+    ["retired_at", "INTEGER NOT NULL DEFAULT 0"]
   ]) {
     if (!(userColumns.results || []).some((item) => item.name === column)) {
       try {
@@ -504,6 +506,7 @@ async function ensureSchema(db) {
       }
     }
   }
+  await db.prepare("UPDATE users SET retired_at = ? WHERE status = 'Retirado' AND retired_at = 0").bind(Date.now()).run();
   await db.prepare("CREATE INDEX IF NOT EXISTS idx_users_team_status ON users(team, status, role)").run();
   await db
     .prepare("UPDATE users SET access_level = ?, zone = 'Administracion general', team = 'Todos', job_title = 'Admin', member_type = 'admin' WHERE email = ?")
@@ -4186,7 +4189,7 @@ async function stateResponse(db, user, loadedData = null, knownStateVersion = ""
   const observer = isObserverUser(user);
   const userRows = await db
     .prepare(
-      `SELECT id, name, email, zone, role, status, created_at, access_level, team, job_title, member_type
+      `SELECT id, name, email, zone, role, status, created_at, access_level, team, job_title, member_type, retired_at
        FROM users ORDER BY created_at ASC`
     )
     .all();
@@ -4934,7 +4937,7 @@ async function setUserStatus(request, db, actor) {
     return json({ ok: false, message: "Selecciona un usuario y un estado valido." }, 400);
   }
   const target = await db
-    .prepare("SELECT id, name, email, zone, role, status, access_level, team, job_title, member_type, created_at FROM users WHERE id = ?")
+    .prepare("SELECT id, name, email, zone, role, status, access_level, team, job_title, member_type, created_at, retired_at FROM users WHERE id = ?")
     .bind(userId)
     .first();
   if (!target) return json({ ok: false, message: "Usuario no encontrado." }, 404);
@@ -4946,13 +4949,14 @@ async function setUserStatus(request, db, actor) {
   if (target.status !== nextStatus) {
     const now = Date.now();
     const statements = [
-      db.prepare("UPDATE users SET status = ? WHERE id = ?").bind(nextStatus, target.id),
+      db.prepare("UPDATE users SET status = ?, retired_at = ? WHERE id = ?").bind(nextStatus, retire ? now : 0, target.id),
       db.prepare("UPDATE app_data SET updated_at = CASE WHEN updated_at >= ? THEN updated_at + 1 ELSE ? END WHERE id = 1").bind(now, now)
     ];
     if (retire || !enabled) statements.push(db.prepare("DELETE FROM sessions WHERE user_id = ?").bind(target.id));
     await db.batch(statements);
   }
   target.status = nextStatus;
+  target.retired_at = retire ? Date.now() : 0;
   return json({ ok: true, user: publicUser(target), tasksPreserved: true, retired: retire });
 }
 
@@ -5608,6 +5612,7 @@ function publicUser(row) {
     jobTitle: clean(row.job_title || row.jobTitle) || (observer ? "Admin" : row.role === "Coordinador" ? "Coordinador" : "Trainer"),
     memberType: observer ? "admin" : userMemberType(row),
     status: row.status || "Activo",
+    retiredAt: Number(row.retiredAt || row.retired_at || 0),
     createdAt: Number(row.createdAt || row.created_at || Date.now())
   };
 }
