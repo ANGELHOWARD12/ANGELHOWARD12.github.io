@@ -24,7 +24,7 @@ if (/\(route === "state" && request\.method === "GET"\) \|\| route === "storage\
 }
 
 for (const marker of [
-  'const APP_VERSION = "53-historical-retired-roster"',
+  'const APP_VERSION = "54-access-suspended"',
   "const STATE_REFRESH_INTERVAL_MS = 60 * 1000",
   "const STATE_REFRESH_JITTER_MS = 15 * 1000",
   "let serverStateVersion = \"\"",

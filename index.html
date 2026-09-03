@@ -3691,7 +3691,9 @@
       const DEFAULT_BREAK_START = "12:30";
       const DEFAULT_BREAK_END = "14:00";
       const EARLIEST_OVERTIME_START = "05:00";
-      const APP_VERSION = "53-historical-retired-roster";
+      const APP_VERSION = "54-access-suspended";
+      const ACCESS_SUSPENDED = true;
+      const ACCESS_SUSPENDED_MESSAGE = "El acceso a Task Hub se encuentra temporalmente cerrado. Tus tareas y sustentos permanecen protegidos.";
       const HOURLY_CLOUD_MAINTENANCE_MS = 60 * 60 * 1000;
       const HOURLY_CLOUD_MAINTENANCE_KEY = "task-hub-hourly-cloud-maintenance-v1";
       const STATE_REFRESH_INTERVAL_MS = 60 * 1000;
@@ -10395,8 +10397,19 @@
           }
         });
 
+        if (ACCESS_SUSPENDED) {
+          setMessage(els.loginMessage, ACCESS_SUSPENDED_MESSAGE, "err");
+          [...els.loginForm.elements, ...els.registrationForm.elements].forEach((control) => {
+            control.disabled = true;
+          });
+        }
+
         els.loginForm.addEventListener("submit", async (event) => {
           event.preventDefault();
+          if (ACCESS_SUSPENDED) {
+            setMessage(els.loginMessage, ACCESS_SUSPENDED_MESSAGE, "err");
+            return;
+          }
           const email = clean(els.loginEmail.value).toLowerCase();
           const password = els.loginPassword.value;
 
@@ -10448,6 +10461,10 @@
 
         els.registrationForm.addEventListener("submit", async (event) => {
           event.preventDefault();
+          if (ACCESS_SUSPENDED) {
+            setMessage(els.registrationMessage, ACCESS_SUSPENDED_MESSAGE, "err");
+            return;
+          }
           const email = clean(els.regEmail.value).toLowerCase();
           const role = els.regRole.value;
           setMessage(els.registrationMessage, "Creando cuenta en la nube...", "");

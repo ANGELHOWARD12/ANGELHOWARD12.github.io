@@ -20,6 +20,8 @@ const OBSERVER_EMAIL = "giuliana.parra@lgtask.local";
 const PRIMARY_COORDINATOR_EMAIL = "pablo.ramos@lgtask.local";
 const TEAM_TRAINING = "Training";
 const TEAM_AUDIOVISUAL = "Audiovisuales";
+const ACCESS_SUSPENDED = true;
+const ACCESS_SUSPENDED_MESSAGE = "El acceso a Task Hub se encuentra temporalmente cerrado. La informacion y los sustentos permanecen protegidos.";
 const ORGANIZATION_USERS = [
   {
     id: "org-master-nykol-ruiz",
@@ -205,6 +207,9 @@ export async function onRequest(context) {
       await runMaintenance(env.DB, env);
       return await healthStatus(env.DB, env);
     }
+    if (ACCESS_SUSPENDED) {
+      return json({ ok: false, accessSuspended: true, message: ACCESS_SUSPENDED_MESSAGE }, 423);
+    }
     if (route === "auth/register" && request.method === "POST") return await register(request, env.DB);
     if (route === "auth/login" && request.method === "POST") return await login(request, env.DB);
     if (route === "auth/logout" && request.method === "POST") return await logout(request, env.DB);
@@ -312,8 +317,9 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "53-historical-retired-roster",
+    version: "54-access-suspended",
     schema: SCHEMA_VERSION,
+    accessSuspended: ACCESS_SUSPENDED,
     r2: r2StorageEnabled(env),
     migration: {
       pendingFiles: Number(pendingResult?.results?.[0]?.count || 0),

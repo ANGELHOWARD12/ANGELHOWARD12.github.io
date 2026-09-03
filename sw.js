@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-hub-shell-v53-historical-retired-roster";
+const CACHE_NAME = "task-hub-shell-v54-access-suspended";
 const APP_SHELL = [
   "/",
   "/index.html",
