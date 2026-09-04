@@ -19,7 +19,7 @@ for (const marker of [
 }
 
 for (const marker of [
-  'const APP_VERSION = "55-access-restored"',
+  'const APP_VERSION = "56-access-suspended"',
   "async function requestTaskAction",
   'apiRequest("/tasks/action"',
   'requestTaskAction("start"',

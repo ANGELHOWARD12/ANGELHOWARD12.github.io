@@ -6,11 +6,11 @@ Actualizado: 2026-08-31
 
 - Producto visible: Task Hub.
 - Snapshot local activo: `publish-v23/`.
-- Candidato local: `APP_VERSION = 55-access-restored`.
-- Cache PWA local: `task-hub-shell-v55-access-restored`.
-- Respuesta `/health` local: `55-access-restored`.
-- Acceso global restablecido temporalmente; D1 y R2 permanecen intactos.
-- Produccion verificada antes de este cambio: `54-access-suspended`, commit `c6aa28e`.
+- Candidato local: `APP_VERSION = 56-access-suspended`.
+- Cache PWA local: `task-hub-shell-v56-access-suspended`.
+- Respuesta `/health` local: `56-access-suspended`.
+- Acceso global nuevamente suspendido; D1 y R2 permanecen intactos.
+- Produccion verificada antes de este cambio: `55-access-restored`, commit `4e6f6c2`.
 - Esquema D1: `29-scoped-state-sync-1`.
 - `index.html` y `operativo.html` son copias exactas.
 - `functions/api/[[path]].js` y `functions/cloud/[[path]].js` son copias exactas.

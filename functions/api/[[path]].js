@@ -20,7 +20,7 @@ const OBSERVER_EMAIL = "giuliana.parra@lgtask.local";
 const PRIMARY_COORDINATOR_EMAIL = "pablo.ramos@lgtask.local";
 const TEAM_TRAINING = "Training";
 const TEAM_AUDIOVISUAL = "Audiovisuales";
-const ACCESS_SUSPENDED = false;
+const ACCESS_SUSPENDED = true;
 const ACCESS_SUSPENDED_MESSAGE = "El acceso a Task Hub se encuentra temporalmente cerrado. La informacion y los sustentos permanecen protegidos.";
 const ORGANIZATION_USERS = [
   {
@@ -317,7 +317,7 @@ async function healthStatus(db, env) {
   ]);
   return json({
     ok: true,
-    version: "55-access-restored",
+    version: "56-access-suspended",
     schema: SCHEMA_VERSION,
     accessSuspended: ACCESS_SUSPENDED,
     r2: r2StorageEnabled(env),

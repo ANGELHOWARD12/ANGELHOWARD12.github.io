@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-hub-shell-v55-access-restored";
+const CACHE_NAME = "task-hub-shell-v56-access-suspended";
 const APP_SHELL = [
   "/",
   "/index.html",

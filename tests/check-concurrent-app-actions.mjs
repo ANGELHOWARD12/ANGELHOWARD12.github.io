@@ -3,7 +3,7 @@ import fs from "node:fs";
 const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const api = fs.readFileSync(new URL("../functions/api/[[path]].js", import.meta.url), "utf8");
 
-if (!html.includes('const APP_VERSION = "55-access-restored"')) {
+if (!html.includes('const APP_VERSION = "56-access-suspended"')) {
   throw new Error("La version de la etapa 6 no fue actualizada.");
 }
 
